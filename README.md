@@ -18,3 +18,22 @@ View your app in AI Studio: https://ai.studio/apps/6a1074e0-4705-4048-baf2-fa5b9
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+
+## Projektstruktur
+
+- `.dockerignore`
+- `.env.example`
+- `.gitattributes`
+- `.github/`
+- `.gitignore`
+- `.gitlab-ci.yml`
+- `.gitlab/`
+- `.gitpod.yml`
+- `.npmrc`
+- `Dockerfile`
+- `Prompt.md`
+- `README.md`
+- `aiProviders.ts`
+- `docker-compose.dev.yaml`
+
+_Insgesamt 417 Dateien._
