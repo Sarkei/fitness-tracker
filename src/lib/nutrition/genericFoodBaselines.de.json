@@ -1,0 +1,161 @@
+[
+  {
+    "id": "haehnchenbrust",
+    "name": "Hähnchenbrust, roh",
+    "category": "protein",
+    "nutrients": { "calories": 120, "protein": 22.5, "carbs": 0, "fat": 2.6 }
+  },
+  {
+    "id": "reis_gekocht",
+    "name": "Reis, gekocht",
+    "category": "carbs",
+    "nutrients": { "calories": 130, "protein": 2.7, "carbs": 28, "fat": 0.3 }
+  },
+  {
+    "id": "nudeln_gekocht",
+    "name": "Nudeln, gekocht",
+    "category": "carbs",
+    "nutrients": { "calories": 158, "protein": 5.8, "carbs": 30.9, "fat": 0.9 }
+  },
+  {
+    "id": "apfel",
+    "name": "Apfel",
+    "category": "fruit",
+    "nutrients": { "calories": 52, "protein": 0.3, "carbs": 14, "fat": 0.2 }
+  },
+  {
+    "id": "broetchen",
+    "name": "Brötchen",
+    "category": "bakery",
+    "nutrients": { "calories": 280, "protein": 9, "carbs": 52, "fat": 3.5 }
+  },
+  {
+    "id": "fleischkaese",
+    "name": "Fleischkäse",
+    "category": "protein",
+    "nutrients": { "calories": 280, "protein": 12, "carbs": 3, "fat": 24 }
+  },
+  {
+    "id": "kaese_scheibe",
+    "name": "Käse, Scheibe",
+    "category": "dairy",
+    "nutrients": { "calories": 350, "protein": 22, "carbs": 1, "fat": 28 }
+  },
+  {
+    "id": "rinderhack",
+    "name": "Rinderhackfleisch",
+    "category": "protein",
+    "nutrients": { "calories": 250, "protein": 17, "carbs": 0, "fat": 20 }
+  },
+  {
+    "id": "tomate",
+    "name": "Tomate",
+    "category": "vegetable",
+    "nutrients": { "calories": 18, "protein": 0.9, "carbs": 3.9, "fat": 0.2 }
+  },
+  {
+    "id": "gurke",
+    "name": "Gurke",
+    "category": "vegetable",
+    "nutrients": { "calories": 15, "protein": 0.7, "carbs": 3.6, "fat": 0.1 }
+  },
+  {
+    "id": "salat_blatt",
+    "name": "Blattsalat",
+    "category": "vegetable",
+    "nutrients": { "calories": 15, "protein": 1.4, "carbs": 2.9, "fat": 0.2 }
+  },
+  {
+    "id": "ketchup",
+    "name": "Ketchup",
+    "category": "sauce",
+    "nutrients": { "calories": 112, "protein": 1.8, "carbs": 26, "fat": 0.1 }
+  },
+  {
+    "id": "mayonnaise",
+    "name": "Mayonnaise",
+    "category": "sauce",
+    "nutrients": { "calories": 680, "protein": 1, "carbs": 0.6, "fat": 75 }
+  },
+  {
+    "id": "senf",
+    "name": "Senf",
+    "category": "sauce",
+    "nutrients": { "calories": 66, "protein": 4, "carbs": 5, "fat": 3.5 }
+  },
+  {
+    "id": "wurst_brat",
+    "name": "Bratwurst",
+    "category": "protein",
+    "nutrients": { "calories": 290, "protein": 12, "carbs": 2, "fat": 26 }
+  },
+  {
+    "id": "hotdog_broetchen",
+    "name": "Hotdog-Brötchen",
+    "category": "bakery",
+    "nutrients": { "calories": 280, "protein": 9, "carbs": 50, "fat": 4 }
+  },
+  { "id": "haehnchenbrust_gekocht", "name": "Hähnchenbrust, gekocht", "category": "protein", "nutrients": { "calories": 165, "protein": 31, "carbs": 0, "fat": 3.6 } },
+  { "id": "lachs_roh", "name": "Lachs, roh", "category": "protein", "nutrients": { "calories": 208, "protein": 20, "carbs": 0, "fat": 13 } },
+  { "id": "thunfisch_dose", "name": "Thunfisch in Öl (abgetropft)", "category": "protein", "nutrients": { "calories": 198, "protein": 29, "carbs": 0, "fat": 8 } },
+  { "id": "ei_ganz", "name": "Ei, ganz", "category": "protein", "nutrients": { "calories": 155, "protein": 13, "carbs": 1.1, "fat": 11 } },
+  { "id": "magerquark", "name": "Magerquark", "category": "dairy", "nutrients": { "calories": 67, "protein": 12, "carbs": 4, "fat": 0.3 } },
+  { "id": "joghurt_natur", "name": "Joghurt natur", "category": "dairy", "nutrients": { "calories": 61, "protein": 3.5, "carbs": 4.7, "fat": 3.3 } },
+  { "id": "milch_voll", "name": "Milch 3,5%", "category": "dairy", "nutrients": { "calories": 64, "protein": 3.3, "carbs": 4.8, "fat": 3.5 } },
+  { "id": "butter", "name": "Butter", "category": "dairy", "nutrients": { "calories": 717, "protein": 0.9, "carbs": 0.1, "fat": 81 } },
+  { "id": "olivenoel", "name": "Olivenöl", "category": "sauce", "nutrients": { "calories": 884, "protein": 0, "carbs": 0, "fat": 100 } },
+  { "id": "kartoffeln_gekocht", "name": "Kartoffeln, gekocht", "category": "carbs", "nutrients": { "calories": 87, "protein": 1.9, "carbs": 20, "fat": 0.1 } },
+  { "id": "kartoffeln_roh", "name": "Kartoffeln, roh", "category": "carbs", "nutrients": { "calories": 77, "protein": 2, "carbs": 17, "fat": 0.1 } },
+  { "id": "pommes_frites", "name": "Pommes frites", "category": "carbs", "nutrients": { "calories": 312, "protein": 3.4, "carbs": 41, "fat": 15 } },
+  { "id": "brot_vollkorn", "name": "Vollkornbrot", "category": "bakery", "nutrients": { "calories": 247, "protein": 9, "carbs": 41, "fat": 3.4 } },
+  { "id": "brot_weiss", "name": "Weißbrot", "category": "bakery", "nutrients": { "calories": 265, "protein": 9, "carbs": 49, "fat": 3.2 } },
+  { "id": "haferflocken", "name": "Haferflocken", "category": "carbs", "nutrients": { "calories": 379, "protein": 13, "carbs": 68, "fat": 7 } },
+  { "id": "banane", "name": "Banane", "category": "fruit", "nutrients": { "calories": 89, "protein": 1.1, "carbs": 23, "fat": 0.3 } },
+  { "id": "orange", "name": "Orange", "category": "fruit", "nutrients": { "calories": 47, "protein": 0.9, "carbs": 12, "fat": 0.1 } },
+  { "id": "erdbeeren", "name": "Erdbeeren", "category": "fruit", "nutrients": { "calories": 32, "protein": 0.7, "carbs": 7.7, "fat": 0.3 } },
+  { "id": "zwiebel", "name": "Zwiebel", "category": "vegetable", "nutrients": { "calories": 40, "protein": 1.1, "carbs": 9.3, "fat": 0.1 } },
+  { "id": "paprika", "name": "Paprika", "category": "vegetable", "nutrients": { "calories": 31, "protein": 1, "carbs": 6, "fat": 0.3 } },
+  { "id": "gurke_salat", "name": "Gurkensalat", "category": "vegetable", "nutrients": { "calories": 12, "protein": 0.5, "carbs": 2.2, "fat": 0.1 } },
+  { "id": "brokkoli_gekocht", "name": "Brokkoli, gekocht", "category": "vegetable", "nutrients": { "calories": 35, "protein": 2.4, "carbs": 7, "fat": 0.4 } },
+  { "id": "spinat_roh", "name": "Spinat, roh", "category": "vegetable", "nutrients": { "calories": 23, "protein": 2.9, "carbs": 3.6, "fat": 0.4 } },
+  { "id": "avocado", "name": "Avocado", "category": "fruit", "nutrients": { "calories": 160, "protein": 2, "carbs": 8.5, "fat": 15 } },
+  { "id": "nuesse_mandeln", "name": "Mandeln", "category": "snack", "nutrients": { "calories": 579, "protein": 21, "carbs": 22, "fat": 50 } },
+  { "id": "erdnussbutter", "name": "Erdnussbutter", "category": "snack", "nutrients": { "calories": 588, "protein": 25, "carbs": 20, "fat": 50 } },
+  { "id": "schokolade_milch", "name": "Vollmilchschokolade", "category": "snack", "nutrients": { "calories": 535, "protein": 7.6, "carbs": 59, "fat": 30 } },
+  { "id": "honig", "name": "Honig", "category": "sauce", "nutrients": { "calories": 304, "protein": 0.3, "carbs": 82, "fat": 0 } },
+  { "id": "zucker", "name": "Zucker", "category": "carbs", "nutrients": { "calories": 387, "protein": 0, "carbs": 100, "fat": 0 } },
+  { "id": "linsen_gekocht", "name": "Linsen, gekocht", "category": "protein", "nutrients": { "calories": 116, "protein": 9, "carbs": 20, "fat": 0.4 } },
+  { "id": "kichererbsen_gekocht", "name": "Kichererbsen, gekocht", "category": "protein", "nutrients": { "calories": 164, "protein": 8.9, "carbs": 27, "fat": 2.6 } },
+  { "id": "tofu", "name": "Tofu natur", "category": "protein", "nutrients": { "calories": 76, "protein": 8, "carbs": 1.9, "fat": 4.8 } },
+  { "id": "schinken_gekocht", "name": "Kochschinken", "category": "protein", "nutrients": { "calories": 107, "protein": 18, "carbs": 1.5, "fat": 3.5 } },
+  { "id": "salami", "name": "Salami", "category": "protein", "nutrients": { "calories": 336, "protein": 22, "carbs": 1.5, "fat": 27 } },
+  { "id": "wurst_wiener", "name": "Wiener Würstchen", "category": "protein", "nutrients": { "calories": 290, "protein": 11, "carbs": 2, "fat": 26 } },
+  { "id": "pizza_margherita", "name": "Pizza Margherita (Stück)", "category": "readymeal", "nutrients": { "calories": 250, "protein": 10, "carbs": 30, "fat": 10 } },
+  { "id": "doener_fleisch", "name": "Dönerfleisch (Kalb/Hähnchen)", "category": "protein", "nutrients": { "calories": 215, "protein": 18, "carbs": 3, "fat": 14 } },
+  { "id": "reis_natur_roh", "name": "Reis, roh", "category": "carbs", "nutrients": { "calories": 360, "protein": 7, "carbs": 79, "fat": 0.6 } },
+  { "id": "nudeln_roh", "name": "Nudeln, roh", "category": "carbs", "nutrients": { "calories": 371, "protein": 13, "carbs": 75, "fat": 1.5 } },
+  { "id": "cola", "name": "Cola", "category": "drink", "nutrients": { "calories": 42, "protein": 0, "carbs": 10.6, "fat": 0 } },
+  { "id": "orangensaft", "name": "Orangensaft", "category": "drink", "nutrients": { "calories": 45, "protein": 0.7, "carbs": 10, "fat": 0.2 } },
+  { "id": "kaffee_schwarz", "name": "Kaffee schwarz", "category": "drink", "nutrients": { "calories": 2, "protein": 0.1, "carbs": 0, "fat": 0 } },
+  { "id": "protein_shake", "name": "Proteinshake (Whey, Wasser)", "category": "drink", "nutrients": { "calories": 80, "protein": 18, "carbs": 2, "fat": 0.5 } },
+  { "id": "oliven", "name": "Oliven", "category": "vegetable", "nutrients": { "calories": 115, "protein": 0.8, "carbs": 6, "fat": 11 } },
+  { "id": "mozzarella", "name": "Mozzarella", "category": "dairy", "nutrients": { "calories": 280, "protein": 18, "carbs": 2.2, "fat": 22 } },
+  { "id": "parmesan", "name": "Parmesan", "category": "dairy", "nutrients": { "calories": 431, "protein": 38, "carbs": 4, "fat": 29 } },
+  { "id": "sahne", "name": "Sahne 30%", "category": "dairy", "nutrients": { "calories": 292, "protein": 2.5, "carbs": 3, "fat": 30 } },
+  { "id": "kokosmilch", "name": "Kokosmilch", "category": "sauce", "nutrients": { "calories": 197, "protein": 2.3, "carbs": 3.3, "fat": 21 } },
+  { "id": "sojasauce", "name": "Sojasauce", "category": "sauce", "nutrients": { "calories": 53, "protein": 8, "carbs": 4.9, "fat": 0.1 } },
+  { "id": "essig", "name": "Essig", "category": "sauce", "nutrients": { "calories": 18, "protein": 0, "carbs": 0.9, "fat": 0 } },
+  { "id": "champignons", "name": "Champignons", "category": "vegetable", "nutrients": { "calories": 22, "protein": 3.1, "carbs": 3.3, "fat": 0.3 } },
+  { "id": "karotte", "name": "Karotte", "category": "vegetable", "nutrients": { "calories": 41, "protein": 0.9, "carbs": 10, "fat": 0.2 } },
+  { "id": "mais", "name": "Mais", "category": "vegetable", "nutrients": { "calories": 86, "protein": 3.3, "carbs": 19, "fat": 1.2 } },
+  { "id": "couscous_gekocht", "name": "Couscous, gekocht", "category": "carbs", "nutrients": { "calories": 112, "protein": 3.8, "carbs": 23, "fat": 0.2 } },
+  { "id": "quinoa_gekocht", "name": "Quinoa, gekocht", "category": "carbs", "nutrients": { "calories": 120, "protein": 4.4, "carbs": 21, "fat": 1.9 } },
+  { "id": "fladenbrot", "name": "Fladenbrot", "category": "bakery", "nutrients": { "calories": 275, "protein": 9, "carbs": 50, "fat": 4 } },
+  { "id": "speck", "name": "Speck", "category": "protein", "nutrients": { "calories": 540, "protein": 15, "carbs": 0, "fat": 52 } },
+  { "id": "zitrone", "name": "Zitrone", "category": "fruit", "nutrients": { "calories": 29, "protein": 1.1, "carbs": 9, "fat": 0.3 } },
+  { "id": "falafel", "name": "Falafel", "category": "protein", "nutrients": { "calories": 333, "protein": 13, "carbs": 32, "fat": 18 } },
+  { "id": "hummus", "name": "Hummus", "category": "protein", "nutrients": { "calories": 166, "protein": 8, "carbs": 14, "fat": 10 } },
+  { "id": "sushi_maki", "name": "Sushi Maki", "category": "readymeal", "nutrients": { "calories": 150, "protein": 5, "carbs": 28, "fat": 2 } },
+  { "id": "haehnchenfluegel", "name": "Hähnchenflügel", "category": "protein", "nutrients": { "calories": 203, "protein": 18, "carbs": 0, "fat": 14 } },
+  { "id": "erdnuesse", "name": "Erdnüsse", "category": "snack", "nutrients": { "calories": 567, "protein": 26, "carbs": 16, "fat": 49 } }
+]

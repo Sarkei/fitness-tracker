@@ -1,0 +1,214 @@
+{
+  "cheeseburger": {
+    "aliases": ["cheeseburger", "cheese burger", "burger mit käse"],
+    "label": "Cheeseburger",
+    "components": [
+      { "foodHintDe": "Brötchen", "defaultGrams": 60 },
+      { "foodHintDe": "Rinderhackfleisch", "defaultGrams": 120 },
+      { "foodHintDe": "Käse, Scheibe", "defaultGrams": 20 },
+      { "foodHintDe": "Tomate", "defaultGrams": 30 },
+      { "foodHintDe": "Gurke", "defaultGrams": 20 },
+      { "foodHintDe": "Blattsalat", "defaultGrams": 15 },
+      { "foodHintDe": "Ketchup", "defaultGrams": 15 }
+    ]
+  },
+  "hotdog": {
+    "aliases": ["hotdog", "hot dog", "hot-dog"],
+    "label": "Hotdog",
+    "components": [
+      { "foodHintDe": "Hotdog-Brötchen", "defaultGrams": 50 },
+      { "foodHintDe": "Bratwurst", "defaultGrams": 90 },
+      { "foodHintDe": "Senf", "defaultGrams": 10 }
+    ]
+  },
+  "hamburger": {
+    "aliases": ["hamburger", "burger"],
+    "label": "Hamburger",
+    "components": [
+      { "foodHintDe": "Brötchen", "defaultGrams": 60 },
+      { "foodHintDe": "Rinderhackfleisch", "defaultGrams": 120 },
+      { "foodHintDe": "Tomate", "defaultGrams": 30 },
+      { "foodHintDe": "Blattsalat", "defaultGrams": 15 },
+      { "foodHintDe": "Ketchup", "defaultGrams": 15 }
+    ]
+  },
+  "leberkaessemmel": {
+    "aliases": [
+      "leberkässemmel",
+      "leberkäse semmel",
+      "leberkäsesemmel",
+      "leberkäsesemmeln",
+      "leberkaessemmel",
+      "leberkaessemmeln",
+      "leberkassemmel",
+      "leberkassemmeln",
+      "leberkas semmel",
+      "fleischkassemmel"
+    ],
+    "label": "Leberkässemmel",
+    "components": [
+      { "foodHintDe": "Leberkäse", "defaultGrams": 50 },
+      { "foodHintDe": "Brötchen", "defaultGrams": 60 }
+    ]
+  },
+  "doener": {
+    "aliases": ["döner", "doener", "döner kebab", "doener kebab"],
+    "label": "Döner",
+    "components": [
+      { "foodHintDe": "Dönerfleisch (Kalb/Hähnchen)", "defaultGrams": 150 },
+      { "foodHintDe": "Fladenbrot", "defaultGrams": 80 },
+      { "foodHintDe": "Tomate", "defaultGrams": 40 },
+      { "foodHintDe": "Gurke", "defaultGrams": 30 },
+      { "foodHintDe": "Zwiebel", "defaultGrams": 25 },
+      { "foodHintDe": "Blattsalat", "defaultGrams": 20 },
+      { "foodHintDe": "Joghurt natur", "defaultGrams": 30 }
+    ]
+  },
+  "spaghetti_bolognese": {
+    "aliases": ["spaghetti bolognese", "bolognese", "nudeln mit hackfleischsoße"],
+    "label": "Spaghetti Bolognese",
+    "components": [
+      { "foodHintDe": "Nudeln, gekocht", "defaultGrams": 220 },
+      { "foodHintDe": "Rinderhackfleisch", "defaultGrams": 120 },
+      { "foodHintDe": "Tomate", "defaultGrams": 150 },
+      { "foodHintDe": "Zwiebel", "defaultGrams": 40 },
+      { "foodHintDe": "Olivenöl", "defaultGrams": 10 }
+    ]
+  },
+  "pasta_carbonara": {
+    "aliases": ["carbonara", "pasta carbonara", "spaghetti carbonara"],
+    "label": "Pasta Carbonara",
+    "components": [
+      { "foodHintDe": "Nudeln, gekocht", "defaultGrams": 220 },
+      { "foodHintDe": "Speck", "defaultGrams": 60 },
+      { "foodHintDe": "Ei, ganz", "defaultGrams": 50 },
+      { "foodHintDe": "Parmesan", "defaultGrams": 25 }
+    ]
+  },
+  "caesar_salad": {
+    "aliases": ["caesar salad", "caesar salat", "salat caesar"],
+    "label": "Caesar Salad",
+    "components": [
+      { "foodHintDe": "Blattsalat", "defaultGrams": 80 },
+      { "foodHintDe": "Hähnchenbrust, gekocht", "defaultGrams": 100 },
+      { "foodHintDe": "Parmesan", "defaultGrams": 15 },
+      { "foodHintDe": "Mayonnaise", "defaultGrams": 25 },
+      { "foodHintDe": "Brötchen", "defaultGrams": 30 }
+    ]
+  },
+  "griechischer_salat": {
+    "aliases": ["griechischer salat", "greek salad"],
+    "label": "Griechischer Salat",
+    "components": [
+      { "foodHintDe": "Tomate", "defaultGrams": 120 },
+      { "foodHintDe": "Gurke", "defaultGrams": 80 },
+      { "foodHintDe": "Oliven", "defaultGrams": 30 },
+      { "foodHintDe": "Mozzarella", "defaultGrams": 60 },
+      { "foodHintDe": "Zwiebel", "defaultGrams": 30 },
+      { "foodHintDe": "Olivenöl", "defaultGrams": 15 }
+    ]
+  },
+  "pizza_margherita_stueck": {
+    "aliases": ["pizza margherita", "pizza stück", "stück pizza"],
+    "label": "Pizza Margherita (Stück)",
+    "components": [
+      { "foodHintDe": "Pizza Margherita (Stück)", "defaultGrams": 120 },
+      { "foodHintDe": "Mozzarella", "defaultGrams": 40 },
+      { "foodHintDe": "Tomate", "defaultGrams": 50 }
+    ]
+  },
+  "currywurst": {
+    "aliases": ["currywurst", "curry wurst"],
+    "label": "Currywurst mit Pommes",
+    "components": [
+      { "foodHintDe": "Bratwurst", "defaultGrams": 150 },
+      { "foodHintDe": "Pommes frites", "defaultGrams": 200 },
+      { "foodHintDe": "Ketchup", "defaultGrams": 40 }
+    ]
+  },
+  "schnitzel_pommes": {
+    "aliases": ["schnitzel mit pommes", "wiener schnitzel", "schnitzel pommes"],
+    "label": "Schnitzel mit Pommes",
+    "components": [
+      { "foodHintDe": "Hähnchenbrust, gekocht", "defaultGrams": 180 },
+      { "foodHintDe": "Pommes frites", "defaultGrams": 200 },
+      { "foodHintDe": "Zitrone", "defaultGrams": 20 }
+    ]
+  },
+  "muesli": {
+    "aliases": ["müsli", "muesli", "haferflocken mit milch"],
+    "label": "Müsli mit Milch",
+    "components": [
+      { "foodHintDe": "Haferflocken", "defaultGrams": 50 },
+      { "foodHintDe": "Milch 3,5%", "defaultGrams": 200 },
+      { "foodHintDe": "Banane", "defaultGrams": 80 }
+    ]
+  },
+  "fruehstuecksei": {
+    "aliases": ["frühstücksei", "fruehstuecksei", "spiegelei", "rührei"],
+    "label": "Frühstücksei",
+    "components": [
+      { "foodHintDe": "Ei, ganz", "defaultGrams": 110 },
+      { "foodHintDe": "Butter", "defaultGrams": 10 },
+      { "foodHintDe": "Vollkornbrot", "defaultGrams": 40 }
+    ]
+  },
+  "avocado_toast": {
+    "aliases": ["avocado toast", "avocado auf brot"],
+    "label": "Avocado Toast",
+    "components": [
+      { "foodHintDe": "Vollkornbrot", "defaultGrams": 60 },
+      { "foodHintDe": "Avocado", "defaultGrams": 80 },
+      { "foodHintDe": "Ei, ganz", "defaultGrams": 50 }
+    ]
+  },
+  "club_sandwich": {
+    "aliases": ["club sandwich", "clubsandwich"],
+    "label": "Club Sandwich",
+    "components": [
+      { "foodHintDe": "Vollkornbrot", "defaultGrams": 90 },
+      { "foodHintDe": "Hähnchenbrust, gekocht", "defaultGrams": 80 },
+      { "foodHintDe": "Kochschinken", "defaultGrams": 30 },
+      { "foodHintDe": "Tomate", "defaultGrams": 40 },
+      { "foodHintDe": "Blattsalat", "defaultGrams": 20 },
+      { "foodHintDe": "Mayonnaise", "defaultGrams": 15 }
+    ]
+  },
+  "falafel_teller": {
+    "aliases": ["falafel teller", "falafel mit hummus"],
+    "label": "Falafel Teller",
+    "components": [
+      { "foodHintDe": "Falafel", "defaultGrams": 120 },
+      { "foodHintDe": "Hummus", "defaultGrams": 80 },
+      { "foodHintDe": "Couscous, gekocht", "defaultGrams": 150 },
+      { "foodHintDe": "Blattsalat", "defaultGrams": 40 }
+    ]
+  },
+  "sushi_set": {
+    "aliases": ["sushi set", "maki set", "8 stück sushi"],
+    "label": "Sushi Set",
+    "components": [
+      { "foodHintDe": "Sushi Maki", "defaultGrams": 200 },
+      { "foodHintDe": "Reis, gekocht", "defaultGrams": 120 },
+      { "foodHintDe": "Sojasauce", "defaultGrams": 15 }
+    ]
+  },
+  "pad_thai": {
+    "aliases": ["pad thai", "thai nudeln"],
+    "label": "Pad Thai",
+    "components": [
+      { "foodHintDe": "Nudeln, gekocht", "defaultGrams": 200 },
+      { "foodHintDe": "Hähnchenbrust, gekocht", "defaultGrams": 100 },
+      { "foodHintDe": "Ei, ganz", "defaultGrams": 50 },
+      { "foodHintDe": "Erdnüsse", "defaultGrams": 15 }
+    ]
+  },
+  "chicken_wings": {
+    "aliases": ["chicken wings", "hähnchenflügel", "hot wings"],
+    "label": "Chicken Wings",
+    "components": [
+      { "foodHintDe": "Hähnchenflügel", "defaultGrams": 200 },
+      { "foodHintDe": "Ketchup", "defaultGrams": 30 }
+    ]
+  }
+}

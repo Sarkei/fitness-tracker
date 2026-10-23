@@ -1,0 +1,1982 @@
+{
+  "brotaufstrich müsliriegel": {
+    "grams": 40,
+    "unit": "stk"
+  },
+  "bratwurst mit brötchen": {
+    "grams": 180,
+    "unit": "stk"
+  },
+  "porridge haferflocken": {
+    "grams": 250,
+    "unit": "g"
+  },
+  "berliner pfannkuchen": {
+    "grams": 65,
+    "unit": "stk"
+  },
+  "kichererbsen gekocht": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "griechischer joghurt": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "isotonisches getränk": {
+    "grams": 500,
+    "unit": "ml"
+  },
+  "basmatireis gekocht": {
+    "grams": 180,
+    "unit": "g"
+  },
+  "tomatenmark portion": {
+    "grams": 30,
+    "unit": "g"
+  },
+  "saure kirschen dose": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "mozzarella scheibe": {
+    "grams": 25,
+    "unit": "scheibe"
+  },
+  "hähnchenaufschnitt": {
+    "grams": 20,
+    "unit": "scheibe"
+  },
+  "wassermelone stück": {
+    "grams": 150,
+    "unit": "stk"
+  },
+  "kartoffeln gekocht": {
+    "grams": 200,
+    "unit": "g"
+  },
+  "jasminreis gekocht": {
+    "grams": 180,
+    "unit": "g"
+  },
+  "rinderroulade dose": {
+    "grams": 400,
+    "unit": "g"
+  },
+  "sauerkraut portion": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "mayonnaise portion": {
+    "grams": 15,
+    "unit": "g"
+  },
+  "alkoholfreies bier": {
+    "grams": 330,
+    "unit": "ml"
+  },
+  "schweineschnitzel": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "thunfisch in dose": {
+    "grams": 80,
+    "unit": "g"
+  },
+  "spaghetti gekocht": {
+    "grams": 220,
+    "unit": "g"
+  },
+  "kidneybohnen dose": {
+    "grams": 140,
+    "unit": "g"
+  },
+  "passierte tomaten": {
+    "grams": 200,
+    "unit": "g"
+  },
+  "heringsfilet dose": {
+    "grams": 100,
+    "unit": "g"
+  },
+  "pain au chocolat": {
+    "grams": 70,
+    "unit": "stk"
+  },
+  "belgische waffel": {
+    "grams": 80,
+    "unit": "stk"
+  },
+  "american pancake": {
+    "grams": 70,
+    "unit": "stk"
+  },
+  "pizza margherita": {
+    "grams": 330,
+    "unit": "stk"
+  },
+  "schinken gekocht": {
+    "grams": 20,
+    "unit": "scheibe"
+  },
+  "rueucherschinken": {
+    "grams": 20,
+    "unit": "scheibe"
+  },
+  "hartgekochtes ei": {
+    "grams": 55,
+    "unit": "stk"
+  },
+  "hähnchenschenkel": {
+    "grams": 130,
+    "unit": "g"
+  },
+  "hackfleisch rind": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "wiener schnitzel": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "schweinekotelett": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "thunfisch frisch": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "couscous gekocht": {
+    "grams": 180,
+    "unit": "g"
+  },
+  "champignons dose": {
+    "grams": 140,
+    "unit": "g"
+  },
+  "multivitaminsaft": {
+    "grams": 200,
+    "unit": "ml"
+  },
+  "heiße schokolade": {
+    "grams": 250,
+    "unit": "ml"
+  },
+  "schokolade tafel": {
+    "grams": 40,
+    "unit": "stk"
+  },
+  "mcdonalds burger": {
+    "grams": 200,
+    "unit": "stk"
+  },
+  "mcdonalds pommes": {
+    "grams": 110,
+    "unit": "g"
+  },
+  "mozzarella kugel": {
+    "grams": 125,
+    "unit": "stk"
+  },
+  "büffelmozzarella": {
+    "grams": 125,
+    "unit": "stk"
+  },
+  "rustikales brot": {
+    "grams": 40,
+    "unit": "scheibe"
+  },
+  "tortilla weizen": {
+    "grams": 65,
+    "unit": "stk"
+  },
+  "räucherschinken": {
+    "grams": 20,
+    "unit": "scheibe"
+  },
+  "wurstaufschnitt": {
+    "grams": 20,
+    "unit": "scheibe"
+  },
+  "pute aufschnitt": {
+    "grams": 20,
+    "unit": "scheibe"
+  },
+  "geriebener käse": {
+    "grams": 15,
+    "unit": "g"
+  },
+  "putenbrustfilet": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "fleischbällchen": {
+    "grams": 50,
+    "unit": "stk"
+  },
+  "hamburger patty": {
+    "grams": 120,
+    "unit": "stk"
+  },
+  "chicken nuggets": {
+    "grams": 120,
+    "unit": "g"
+  },
+  "thunfisch steak": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "sashimi portion": {
+    "grams": 120,
+    "unit": "g"
+  },
+  "fusilli gekocht": {
+    "grams": 220,
+    "unit": "g"
+  },
+  "lasagne portion": {
+    "grams": 350,
+    "unit": "g"
+  },
+  "chili con carne": {
+    "grams": 350,
+    "unit": "g"
+  },
+  "maiskörner dose": {
+    "grams": 140,
+    "unit": "g"
+  },
+  "ketchup portion": {
+    "grams": 15,
+    "unit": "g"
+  },
+  "latte macchiato": {
+    "grams": 200,
+    "unit": "ml"
+  },
+  "fruehlingsrolle": {
+    "grams": 50,
+    "unit": "stk"
+  },
+  "vollkorn toast": {
+    "grams": 40,
+    "unit": "scheibe"
+  },
+  "laugenbrötchen": {
+    "grams": 60,
+    "unit": "stk"
+  },
+  "salami scheibe": {
+    "grams": 15,
+    "unit": "scheibe"
+  },
+  "roher schinken": {
+    "grams": 15,
+    "unit": "scheibe"
+  },
+  "parma schinken": {
+    "grams": 15,
+    "unit": "scheibe"
+  },
+  "beeren portion": {
+    "grams": 125,
+    "unit": "stk"
+  },
+  "melonenscheibe": {
+    "grams": 150,
+    "unit": "stk"
+  },
+  "kartoffeln roh": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "kartoffelpüree": {
+    "grams": 200,
+    "unit": "g"
+  },
+  "suesskartoffel": {
+    "grams": 180,
+    "unit": "g"
+  },
+  "erbsen gekocht": {
+    "grams": 120,
+    "unit": "g"
+  },
+  "linsen gekocht": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "fruehstuecksei": {
+    "grams": 55,
+    "unit": "stk"
+  },
+  "fettarme milch": {
+    "grams": 200,
+    "unit": "ml"
+  },
+  "cottage cheese": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "haehnchenbrust": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "chicken breast": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "pute schnitzel": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "schweinebraten": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "hähnchenflügel": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "thunfisch dose": {
+    "grams": 80,
+    "unit": "g"
+  },
+  "fischstaebchen": {
+    "grams": 120,
+    "unit": "g"
+  },
+  "nudeln gekocht": {
+    "grams": 220,
+    "unit": "g"
+  },
+  "bulgur gekocht": {
+    "grams": 180,
+    "unit": "g"
+  },
+  "kartoffelsalat": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "kartoffelchips": {
+    "grams": 30,
+    "unit": "g"
+  },
+  "pfirsiche dose": {
+    "grams": 140,
+    "unit": "g"
+  },
+  "monster energy": {
+    "grams": 250,
+    "unit": "dose"
+  },
+  "frühlingsrolle": {
+    "grams": 50,
+    "unit": "stk"
+  },
+  "marmeladenbrot": {
+    "grams": 60,
+    "unit": "stk"
+  },
+  "protein riegel": {
+    "grams": 60,
+    "unit": "stk"
+  },
+  "hummus portion": {
+    "grams": 80,
+    "unit": "g"
+  },
+  "protein pulver": {
+    "grams": 30,
+    "unit": "g"
+  },
+  "pizzaschnitte": {
+    "grams": 120,
+    "unit": "stk"
+  },
+  "bacon scheibe": {
+    "grams": 15,
+    "unit": "scheibe"
+  },
+  "kartoffel roh": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "kartoffelbrei": {
+    "grams": 200,
+    "unit": "g"
+  },
+  "knoblauchzehe": {
+    "grams": 5,
+    "unit": "stk"
+  },
+  "ingwer frisch": {
+    "grams": 15,
+    "unit": "g"
+  },
+  "joghurt natur": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "crème fraîche": {
+    "grams": 30,
+    "unit": "g"
+  },
+  "creme fraiche": {
+    "grams": 30,
+    "unit": "g"
+  },
+  "hähnchenbrust": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "hähnchenkeule": {
+    "grams": 130,
+    "unit": "g"
+  },
+  "hähnchen ganz": {
+    "grams": 200,
+    "unit": "g"
+  },
+  "grillhähnchen": {
+    "grams": 200,
+    "unit": "g"
+  },
+  "schweinebauch": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "doenerfleisch": {
+    "grams": 120,
+    "unit": "g"
+  },
+  "kebab fleisch": {
+    "grams": 120,
+    "unit": "g"
+  },
+  "chicken wings": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "speckstreifen": {
+    "grams": 40,
+    "unit": "g"
+  },
+  "forellenfilet": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "fischstäbchen": {
+    "grams": 120,
+    "unit": "g"
+  },
+  "pasta gekocht": {
+    "grams": 220,
+    "unit": "g"
+  },
+  "penne gekocht": {
+    "grams": 220,
+    "unit": "g"
+  },
+  "pommes frites": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "suppe portion": {
+    "grams": 300,
+    "unit": "g"
+  },
+  "instant suppe": {
+    "grams": 250,
+    "unit": "ml"
+  },
+  "sardinen dose": {
+    "grams": 90,
+    "unit": "g"
+  },
+  "peperoni glas": {
+    "grams": 30,
+    "unit": "g"
+  },
+  "erdnussbutter": {
+    "grams": 20,
+    "unit": "g"
+  },
+  "honig portion": {
+    "grams": 20,
+    "unit": "g"
+  },
+  "mineralwasser": {
+    "grams": 500,
+    "unit": "ml"
+  },
+  "sprudelwasser": {
+    "grams": 330,
+    "unit": "ml"
+  },
+  "schwarzer tee": {
+    "grams": 250,
+    "unit": "ml"
+  },
+  "protein shake": {
+    "grams": 300,
+    "unit": "ml"
+  },
+  "club sandwich": {
+    "grams": 200,
+    "unit": "g"
+  },
+  "pommes medium": {
+    "grams": 110,
+    "unit": "g"
+  },
+  "tiefkühlpizza": {
+    "grams": 350,
+    "unit": "stk"
+  },
+  "fischbrötchen": {
+    "grams": 250,
+    "unit": "stk"
+  },
+  "toastscheibe": {
+    "grams": 25,
+    "unit": "scheibe"
+  },
+  "vollkornbrot": {
+    "grams": 40,
+    "unit": "scheibe"
+  },
+  "brot scheibe": {
+    "grams": 35,
+    "unit": "scheibe"
+  },
+  "pumpernickel": {
+    "grams": 12,
+    "unit": "stk"
+  },
+  "laugenbrezel": {
+    "grams": 85,
+    "unit": "stk"
+  },
+  "laugenstange": {
+    "grams": 85,
+    "unit": "stk"
+  },
+  "korbbrötchen": {
+    "grams": 60,
+    "unit": "stk"
+  },
+  "kaisersemmel": {
+    "grams": 60,
+    "unit": "stk"
+  },
+  "palatschinke": {
+    "grams": 80,
+    "unit": "stk"
+  },
+  "pizza salami": {
+    "grams": 330,
+    "unit": "stk"
+  },
+  "scheibe käse": {
+    "grams": 30,
+    "unit": "scheibe"
+  },
+  "kaesescheibe": {
+    "grams": 30,
+    "unit": "scheibe"
+  },
+  "fleischkaese": {
+    "grams": 25,
+    "unit": "scheibe"
+  },
+  "kochschinken": {
+    "grams": 20,
+    "unit": "scheibe"
+  },
+  "apfel mittel": {
+    "grams": 170,
+    "unit": "stk"
+  },
+  "ananas stück": {
+    "grams": 120,
+    "unit": "stk"
+  },
+  "süßkartoffel": {
+    "grams": 180,
+    "unit": "g"
+  },
+  "grüne bohnen": {
+    "grams": 120,
+    "unit": "g"
+  },
+  "kichererbsen": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "gekochtes ei": {
+    "grams": 55,
+    "unit": "stk"
+  },
+  "frühstücksei": {
+    "grams": 55,
+    "unit": "stk"
+  },
+  "käse streuer": {
+    "grams": 15,
+    "unit": "g"
+  },
+  "grießpudding": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "schweinehack": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "hackbällchen": {
+    "grams": 50,
+    "unit": "stk"
+  },
+  "burger patty": {
+    "grams": 120,
+    "unit": "stk"
+  },
+  "dönerfleisch": {
+    "grams": 120,
+    "unit": "g"
+  },
+  "lammkotelett": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "miesmuscheln": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "reis gekocht": {
+    "grams": 180,
+    "unit": "g"
+  },
+  "haferflocken": {
+    "grams": 50,
+    "unit": "g"
+  },
+  "french fries": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "tomatensuppe": {
+    "grams": 300,
+    "unit": "g"
+  },
+  "tomaten dose": {
+    "grams": 200,
+    "unit": "g"
+  },
+  "makrele dose": {
+    "grams": 90,
+    "unit": "g"
+  },
+  "ravioli dose": {
+    "grams": 400,
+    "unit": "g"
+  },
+  "senf portion": {
+    "grams": 10,
+    "unit": "g"
+  },
+  "energy drink": {
+    "grams": 250,
+    "unit": "dose"
+  },
+  "proteinshake": {
+    "grams": 300,
+    "unit": "ml"
+  },
+  "schokoriegel": {
+    "grams": 40,
+    "unit": "stk"
+  },
+  "gummibärchen": {
+    "grams": 50,
+    "unit": "g"
+  },
+  "brezel snack": {
+    "grams": 2,
+    "unit": "stk"
+  },
+  "nussmischung": {
+    "grams": 30,
+    "unit": "g"
+  },
+  "kuchen stück": {
+    "grams": 80,
+    "unit": "stk"
+  },
+  "cheeseburger": {
+    "grams": 200,
+    "unit": "stk"
+  },
+  "frozen pizza": {
+    "grams": 350,
+    "unit": "stk"
+  },
+  "riegel müsli": {
+    "grams": 40,
+    "unit": "stk"
+  },
+  "whey portion": {
+    "grams": 30,
+    "unit": "g"
+  },
+  "buttertoast": {
+    "grams": 25,
+    "unit": "scheibe"
+  },
+  "brotscheibe": {
+    "grams": 35,
+    "unit": "scheibe"
+  },
+  "knaeckebrot": {
+    "grams": 12,
+    "unit": "stk"
+  },
+  "pfannkuchen": {
+    "grams": 80,
+    "unit": "stk"
+  },
+  "pizza stück": {
+    "grams": 120,
+    "unit": "stk"
+  },
+  "käsescheibe": {
+    "grams": 30,
+    "unit": "scheibe"
+  },
+  "fleischkäse": {
+    "grams": 25,
+    "unit": "scheibe"
+  },
+  "gurkensalat": {
+    "grams": 100,
+    "unit": "g"
+  },
+  "bohnen grün": {
+    "grams": 120,
+    "unit": "g"
+  },
+  "gewürzgurke": {
+    "grams": 30,
+    "unit": "g"
+  },
+  "speisequark": {
+    "grams": 200,
+    "unit": "g"
+  },
+  "buttermilch": {
+    "grams": 200,
+    "unit": "ml"
+  },
+  "schlagsahne": {
+    "grams": 30,
+    "unit": "g"
+  },
+  "rindfleisch": {
+    "grams": 200,
+    "unit": "g"
+  },
+  "rindersteak": {
+    "grams": 200,
+    "unit": "g"
+  },
+  "nuernberger": {
+    "grams": 90,
+    "unit": "g"
+  },
+  "wildschwein": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "tintenfisch": {
+    "grams": 120,
+    "unit": "g"
+  },
+  "sushi stück": {
+    "grams": 35,
+    "unit": "stk"
+  },
+  "müsliriegel": {
+    "grams": 40,
+    "unit": "stk"
+  },
+  "gemüsesuppe": {
+    "grams": 300,
+    "unit": "g"
+  },
+  "hühnersuppe": {
+    "grams": 300,
+    "unit": "g"
+  },
+  "erbsen dose": {
+    "grams": 140,
+    "unit": "g"
+  },
+  "bohnen dose": {
+    "grams": 140,
+    "unit": "g"
+  },
+  "tomatenmark": {
+    "grams": 30,
+    "unit": "g"
+  },
+  "ananas dose": {
+    "grams": 140,
+    "unit": "g"
+  },
+  "dosennudeln": {
+    "grams": 400,
+    "unit": "g"
+  },
+  "corned beef": {
+    "grams": 80,
+    "unit": "g"
+  },
+  "oliven glas": {
+    "grams": 50,
+    "unit": "g"
+  },
+  "orangensaft": {
+    "grams": 200,
+    "unit": "ml"
+  },
+  "kokoswasser": {
+    "grams": 330,
+    "unit": "ml"
+  },
+  "eis portion": {
+    "grams": 100,
+    "unit": "g"
+  },
+  "torte stück": {
+    "grams": 80,
+    "unit": "stk"
+  },
+  "döner kebab": {
+    "grams": 350,
+    "unit": "g"
+  },
+  "bauernbrot": {
+    "grams": 40,
+    "unit": "scheibe"
+  },
+  "knäckebrot": {
+    "grams": 12,
+    "unit": "stk"
+  },
+  "crispbread": {
+    "grams": 12,
+    "unit": "stk"
+  },
+  "fladenbrot": {
+    "grams": 65,
+    "unit": "stk"
+  },
+  "pizzastück": {
+    "grams": 120,
+    "unit": "stk"
+  },
+  "emmentaler": {
+    "grams": 30,
+    "unit": "scheibe"
+  },
+  "butterkäse": {
+    "grams": 30,
+    "unit": "scheibe"
+  },
+  "schafskäse": {
+    "grams": 30,
+    "unit": "scheibe"
+  },
+  "parmigiano": {
+    "grams": 10,
+    "unit": "scheibe"
+  },
+  "leberkaese": {
+    "grams": 55,
+    "unit": "scheibe"
+  },
+  "mortadella": {
+    "grams": 20,
+    "unit": "scheibe"
+  },
+  "aufschnitt": {
+    "grams": 20,
+    "unit": "scheibe"
+  },
+  "clementine": {
+    "grams": 150,
+    "unit": "stk"
+  },
+  "weintraube": {
+    "grams": 100,
+    "unit": "stk"
+  },
+  "salatgurke": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "blumenkohl": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "spinat roh": {
+    "grams": 80,
+    "unit": "g"
+  },
+  "blattsalat": {
+    "grams": 80,
+    "unit": "g"
+  },
+  "champignon": {
+    "grams": 100,
+    "unit": "g"
+  },
+  "mischpilze": {
+    "grams": 100,
+    "unit": "g"
+  },
+  "maiskolben": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "krautsalat": {
+    "grams": 120,
+    "unit": "g"
+  },
+  "radieschen": {
+    "grams": 60,
+    "unit": "g"
+  },
+  "ei gekocht": {
+    "grams": 55,
+    "unit": "stk"
+  },
+  "magerquark": {
+    "grams": 200,
+    "unit": "g"
+  },
+  "hüttenkäse": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "mascarpone": {
+    "grams": 50,
+    "unit": "g"
+  },
+  "pute brust": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "putenbrust": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "rinderhack": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "grillwurst": {
+    "grams": 100,
+    "unit": "stk"
+  },
+  "currywurst": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "leberwurst": {
+    "grams": 30,
+    "unit": "g"
+  },
+  "nürnberger": {
+    "grams": 90,
+    "unit": "g"
+  },
+  "frikadelle": {
+    "grams": 80,
+    "unit": "stk"
+  },
+  "entenbrust": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "kalbsleber": {
+    "grams": 120,
+    "unit": "g"
+  },
+  "lachsfilet": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "cornflakes": {
+    "grams": 40,
+    "unit": "g"
+  },
+  "reiswaffel": {
+    "grams": 8,
+    "unit": "stk"
+  },
+  "tütensuppe": {
+    "grams": 250,
+    "unit": "ml"
+  },
+  "sauerkraut": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "light cola": {
+    "grams": 330,
+    "unit": "dose"
+  },
+  "weizenbier": {
+    "grams": 500,
+    "unit": "ml"
+  },
+  "cappuccino": {
+    "grams": 200,
+    "unit": "ml"
+  },
+  "kräutertee": {
+    "grams": 250,
+    "unit": "ml"
+  },
+  "milchshake": {
+    "grams": 400,
+    "unit": "ml"
+  },
+  "gummibären": {
+    "grams": 50,
+    "unit": "g"
+  },
+  "chips tüte": {
+    "grams": 40,
+    "unit": "g"
+  },
+  "salzstange": {
+    "grams": 2,
+    "unit": "stk"
+  },
+  "butterkeks": {
+    "grams": 12,
+    "unit": "stk"
+  },
+  "tofu natur": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "öl portion": {
+    "grams": 10,
+    "unit": "ml"
+  },
+  "weissbrot": {
+    "grams": 40,
+    "unit": "scheibe"
+  },
+  "mischbrot": {
+    "grams": 40,
+    "unit": "scheibe"
+  },
+  "broetchen": {
+    "grams": 60,
+    "unit": "stk"
+  },
+  "croissant": {
+    "grams": 70,
+    "unit": "stk"
+  },
+  "leberkäse": {
+    "grams": 55,
+    "unit": "scheibe"
+  },
+  "mandarine": {
+    "grams": 150,
+    "unit": "stk"
+  },
+  "nektarine": {
+    "grams": 150,
+    "unit": "stk"
+  },
+  "zwetschge": {
+    "grams": 60,
+    "unit": "stk"
+  },
+  "feldsalat": {
+    "grams": 80,
+    "unit": "g"
+  },
+  "courgette": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "aubergine": {
+    "grams": 200,
+    "unit": "g"
+  },
+  "knoblauch": {
+    "grams": 5,
+    "unit": "stk"
+  },
+  "spiegelei": {
+    "grams": 110,
+    "unit": "stk"
+  },
+  "vollmilch": {
+    "grams": 200,
+    "unit": "ml"
+  },
+  "margarine": {
+    "grams": 15,
+    "unit": "g"
+  },
+  "entrecôte": {
+    "grams": 200,
+    "unit": "g"
+  },
+  "entrecote": {
+    "grams": 200,
+    "unit": "g"
+  },
+  "rumpsteak": {
+    "grams": 200,
+    "unit": "g"
+  },
+  "schnitzel": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "bratwurst": {
+    "grams": 100,
+    "unit": "stk"
+  },
+  "bockwurst": {
+    "grams": 100,
+    "unit": "stk"
+  },
+  "weißwurst": {
+    "grams": 100,
+    "unit": "stk"
+  },
+  "mettwurst": {
+    "grams": 30,
+    "unit": "g"
+  },
+  "cabanossi": {
+    "grams": 50,
+    "unit": "g"
+  },
+  "spareribs": {
+    "grams": 200,
+    "unit": "g"
+  },
+  "kroketten": {
+    "grams": 100,
+    "unit": "g"
+  },
+  "mais dose": {
+    "grams": 140,
+    "unit": "g"
+  },
+  "marmelade": {
+    "grams": 20,
+    "unit": "g"
+  },
+  "konfitüre": {
+    "grams": 20,
+    "unit": "g"
+  },
+  "sojasauce": {
+    "grams": 15,
+    "unit": "ml"
+  },
+  "coca cola": {
+    "grams": 330,
+    "unit": "dose"
+  },
+  "cola zero": {
+    "grams": 330,
+    "unit": "dose"
+  },
+  "apfelsaft": {
+    "grams": 200,
+    "unit": "ml"
+  },
+  "saft glas": {
+    "grams": 200,
+    "unit": "ml"
+  },
+  "wein glas": {
+    "grams": 125,
+    "unit": "ml"
+  },
+  "sekt glas": {
+    "grams": 100,
+    "unit": "ml"
+  },
+  "eisbecher": {
+    "grams": 100,
+    "unit": "g"
+  },
+  "hamburger": {
+    "grams": 200,
+    "unit": "stk"
+  },
+  "sushi box": {
+    "grams": 400,
+    "unit": "g"
+  },
+  "poke bowl": {
+    "grams": 400,
+    "unit": "g"
+  },
+  "honigbrot": {
+    "grams": 60,
+    "unit": "stk"
+  },
+  "acai bowl": {
+    "grams": 350,
+    "unit": "g"
+  },
+  "guacamole": {
+    "grams": 50,
+    "unit": "g"
+  },
+  "graubrot": {
+    "grams": 40,
+    "unit": "scheibe"
+  },
+  "weißbrot": {
+    "grams": 40,
+    "unit": "scheibe"
+  },
+  "baguette": {
+    "grams": 80,
+    "unit": "stk"
+  },
+  "ciabatta": {
+    "grams": 80,
+    "unit": "stk"
+  },
+  "focaccia": {
+    "grams": 80,
+    "unit": "stk"
+  },
+  "brötchen": {
+    "grams": 60,
+    "unit": "stk"
+  },
+  "schrippe": {
+    "grams": 60,
+    "unit": "stk"
+  },
+  "berliner": {
+    "grams": 70,
+    "unit": "stk"
+  },
+  "tilsiter": {
+    "grams": 30,
+    "unit": "scheibe"
+  },
+  "parmesan": {
+    "grams": 10,
+    "unit": "scheibe"
+  },
+  "schinken": {
+    "grams": 20,
+    "unit": "scheibe"
+  },
+  "pfirsich": {
+    "grams": 150,
+    "unit": "stk"
+  },
+  "erdbeere": {
+    "grams": 125,
+    "unit": "stk"
+  },
+  "himbeere": {
+    "grams": 125,
+    "unit": "stk"
+  },
+  "peperoni": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "zwiebeln": {
+    "grams": 80,
+    "unit": "g"
+  },
+  "brokkoli": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "broccoli": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "zucchini": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "weißkohl": {
+    "grams": 120,
+    "unit": "g"
+  },
+  "kotelett": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "teewurst": {
+    "grams": 30,
+    "unit": "g"
+  },
+  "corn dog": {
+    "grams": 100,
+    "unit": "stk"
+  },
+  "kabeljau": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "seelachs": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "garnelen": {
+    "grams": 120,
+    "unit": "g"
+  },
+  "muscheln": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "calamari": {
+    "grams": 120,
+    "unit": "g"
+  },
+  "couscous": {
+    "grams": 180,
+    "unit": "g"
+  },
+  "porridge": {
+    "grams": 50,
+    "unit": "g"
+  },
+  "limonade": {
+    "grams": 330,
+    "unit": "dose"
+  },
+  "smoothie": {
+    "grams": 300,
+    "unit": "ml"
+  },
+  "red bull": {
+    "grams": 250,
+    "unit": "dose"
+  },
+  "weißwein": {
+    "grams": 125,
+    "unit": "ml"
+  },
+  "prosecco": {
+    "grams": 100,
+    "unit": "ml"
+  },
+  "espresso": {
+    "grams": 200,
+    "unit": "ml"
+  },
+  "powerade": {
+    "grams": 500,
+    "unit": "ml"
+  },
+  "gatorade": {
+    "grams": 500,
+    "unit": "ml"
+  },
+  "erdnüsse": {
+    "grams": 30,
+    "unit": "g"
+  },
+  "lahmacun": {
+    "grams": 250,
+    "unit": "g"
+  },
+  "sandwich": {
+    "grams": 200,
+    "unit": "g"
+  },
+  "powerbar": {
+    "grams": 60,
+    "unit": "stk"
+  },
+  "olivenöl": {
+    "grams": 10,
+    "unit": "ml"
+  },
+  "weckerl": {
+    "grams": 60,
+    "unit": "stk"
+  },
+  "krapfen": {
+    "grams": 70,
+    "unit": "stk"
+  },
+  "cupcake": {
+    "grams": 90,
+    "unit": "stk"
+  },
+  "pancake": {
+    "grams": 70,
+    "unit": "stk"
+  },
+  "cheddar": {
+    "grams": 25,
+    "unit": "scheibe"
+  },
+  "serrano": {
+    "grams": 15,
+    "unit": "scheibe"
+  },
+  "pflaume": {
+    "grams": 60,
+    "unit": "stk"
+  },
+  "avocado": {
+    "grams": 80,
+    "unit": "stk"
+  },
+  "zitrone": {
+    "grams": 60,
+    "unit": "stk"
+  },
+  "limette": {
+    "grams": 60,
+    "unit": "stk"
+  },
+  "tomaten": {
+    "grams": 120,
+    "unit": "g"
+  },
+  "paprika": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "zwiebel": {
+    "grams": 80,
+    "unit": "g"
+  },
+  "karotte": {
+    "grams": 100,
+    "unit": "g"
+  },
+  "rotkohl": {
+    "grams": 120,
+    "unit": "g"
+  },
+  "spargel": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "rettich": {
+    "grams": 80,
+    "unit": "g"
+  },
+  "pickles": {
+    "grams": 30,
+    "unit": "g"
+  },
+  "omelett": {
+    "grams": 110,
+    "unit": "stk"
+  },
+  "joghurt": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "schmand": {
+    "grams": 30,
+    "unit": "g"
+  },
+  "pudding": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "kabanos": {
+    "grams": 50,
+    "unit": "g"
+  },
+  "bulette": {
+    "grams": 80,
+    "unit": "stk"
+  },
+  "nuggets": {
+    "grams": 120,
+    "unit": "g"
+  },
+  "hot dog": {
+    "grams": 100,
+    "unit": "stk"
+  },
+  "forelle": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "makrele": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "scholle": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "shrimps": {
+    "grams": 120,
+    "unit": "g"
+  },
+  "lasagne": {
+    "grams": 350,
+    "unit": "g"
+  },
+  "eintopf": {
+    "grams": 350,
+    "unit": "g"
+  },
+  "gulasch": {
+    "grams": 350,
+    "unit": "g"
+  },
+  "nutella": {
+    "grams": 20,
+    "unit": "g"
+  },
+  "sprudel": {
+    "grams": 330,
+    "unit": "ml"
+  },
+  "ice tea": {
+    "grams": 330,
+    "unit": "dose"
+  },
+  "rotwein": {
+    "grams": 125,
+    "unit": "ml"
+  },
+  "popcorn": {
+    "grams": 40,
+    "unit": "g"
+  },
+  "walnuss": {
+    "grams": 30,
+    "unit": "g"
+  },
+  "mandeln": {
+    "grams": 30,
+    "unit": "g"
+  },
+  "brownie": {
+    "grams": 60,
+    "unit": "stk"
+  },
+  "dueruem": {
+    "grams": 400,
+    "unit": "g"
+  },
+  "burrito": {
+    "grams": 350,
+    "unit": "g"
+  },
+  "big mac": {
+    "grams": 200,
+    "unit": "stk"
+  },
+  "falafel": {
+    "grams": 30,
+    "unit": "stk"
+  },
+  "brezel": {
+    "grams": 85,
+    "unit": "stk"
+  },
+  "semmel": {
+    "grams": 60,
+    "unit": "stk"
+  },
+  "muffin": {
+    "grams": 90,
+    "unit": "stk"
+  },
+  "waffel": {
+    "grams": 80,
+    "unit": "stk"
+  },
+  "edamer": {
+    "grams": 30,
+    "unit": "scheibe"
+  },
+  "salami": {
+    "grams": 15,
+    "unit": "scheibe"
+  },
+  "lyoner": {
+    "grams": 20,
+    "unit": "scheibe"
+  },
+  "banane": {
+    "grams": 120,
+    "unit": "stk"
+  },
+  "orange": {
+    "grams": 150,
+    "unit": "stk"
+  },
+  "traube": {
+    "grams": 100,
+    "unit": "stk"
+  },
+  "tomate": {
+    "grams": 120,
+    "unit": "g"
+  },
+  "moehre": {
+    "grams": 100,
+    "unit": "g"
+  },
+  "spinat": {
+    "grams": 80,
+    "unit": "g"
+  },
+  "rucola": {
+    "grams": 80,
+    "unit": "g"
+  },
+  "erbsen": {
+    "grams": 120,
+    "unit": "g"
+  },
+  "linsen": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "porree": {
+    "grams": 80,
+    "unit": "g"
+  },
+  "oliven": {
+    "grams": 30,
+    "unit": "g"
+  },
+  "rührei": {
+    "grams": 110,
+    "unit": "stk"
+  },
+  "omelet": {
+    "grams": 110,
+    "unit": "stk"
+  },
+  "butter": {
+    "grams": 15,
+    "unit": "g"
+  },
+  "hirsch": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "hotdog": {
+    "grams": 100,
+    "unit": "stk"
+  },
+  "hering": {
+    "grams": 100,
+    "unit": "g"
+  },
+  "matjes": {
+    "grams": 100,
+    "unit": "g"
+  },
+  "muesli": {
+    "grams": 60,
+    "unit": "g"
+  },
+  "pommes": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "roesti": {
+    "grams": 120,
+    "unit": "g"
+  },
+  "borsch": {
+    "grams": 300,
+    "unit": "g"
+  },
+  "wasser": {
+    "grams": 500,
+    "unit": "ml"
+  },
+  "sprite": {
+    "grams": 330,
+    "unit": "dose"
+  },
+  "eistee": {
+    "grams": 330,
+    "unit": "dose"
+  },
+  "radler": {
+    "grams": 330,
+    "unit": "ml"
+  },
+  "kaffee": {
+    "grams": 200,
+    "unit": "ml"
+  },
+  "doener": {
+    "grams": 350,
+    "unit": "g"
+  },
+  "panini": {
+    "grams": 220,
+    "unit": "g"
+  },
+  "burger": {
+    "grams": 200,
+    "unit": "stk"
+  },
+  "tempeh": {
+    "grams": 120,
+    "unit": "g"
+  },
+  "seitan": {
+    "grams": 120,
+    "unit": "g"
+  },
+  "toast": {
+    "grams": 25,
+    "unit": "scheibe"
+  },
+  "breze": {
+    "grams": 85,
+    "unit": "stk"
+  },
+  "donut": {
+    "grams": 65,
+    "unit": "stk"
+  },
+  "crepe": {
+    "grams": 80,
+    "unit": "stk"
+  },
+  "bagel": {
+    "grams": 90,
+    "unit": "stk"
+  },
+  "gouda": {
+    "grams": 30,
+    "unit": "scheibe"
+  },
+  "speck": {
+    "grams": 15,
+    "unit": "scheibe"
+  },
+  "apfel": {
+    "grams": 170,
+    "unit": "stk"
+  },
+  "birne": {
+    "grams": 170,
+    "unit": "stk"
+  },
+  "mango": {
+    "grams": 200,
+    "unit": "stk"
+  },
+  "gurke": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "möhre": {
+    "grams": 100,
+    "unit": "g"
+  },
+  "salat": {
+    "grams": 80,
+    "unit": "g"
+  },
+  "rauke": {
+    "grams": 80,
+    "unit": "g"
+  },
+  "pilze": {
+    "grams": 100,
+    "unit": "g"
+  },
+  "lauch": {
+    "grams": 80,
+    "unit": "g"
+  },
+  "chili": {
+    "grams": 10,
+    "unit": "g"
+  },
+  "quark": {
+    "grams": 200,
+    "unit": "g"
+  },
+  "milch": {
+    "grams": 200,
+    "unit": "ml"
+  },
+  "sahne": {
+    "grams": 30,
+    "unit": "g"
+  },
+  "gyros": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "leber": {
+    "grams": 120,
+    "unit": "g"
+  },
+  "bacon": {
+    "grams": 40,
+    "unit": "g"
+  },
+  "lachs": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "müsli": {
+    "grams": 60,
+    "unit": "g"
+  },
+  "rösti": {
+    "grams": 120,
+    "unit": "g"
+  },
+  "chips": {
+    "grams": 30,
+    "unit": "g"
+  },
+  "ramen": {
+    "grams": 400,
+    "unit": "g"
+  },
+  "pepsi": {
+    "grams": 330,
+    "unit": "dose"
+  },
+  "fanta": {
+    "grams": 330,
+    "unit": "dose"
+  },
+  "kakao": {
+    "grams": 250,
+    "unit": "ml"
+  },
+  "döner": {
+    "grams": 350,
+    "unit": "g"
+  },
+  "dürüm": {
+    "grams": 400,
+    "unit": "g"
+  },
+  "essig": {
+    "grams": 10,
+    "unit": "ml"
+  },
+  "wrap": {
+    "grams": 65,
+    "unit": "stk"
+  },
+  "pita": {
+    "grams": 80,
+    "unit": "stk"
+  },
+  "naan": {
+    "grams": 80,
+    "unit": "stk"
+  },
+  "feta": {
+    "grams": 30,
+    "unit": "scheibe"
+  },
+  "kiwi": {
+    "grams": 75,
+    "unit": "stk"
+  },
+  "mais": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "skyr": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "lamm": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "ente": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "gans": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "ribs": {
+    "grams": 200,
+    "unit": "g"
+  },
+  "maki": {
+    "grams": 35,
+    "unit": "stk"
+  },
+  "mayo": {
+    "grams": 15,
+    "unit": "g"
+  },
+  "cola": {
+    "grams": 330,
+    "unit": "dose"
+  },
+  "bier": {
+    "grams": 500,
+    "unit": "ml"
+  },
+  "pils": {
+    "grams": 500,
+    "unit": "ml"
+  },
+  "keks": {
+    "grams": 12,
+    "unit": "stk"
+  },
+  "taco": {
+    "grams": 120,
+    "unit": "stk"
+  },
+  "reh": {
+    "grams": 150,
+    "unit": "g"
+  },
+  "pho": {
+    "grams": 400,
+    "unit": "g"
+  },
+  "tee": {
+    "grams": 250,
+    "unit": "ml"
+  }
+}

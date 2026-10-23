@@ -1,0 +1,60 @@
+{
+  "description": "Manuelle Regression für Meal-KI (Mistral/Gemini). Für jeden case: POST /api/ai/analyze-meal mit Authorization, Body { \"input\", \"decomposeDish?\", \"imageDataUrl?\" }. Prüfen: JSON parsebar, ingredients exakt aus DB-Namen, Mengen (g/stk) plausibel, keine willkürliche Wurst-/Gebäck-Familie bei eindeutigem Kontext. Optional: POST /api/ai/suggest-custom-food-draft mit { \"query\" }, POST /api/ai/daily-nutrition-review mit aggregierten Tagesdaten.",
+  "analyzeMealCases": [
+    {
+      "id": "de_quantity_slices",
+      "input": "3 Scheiben gekochter Schinken",
+      "decomposeDish": false,
+      "expectNotes": "Eine Zeile oder passende Zerlegung; bei Aufschnitt bevorzugt unit g, Gesamtmasse in der Größenordnung 3× Scheibe."
+    },
+    {
+      "id": "de_quantity_stk",
+      "input": "2 Stück Bratwurst",
+      "decomposeDish": false,
+      "expectNotes": "stk mit ganzer Zahl oder realistische g; keine Grammzahl in stk."
+    },
+    {
+      "id": "multi_independent",
+      "input": "Apfel und Banane",
+      "decomposeDish": false,
+      "expectNotes": "Zwei unabhängige Positionen oder zwei ingredients-Zeilen je nach Modus."
+    },
+    {
+      "id": "decompose_positions",
+      "input": "belegtes Brötchen und eine kleine Pommes",
+      "decomposeDish": true,
+      "expectNotes": "Zwei meal_items oder logisch getrennte Gruppen; kein Gesamtgericht als Zutat unter sich selbst."
+    },
+    {
+      "id": "no_auto_split_compound_name",
+      "input": "Schoko-Sahne-Torte ein Stück",
+      "decomposeDish": false,
+      "expectNotes": "Lieber eine passende Kuchen-/Süßspeisen-Zeile aus der DB als künstlich viele Einzelwörter."
+    },
+    {
+      "id": "typed_list_no_image",
+      "input": "Griechischer Joghurt 150 g, Honig 10 g",
+      "decomposeDish": false,
+      "expectNotes": "Mengen aus dem Text übernehmen; Namen nur aus erlaubter Liste."
+    },
+    {
+      "id": "sandwich_coherence",
+      "input": "Kalter Braten im Weizenbrötchen",
+      "decomposeDish": false,
+      "expectNotes": "Braten/Schweinebraten vs Bratwurst: zum Text passende Kategorie; Kohärenz Gebäck + Belag."
+    }
+  ],
+  "suggestCustomFoodCases": [
+    {
+      "id": "draft_basic",
+      "query": "Hafermilch Barista 1l ungesüßt",
+      "expectNotes": "Gültiges JSON-Draft-Schema; nutrients_per_100g plausibel; category aus FOOD_CATEGORY_LIST."
+    }
+  ],
+  "dailyNutritionReviewCases": [
+    {
+      "id": "review_plain",
+      "expectNotes": "POST mit locale de/en, meals[], consumed{}, Zielen — Antwort nur Klartext mit Gut:/Zu beachten:/Tipp: bzw. englische Überschriften; kein Markdown."
+    }
+  ]
+}

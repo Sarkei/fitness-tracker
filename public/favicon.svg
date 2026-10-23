@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="7" fill="#111111"/>
+  <!-- Stylized V shape representing VRTX -->
+  <polyline points="5,8 12,22 16,14 20,22 27,8" fill="none" stroke="#14b8a6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Accent dot -->
+  <circle cx="16" cy="26" r="1.5" fill="#14b8a6" opacity="0.6"/>
+</svg>
