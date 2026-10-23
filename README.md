@@ -1,23 +1,10 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Fitness Tracker (VRTX)
 
-# Run and deploy your AI Studio app
+Trainings-Tracker mit Übungs- und Satzverwaltung, Sessions, Statistiken und Coach-Logik.
+Frontend React/TypeScript, Backend Node/Express mit PostgreSQL, Start über Docker Compose.
+Playwright-Tests liegen unter `e2e/`.
 
-This contains everything you need to run your app locally.
-
-View your app in AI Studio: https://ai.studio/apps/6a1074e0-4705-4048-baf2-fa5b9b526d9d
-
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+**Technik:** `React` · `TypeScript` · `Express` · `PostgreSQL` · `Docker Compose`
 
 ## Projektstruktur
 
