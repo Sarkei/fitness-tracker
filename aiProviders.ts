@@ -1,5 +1,6 @@
 /**
- * Server-side AI routing: prefer Mistral when configured, fall back to Gemini.
+ * Server-side AI routing. Reihenfolge: aktiver Provider (AI_ACTIVE_PROVIDER), dann
+ * die übrigen konfigurierten Provider als Fallback (Ollama, DeepSeek, Mistral, Gemini).
  */
 
 import { GoogleGenAI } from "@google/genai";
@@ -19,7 +20,7 @@ export let activeProviderOverride: AiProviderName | null = null;
 
 function parseProviderToken(raw: string | undefined | null): AiProviderName | null {
   const t = raw?.trim().toLowerCase();
-  if (t === "ollama" || t === "gemini" || t === "mistral") return t;
+  if (t === "ollama" || t === "deepseek" || t === "gemini" || t === "mistral") return t;
   return null;
 }
 
@@ -64,7 +65,25 @@ export function isOllamaConfigured(): boolean {
   );
 }
 
-const PLACEHOLDER_SUBSTRINGS = ["your_mistral_api_key_here", "your_gemini_api_key_here"];
+const PLACEHOLDER_SUBSTRINGS = [
+  "your_mistral_api_key_here",
+  "your_gemini_api_key_here",
+  "your_deepseek_api_key_here",
+];
+
+/** DeepSeek ist OpenAI-kompatibel; Basis-URL endet ohne /chat/completions. */
+export function getDeepSeekBaseUrl(): string {
+  const url = process.env.DEEPSEEK_BASE_URL?.trim() || "https://api.deepseek.com/v1";
+  return url.replace(/\/+$/, "");
+}
+
+export function getDeepSeekModel(area: AiModelArea): string {
+  return getAiModel("deepseek", area);
+}
+
+export function isDeepSeekConfigured(): boolean {
+  return isConfiguredApiKey(process.env.DEEPSEEK_API_KEY);
+}
 
 export function isConfiguredApiKey(key: string | undefined | null): boolean {
   if (key == null || typeof key !== "string") return false;
@@ -80,28 +99,46 @@ export function resolveAiCapabilities(): {
   enabled: boolean;
   provider: AiProviderName | "none";
   ollamaConfigured: boolean;
+  deepseekConfigured: boolean;
   mistralConfigured: boolean;
   geminiConfigured: boolean;
 } {
   const preferred = syncActiveProviderFromEnv();
 
   const ollamaConfigured = isOllamaConfigured();
+  const deepseekConfigured = isDeepSeekConfigured();
   const mistralConfigured = isConfiguredApiKey(process.env.MISTRAL_API_KEY);
   const geminiConfigured = isConfiguredApiKey(process.env.GEMINI_API_KEY);
   const e2eMock = process.env.COACH_E2E_MOCK === "1";
-  const enabled = ollamaConfigured || mistralConfigured || geminiConfigured || e2eMock;
+  const enabled = ollamaConfigured || deepseekConfigured || mistralConfigured || geminiConfigured || e2eMock;
 
   let provider: AiProviderName | "none" = "none";
   if (preferred === "ollama" && ollamaConfigured) provider = "ollama";
+  else if (preferred === "deepseek" && deepseekConfigured) provider = "deepseek";
   else if (preferred === "gemini" && geminiConfigured) provider = "gemini";
   else if (preferred === "mistral" && mistralConfigured) provider = "mistral";
   // Fallbacks if preferred is not configured
+  else if (deepseekConfigured) provider = "deepseek";
   else if (ollamaConfigured) provider = "ollama";
   else if (mistralConfigured) provider = "mistral";
   else if (geminiConfigured) provider = "gemini";
   else provider = "none";
 
-  return { enabled, provider, ollamaConfigured, mistralConfigured, geminiConfigured };
+  return { enabled, provider, ollamaConfigured, deepseekConfigured, mistralConfigured, geminiConfigured };
+}
+
+/** Reihenfolge: bevorzugter Provider zuerst, danach alle übrigen konfigurierten als Fallback. */
+function buildProviderOrder(caps: ReturnType<typeof resolveAiCapabilities>): AiProviderName[] {
+  const order: AiProviderName[] = [];
+  const preferred = caps.provider;
+  if (preferred === "ollama" || preferred === "deepseek" || preferred === "mistral" || preferred === "gemini") {
+    order.push(preferred);
+  }
+  if (caps.deepseekConfigured && !order.includes("deepseek")) order.push("deepseek");
+  if (caps.ollamaConfigured && !order.includes("ollama")) order.push("ollama");
+  if (caps.mistralConfigured && !order.includes("mistral")) order.push("mistral");
+  if (caps.geminiConfigured && !order.includes("gemini")) order.push("gemini");
+  return order;
 }
 
 /** Validate Ollama reachability and check if the target model is downloaded. */
@@ -237,6 +274,64 @@ async function mistralVision(
   return content;
 }
 
+type DeepSeekMsg = { role: string; content: string };
+
+/**
+ * DeepSeek über die OpenAI-kompatible Chat-Completions-API.
+ * Kein Bild-Eingang: Bildteile werden verworfen, Vision-Anfragen überspringen den Provider.
+ */
+async function deepseekChat(
+  messages: MistralMsg[],
+  jsonObject: boolean,
+  temperature: number,
+  area: AiModelArea,
+): Promise<string> {
+  const key = process.env.DEEPSEEK_API_KEY;
+  if (!isConfiguredApiKey(key)) throw new Error("DEEPSEEK_API_KEY not configured");
+
+  const model = getDeepSeekModel(area);
+  const flat: DeepSeekMsg[] = messages.map((m) => ({
+    role: m.role,
+    content:
+      typeof m.content === "string"
+        ? m.content
+        : m.content
+            .map((part) => (part.type === "text" ? part.text : ""))
+            .join("\n")
+            .trim(),
+  }));
+
+  const body: Record<string, unknown> = {
+    model,
+    messages: flat,
+    temperature,
+    max_tokens: 8000,
+    stream: false,
+  };
+  // deepseek-reasoner unterstützt kein response_format; die Prompts fordern JSON ohnehin im Text.
+  if (jsonObject && !model.includes("reasoner")) {
+    body.response_format = { type: "json_object" };
+  }
+
+  const resp = await fetch(`${getDeepSeekBaseUrl()}/chat/completions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(180_000),
+  });
+
+  if (!resp.ok) {
+    const txt = await resp.text();
+    throw new Error(`DeepSeek error ${resp.status}: ${txt.slice(0, 400)}`);
+  }
+  const data = (await resp.json()) as { choices?: Array<{ message?: { content?: string | null } }> };
+  const content = data.choices?.[0]?.message?.content;
+  if (content == null || String(content).trim() === "") {
+    throw new Error(`DeepSeek empty response (model=${model}, area=${area})`);
+  }
+  return content;
+}
+
 async function geminiGenerate(
   prompt: string,
   inlineImage: { mimeType: string; data: string } | undefined,
@@ -328,6 +423,26 @@ export async function testGeminiApiKey(apiKey: string): Promise<{ ok: true } | {
       return { ok: false, error: `Gemini ${resp.status}: ${txt.slice(0, 200)}` };
     }
     return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** Validate a DeepSeek API key by listing the account's models. */
+export async function testDeepSeekApiKey(apiKey: string | undefined): Promise<{ ok: true; model: string } | { ok: false; error: string }> {
+  if (!isConfiguredApiKey(apiKey)) return { ok: false, error: "Ungültiges API-Key-Format" };
+  const model = "deepseek-chat";
+  try {
+    const resp = await fetch(`${getDeepSeekBaseUrl()}/models`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${apiKey!.trim()}` },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!resp.ok) {
+      const txt = await resp.text();
+      return { ok: false, error: `DeepSeek ${resp.status}: ${txt.slice(0, 200)}` };
+    }
+    return { ok: true, model };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
@@ -433,13 +548,7 @@ async function completeCoachJsonForArea(
   const caps = resolveAiCapabilities();
   if (!caps.enabled) throw new Error("AI features disabled: no AI provider or API keys configured");
 
-  const providerOrder: AiProviderName[] = [];
-  if (caps.provider === "ollama" || caps.provider === "mistral" || caps.provider === "gemini") {
-    providerOrder.push(caps.provider);
-  }
-  if (caps.ollamaConfigured && !providerOrder.includes("ollama")) providerOrder.push("ollama");
-  if (caps.mistralConfigured && !providerOrder.includes("mistral")) providerOrder.push("mistral");
-  if (caps.geminiConfigured && !providerOrder.includes("gemini")) providerOrder.push("gemini");
+  const providerOrder = buildProviderOrder(caps);
 
   const merged = messages.map((m) => `${m.role.toUpperCase()}:\n${m.content}`).join("\n\n---\n\n");
   const geminiPrompt = `${merged}\n\nRespond with ONLY valid JSON (no markdown fences). Use English weekday names in schedule[].day: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday.`;
@@ -449,6 +558,9 @@ async function completeCoachJsonForArea(
     try {
       if (provider === "ollama") {
         return await ollamaChat(messages as MistralMsg[], true, 0.4, area);
+      }
+      if (provider === "deepseek") {
+        return await deepseekChat(messages as MistralMsg[], true, 0.45, area);
       }
       if (provider === "mistral") {
         return await mistralChat(messages as MistralMsg[], true, 0.45, area);
@@ -482,13 +594,7 @@ export async function completeMealAnalysis(
   const responseMode = options?.responseMode ?? "text";
   const wantJson = responseMode === "json_object";
   const area: AiModelArea = image ? "meal_vision" : "meal";
-  const providerOrder: AiProviderName[] = [];
-  if (caps.provider === "ollama" || caps.provider === "mistral" || caps.provider === "gemini") {
-    providerOrder.push(caps.provider);
-  }
-  if (caps.ollamaConfigured && !providerOrder.includes("ollama")) providerOrder.push("ollama");
-  if (caps.mistralConfigured && !providerOrder.includes("mistral")) providerOrder.push("mistral");
-  if (caps.geminiConfigured && !providerOrder.includes("gemini")) providerOrder.push("gemini");
+  const providerOrder = buildProviderOrder(caps);
 
   const geminiPrompt = wantJson ? `${prompt}\n\nRespond with ONLY valid JSON (no markdown fences).` : prompt;
   let lastError: unknown = null;
@@ -509,6 +615,11 @@ export async function completeMealAnalysis(
           return await ollamaChat(messages, wantJson, Math.min(0.55, temp + 0.15), area);
         }
         return await ollamaChat([{ role: "user", content: prompt }], wantJson, temp, area);
+      }
+      if (provider === "deepseek") {
+        // Kein Vision-Modell: bei Fotos den Provider überspringen, damit Gemini/Mistral übernimmt.
+        if (image) throw new Error("DeepSeek unterstützt keine Bildanalyse");
+        return await deepseekChat([{ role: "user", content: prompt }], wantJson, temp, area);
       }
       if (provider === "mistral") {
         if (image) {

@@ -1,5 +1,5 @@
 /**
- * Runtime AI model selection per feature area (Mistral + Gemini).
+ * Runtime AI model selection per feature area (DeepSeek, Mistral, Gemini, Ollama).
  * Values load from process.env; admin can update via .env persistence.
  */
 
@@ -10,7 +10,7 @@ export type AiModelArea =
   | "meal_vision"
   | "workout_template";
 
-export type AiProviderName = "ollama" | "mistral" | "gemini";
+export type AiProviderName = "ollama" | "deepseek" | "mistral" | "gemini";
 
 export const AI_MODEL_AREAS: AiModelArea[] = [
   "coach_workout",
@@ -58,6 +58,12 @@ const MISTRAL_VISION_MODELS: AiModelOption[] = [
   { id: "pixtral-12b-2409", label: "Pixtral 12B" },
 ];
 
+/** DeepSeek: OpenAI-kompatibel. Kein Bild-Eingang — Vision-Bereiche fallen auf andere Provider zurück. */
+const DEEPSEEK_MODELS: AiModelOption[] = [
+  { id: "deepseek-chat", label: "DeepSeek Chat (V3.2, schnell, JSON)" },
+  { id: "deepseek-reasoner", label: "DeepSeek Reasoner (Denkmodell, langsamer)" },
+];
+
 const GEMINI_MODELS: AiModelOption[] = [
   { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash (empfohlen)" },
   { id: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite (schneller)" },
@@ -65,6 +71,14 @@ const GEMINI_MODELS: AiModelOption[] = [
 ];
 
 export const AI_MODEL_SELECT_OPTIONS: Record<AiProviderName, Record<AiModelArea, AiModelOption[]>> = {
+  deepseek: {
+    coach_workout: DEEPSEEK_MODELS,
+    coach_nutrition: DEEPSEEK_MODELS,
+    meal: DEEPSEEK_MODELS,
+    // DeepSeek hat kein Vision-Modell: Auswahl nur als Platzhalter, Bildanalyse überspringt den Provider.
+    meal_vision: DEEPSEEK_MODELS,
+    workout_template: DEEPSEEK_MODELS,
+  },
   ollama: {
     coach_workout: OLLAMA_MODELS,
     coach_nutrition: OLLAMA_MODELS,
@@ -104,6 +118,28 @@ export function getModelSelectOptions(
 
 /** Offizielle Empfehlungen pro Provider & Bereich (Admin-Panel). */
 export const AI_MODEL_RECOMMENDATIONS: Record<AiProviderName, Record<AiModelArea, AiModelRecommendation>> = {
+  deepseek: {
+    coach_workout: {
+      model: "deepseek-chat",
+      hint: "Schnell und günstig, liefert zuverlässig JSON",
+    },
+    coach_nutrition: {
+      model: "deepseek-chat",
+      hint: "Wochenpläne, Makros, Mahlzeiten-Scheduling",
+    },
+    meal: {
+      model: "deepseek-chat",
+      hint: "Zutaten-Parsing aus Text",
+    },
+    meal_vision: {
+      model: "deepseek-chat",
+      hint: "Kein Vision-Modell — Fotos laufen über Gemini oder Mistral",
+    },
+    workout_template: {
+      model: "deepseek-chat",
+      hint: "Strukturierte Workout-Vorlagen (JSON)",
+    },
+  },
   ollama: {
     coach_workout: {
       model: "gemma4:e2b",
@@ -173,6 +209,13 @@ export const AI_MODEL_RECOMMENDATIONS: Record<AiProviderName, Record<AiModelArea
 };
 
 const DEFAULTS: Record<AiProviderName, Record<AiModelArea, string>> = {
+  deepseek: {
+    coach_workout: "deepseek-chat",
+    coach_nutrition: "deepseek-chat",
+    meal: "deepseek-chat",
+    meal_vision: "deepseek-chat",
+    workout_template: "deepseek-chat",
+  },
   ollama: {
     coach_workout: "gemma4:e2b",
     coach_nutrition: "gemma4:e2b",
@@ -243,6 +286,7 @@ export function getAiModel(provider: AiProviderName, area: AiModelArea): string 
 
 export function getAllAiModels(): Record<AiProviderName, Record<AiModelArea, string>> {
   return {
+    deepseek: Object.fromEntries(AI_MODEL_AREAS.map((a) => [a, getAiModel("deepseek", a)])) as Record<AiModelArea, string>,
     ollama: Object.fromEntries(AI_MODEL_AREAS.map((a) => [a, getAiModel("ollama", a)])) as Record<AiModelArea, string>,
     mistral: Object.fromEntries(AI_MODEL_AREAS.map((a) => [a, getAiModel("mistral", a)])) as Record<AiModelArea, string>,
     gemini: Object.fromEntries(AI_MODEL_AREAS.map((a) => [a, getAiModel("gemini", a)])) as Record<AiModelArea, string>,
@@ -256,6 +300,7 @@ export function getRecommendedModels(): typeof AI_MODEL_RECOMMENDATIONS {
 export function defaultAiModels(): typeof DEFAULTS {
   return {
     ...DEFAULTS,
+    deepseek: { ...DEFAULTS.deepseek },
     ollama: { ...DEFAULTS.ollama },
     mistral: { ...DEFAULTS.mistral },
     gemini: { ...DEFAULTS.gemini },

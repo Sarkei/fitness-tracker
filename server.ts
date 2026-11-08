@@ -10,6 +10,7 @@ import {
   syncActiveProviderFromEnv,
   testMistralApiKey,
   testGeminiApiKey,
+  testDeepSeekApiKey,
   testOllamaConnection,
   pullOllamaModel,
   getOllamaBaseUrl,
@@ -962,6 +963,7 @@ async function startServer(): Promise<void> {
       enabled: caps.enabled,
       provider: caps.provider,
       ollamaConfigured: caps.ollamaConfigured,
+      deepseekConfigured: caps.deepseekConfigured,
       mistralConfigured: caps.mistralConfigured,
       geminiConfigured: caps.geminiConfigured,
       activeOverride: getActiveProviderOverride(),
@@ -5190,18 +5192,21 @@ ${JSON.stringify(userCtx, null, 2)}
     const caps = resolveAiCapabilities();
     const mistralMasked = maskSecret(process.env.MISTRAL_API_KEY);
     const geminiMasked = maskSecret(process.env.GEMINI_API_KEY);
+    const deepseekMasked = maskSecret(process.env.DEEPSEEK_API_KEY);
     const models = getAllAiModels();
     res.json({
       active: caps.provider,
       ollamaConfigured: caps.ollamaConfigured,
       geminiConfigured: caps.geminiConfigured,
       mistralConfigured: caps.mistralConfigured,
+      deepseekConfigured: caps.deepseekConfigured,
       ollama: {
         baseUrl: getOllamaBaseUrl(),
         model: getLocalLlmModel(),
         configured: caps.ollamaConfigured,
       },
       keys: {
+        deepseek: { configured: caps.deepseekConfigured, masked: deepseekMasked },
         mistral: { configured: caps.mistralConfigured, masked: mistralMasked },
         gemini: { configured: caps.geminiConfigured, masked: geminiMasked },
       },
@@ -5213,11 +5218,13 @@ ${JSON.stringify(userCtx, null, 2)}
           label: AI_MODEL_AREA_LABELS[id],
           recommended: {
             ollama: AI_MODEL_RECOMMENDATIONS.ollama[id],
+            deepseek: AI_MODEL_RECOMMENDATIONS.deepseek[id],
             mistral: AI_MODEL_RECOMMENDATIONS.mistral[id],
             gemini: AI_MODEL_RECOMMENDATIONS.gemini[id],
           },
           options: {
             ollama: getModelSelectOptions("ollama", id, models.ollama[id]),
+            deepseek: getModelSelectOptions("deepseek", id, models.deepseek[id]),
             mistral: getModelSelectOptions("mistral", id, models.mistral[id]),
             gemini: getModelSelectOptions("gemini", id, models.gemini[id]),
           },
@@ -5242,26 +5249,25 @@ ${JSON.stringify(userCtx, null, 2)}
 
   app.post("/api/admin/ai-config", requireAdmin, async (req, res) => {
     const { provider } = req.body as { provider?: string };
-    if (provider !== "ollama" && provider !== "gemini" && provider !== "mistral") {
-      res.status(400).json({ ok: false, error: "Ungültiger Provider (ollama|mistral|gemini)" });
+    if (provider !== "ollama" && provider !== "deepseek" && provider !== "gemini" && provider !== "mistral") {
+      res.status(400).json({ ok: false, error: "Ungültiger Provider (ollama|deepseek|mistral|gemini)" });
       return;
     }
     const capsBefore = resolveAiCapabilities();
     const previousOverride = getActiveProviderOverride();
-    const previousActive: "ollama" | "gemini" | "mistral" | null =
-      previousOverride ??
-      (capsBefore.provider === "ollama" || capsBefore.provider === "gemini" || capsBefore.provider === "mistral"
-        ? capsBefore.provider
-        : null);
+    const previousActive: AiProviderName | null =
+      previousOverride ?? (capsBefore.provider !== "none" ? capsBefore.provider : null);
 
     setActiveProviderOverride(provider);
 
     const test =
       provider === "ollama"
         ? await testOllamaConnection()
-        : provider === "mistral"
-          ? await testMistralApiKey(process.env.MISTRAL_API_KEY ?? "")
-          : await testGeminiApiKey(process.env.GEMINI_API_KEY ?? "");
+        : provider === "deepseek"
+          ? await testDeepSeekApiKey(process.env.DEEPSEEK_API_KEY ?? "")
+          : provider === "mistral"
+            ? await testMistralApiKey(process.env.MISTRAL_API_KEY ?? "")
+            : await testGeminiApiKey(process.env.GEMINI_API_KEY ?? "");
 
     if (!test.ok) {
       setActiveProviderOverride(previousOverride);
@@ -5269,10 +5275,7 @@ ${JSON.stringify(userCtx, null, 2)}
       res.status(400).json({
         ok: false,
         error: "error" in test ? test.error : "KI-Test fehlgeschlagen",
-        active:
-          capsAfter.provider === "ollama" || capsAfter.provider === "gemini" || capsAfter.provider === "mistral"
-            ? capsAfter.provider
-            : previousActive,
+        active: capsAfter.provider !== "none" ? capsAfter.provider : previousActive,
         reverted: true,
       });
       return;
@@ -5297,35 +5300,46 @@ ${JSON.stringify(userCtx, null, 2)}
 
   app.post("/api/admin/ai-keys/test", requireAdmin, async (req, res) => {
     const { provider, apiKey } = req.body as { provider?: string; apiKey?: string };
-    if (!apiKey?.trim() || (provider !== "mistral" && provider !== "gemini")) {
-      res.status(400).json({ ok: false, error: "provider (mistral|gemini) und apiKey erforderlich" });
+    if (!apiKey?.trim() || (provider !== "deepseek" && provider !== "mistral" && provider !== "gemini")) {
+      res.status(400).json({ ok: false, error: "provider (deepseek|mistral|gemini) und apiKey erforderlich" });
       return;
     }
     const result =
-      provider === "mistral" ? await testMistralApiKey(apiKey) : await testGeminiApiKey(apiKey);
+      provider === "deepseek"
+        ? await testDeepSeekApiKey(apiKey)
+        : provider === "mistral"
+          ? await testMistralApiKey(apiKey)
+          : await testGeminiApiKey(apiKey);
     if (result.ok) res.json({ ok: true, provider });
     else res.status(400).json({ ok: false, error: "error" in result ? result.error : "Unbekannter Fehler" });
   });
 
   app.post("/api/admin/ai-keys", requireAdmin, async (req, res) => {
     const { provider, apiKey } = req.body as { provider?: string; apiKey?: string };
-    if (!apiKey?.trim() || (provider !== "mistral" && provider !== "gemini")) {
-      res.status(400).json({ ok: false, error: "provider (mistral|gemini) und apiKey erforderlich" });
+    if (!apiKey?.trim() || (provider !== "deepseek" && provider !== "mistral" && provider !== "gemini")) {
+      res.status(400).json({ ok: false, error: "provider (deepseek|mistral|gemini) und apiKey erforderlich" });
       return;
     }
     const test =
-      provider === "mistral" ? await testMistralApiKey(apiKey) : await testGeminiApiKey(apiKey);
+      provider === "deepseek"
+        ? await testDeepSeekApiKey(apiKey)
+        : provider === "mistral"
+          ? await testMistralApiKey(apiKey)
+          : await testGeminiApiKey(apiKey);
     if (!test.ok) {
       res.status(400).json({ ok: false, error: "error" in test ? test.error : "Unbekannter Fehler" });
       return;
     }
-    const envKey = provider === "mistral" ? "MISTRAL_API_KEY" : "GEMINI_API_KEY";
+    const envKey =
+      provider === "deepseek" ? "DEEPSEEK_API_KEY" : provider === "mistral" ? "MISTRAL_API_KEY" : "GEMINI_API_KEY";
     try {
       upsertEnvVar(envKey, apiKey.trim());
+      reloadEnvFromFile();
       const caps = resolveAiCapabilities();
       res.json({
         ok: true,
         provider,
+        deepseekConfigured: caps.deepseekConfigured,
         geminiConfigured: caps.geminiConfigured,
         mistralConfigured: caps.mistralConfigured,
       });
@@ -5377,7 +5391,7 @@ ${JSON.stringify(userCtx, null, 2)}
       return;
     }
     try {
-      for (const provider of ["ollama", "mistral", "gemini"] as const) {
+      for (const provider of ["ollama", "deepseek", "mistral", "gemini"] as const) {
         const areaMap = models[provider];
         if (!areaMap) continue;
         for (const area of AI_MODEL_AREAS) {

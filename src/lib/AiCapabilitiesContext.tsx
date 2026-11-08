@@ -7,12 +7,13 @@ import {
   type ReactNode,
 } from 'react';
 
-export type AiProviderName = 'ollama' | 'mistral' | 'gemini' | 'none';
+export type AiProviderName = 'ollama' | 'deepseek' | 'mistral' | 'gemini' | 'none';
 
 export interface AiCapabilitiesValue {
   enabled: boolean;
   provider: AiProviderName;
   ollamaConfigured: boolean;
+  deepseekConfigured: boolean;
   mistralConfigured: boolean;
   geminiConfigured: boolean;
   loading: boolean;
@@ -25,6 +26,7 @@ export function AiCapabilitiesProvider({ children }: { children: ReactNode }) {
   const [enabled, setEnabled] = useState(false);
   const [provider, setProvider] = useState<AiProviderName>('none');
   const [ollamaConfigured, setOllamaConfigured] = useState(false);
+  const [deepseekConfigured, setDeepseekConfigured] = useState(false);
   const [mistralConfigured, setMistralConfigured] = useState(false);
   const [geminiConfigured, setGeminiConfigured] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -36,22 +38,28 @@ export function AiCapabilitiesProvider({ children }: { children: ReactNode }) {
         enabled?: boolean;
         provider?: string;
         ollamaConfigured?: boolean;
+        deepseekConfigured?: boolean;
         mistralConfigured?: boolean;
         geminiConfigured?: boolean;
       };
       const p =
-        data.provider === 'ollama' || data.provider === 'mistral' || data.provider === 'gemini'
+        data.provider === 'ollama' ||
+        data.provider === 'deepseek' ||
+        data.provider === 'mistral' ||
+        data.provider === 'gemini'
           ? data.provider
           : 'none';
       setEnabled(Boolean(data.enabled));
       setProvider(p);
       setOllamaConfigured(Boolean(data.ollamaConfigured));
+      setDeepseekConfigured(Boolean(data.deepseekConfigured));
       setMistralConfigured(Boolean(data.mistralConfigured));
       setGeminiConfigured(Boolean(data.geminiConfigured));
     } catch {
       setEnabled(false);
       setProvider('none');
       setOllamaConfigured(false);
+      setDeepseekConfigured(false);
       setMistralConfigured(false);
       setGeminiConfigured(false);
     } finally {
@@ -67,6 +75,7 @@ export function AiCapabilitiesProvider({ children }: { children: ReactNode }) {
     enabled,
     provider,
     ollamaConfigured,
+    deepseekConfigured,
     mistralConfigured,
     geminiConfigured,
     loading,

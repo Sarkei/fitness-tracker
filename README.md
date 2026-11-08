@@ -62,7 +62,7 @@ Web-App für Krafttraining und Ernährung: Live-Sessions werden satzweise protok
 
 **Datenbank:** PostgreSQL 16, unter anderem `users`, `workouts`, `workout_templates`, `nutrition`, `nutrition_log_components`, `meal_templates`, `user_custom_foods`, `posts`, `post_comments`, `user_follows`, `user_blocks`, `post_reports`, `direct_messages`, `password_reset_tokens`, `coach_plans`, `coach_weekly_schedules`, `coach_weekly_reports`, `user_weekly_reports`, `exercise_name_localizations`, `coach_ai_runs`, `meal_ai_runs`. Likes liegen als Integer-Array in `posts`, große Profilteile als JSONB (`measurements`, `goals`, `profile_extras`, `weight_history`).
 
-**KI:** `aiProviders.ts` kennt drei Provider: Ollama (Standard, lokales Modell), Mistral und Gemini. Auswahl über `AI_ACTIVE_PROVIDER` oder das Admin-Panel, Modell-Overrides pro Bereich (`AI_<PROVIDER>_MODEL_<AREA>`). Prompts sind Markdown-Dateien in `prompts/` mit `{{…}}`-Platzhaltern und werden zur Laufzeit geladen.
+**KI:** `aiProviders.ts` kennt vier Provider: DeepSeek (Standard, OpenAI-kompatible API), Ollama (lokales Modell, Compose-Profil `ollama`), Mistral und Gemini. Auswahl über `AI_ACTIVE_PROVIDER` oder das Admin-Panel, Modell-Overrides pro Bereich (`AI_<PROVIDER>_MODEL_<AREA>`). Fällt der aktive Provider aus, probiert der Server die übrigen konfigurierten der Reihe nach. DeepSeek hat kein Vision-Modell — Foto-Analyse (`meal_vision`) überspringt ihn und braucht Gemini oder Mistral. Prompts sind Markdown-Dateien in `prompts/` mit `{{…}}`-Platzhaltern und werden zur Laufzeit geladen.
 
 ## Projektstruktur
 
@@ -141,9 +141,10 @@ Alle Variablen stehen in `.env.example`; `server.ts` liest sie über `process.en
 | `ALLOW_DEV_RESET_LINK` | Reset-Link in der API-Antwort, wenn kein SMTP konfiguriert ist |
 | `EXERCISEDB_RAPIDAPI_KEY` | ExerciseDB-Zugang (Suche, GIF/Video); ohne Key 503 |
 | `EXERCISEDB_RAPIDAPI_HOST` | Host des ExerciseDB-Anbieters (Default AscendAPI V2) |
-| `OLLAMA_BASE_URL`, `LOCAL_LLM_MODEL`, `OLLAMA_PORT`, `OLLAMA_NUM_CTX` | lokales Modell und Kontextlänge |
-| `AI_ACTIVE_PROVIDER` | `ollama` (Default), `mistral` oder `gemini` |
-| `MISTRAL_API_KEY`, `GEMINI_API_KEY` | optionale Cloud-Provider |
+| `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL` | DeepSeek (Default-Provider, Basis-URL inkl. `/v1`) |
+| `OLLAMA_BASE_URL`, `LOCAL_LLM_MODEL`, `OLLAMA_PORT`, `OLLAMA_NUM_CTX` | lokales Modell und Kontextlänge (nur mit Compose-Profil `ollama`) |
+| `AI_ACTIVE_PROVIDER` | `deepseek` (Default), `ollama`, `mistral` oder `gemini` |
+| `MISTRAL_API_KEY`, `GEMINI_API_KEY` | optionale weitere Cloud-Provider |
 | `COACH_WORKOUT_MAX_RETRIES` | KI-Neuversuche bei Schema-/Constraint-Fehlern (Default 3, max. 5) |
 | `AI_<PROVIDER>_MODEL_<AREA>` | Modell-Override pro Bereich, z. B. `AI_OLLAMA_MODEL_COACH_WORKOUT` |
 | `ADMIN_USERNAME`, `ADMIN_PASSWORD` | Basic-Auth für `/admin` (Default `admin`/`admin`) |

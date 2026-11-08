@@ -1942,6 +1942,7 @@ export const MESSAGES: Record<string, { de: string; en: string }> = {
   'coach.header.ai': { de: 'KI-Coach', en: 'AI coach' },
   'coach.ai.loading': { de: 'KI-Status wird geladen…', en: 'Loading AI status…' },
   'coach.ai.ollama': { de: 'Lokales Modell (Ollama · Gemma 4 E2B)', en: 'Local Model (Ollama · Gemma 4 E2B)' },
+  'coach.ai.deepseek': { de: 'DeepSeek (V3.2) · API', en: 'DeepSeek (V3.2) · API' },
   'coach.ai.mistral': { de: 'Mistral (Primär) · Fallback Gemini', en: 'Mistral (primary) · Gemini fallback' },
   'coach.ai.gemini': { de: 'Google Gemini', en: 'Google Gemini' },
   'coach.ai.disabled': { de: 'KI deaktiviert — kein Modell verfügbar', en: 'AI disabled — no model available' },
@@ -1951,6 +1952,10 @@ export const MESSAGES: Record<string, { de: string; en: string }> = {
   'coach.gen.ollama': {
     de: 'Lokales Gemma-Modell erzeugt deinen Plan…',
     en: 'Local Gemma model is generating your plan…',
+  },
+  'coach.gen.deepseek': {
+    de: 'DeepSeek erzeugt deinen Plan…',
+    en: 'DeepSeek is generating your plan…',
   },
   'coach.gen.mistral': {
     de: 'KI erzeugt deinen Plan…',

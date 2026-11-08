@@ -2159,9 +2159,11 @@ export default function CoachPage({ planType, deepLink, autoStartOnboarding }: C
     setCreateMsg(
       aiCaps.provider === 'ollama'
         ? t('coach.gen.ollama')
-        : aiCaps.provider === 'mistral'
-          ? t('coach.gen.mistral')
-          : t('coach.gen.gemini'),
+        : aiCaps.provider === 'deepseek'
+          ? t('coach.gen.deepseek')
+          : aiCaps.provider === 'mistral'
+            ? t('coach.gen.mistral')
+            : t('coach.gen.gemini'),
     );
     let planId: string | null = null;
     try {
@@ -2270,9 +2272,11 @@ export default function CoachPage({ planType, deepLink, autoStartOnboarding }: C
               : aiCaps.enabled
                 ? aiCaps.provider === 'ollama'
                   ? t('coach.ai.ollama')
-                  : aiCaps.provider === 'mistral'
-                    ? t('coach.ai.mistral')
-                    : t('coach.ai.gemini')
+                  : aiCaps.provider === 'deepseek'
+                    ? t('coach.ai.deepseek')
+                    : aiCaps.provider === 'mistral'
+                      ? t('coach.ai.mistral')
+                      : t('coach.ai.gemini')
                 : t('coach.ai.disabled')}
           </p>
         </div>

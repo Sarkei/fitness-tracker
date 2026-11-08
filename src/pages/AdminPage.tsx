@@ -23,19 +23,22 @@ interface AiAreaMeta {
   label: string;
   recommended: {
     ollama: AiModelRecommendation;
+    deepseek: AiModelRecommendation;
     mistral: AiModelRecommendation;
     gemini: AiModelRecommendation;
   };
   options?: {
     ollama: AiModelOptionDto[];
+    deepseek: AiModelOptionDto[];
     mistral: AiModelOptionDto[];
     gemini: AiModelOptionDto[];
   };
 }
 
 interface AiConfigState {
-  active: 'ollama' | 'gemini' | 'mistral' | 'none';
+  active: 'ollama' | 'deepseek' | 'gemini' | 'mistral' | 'none';
   ollamaConfigured: boolean;
+  deepseekConfigured: boolean;
   geminiConfigured: boolean;
   mistralConfigured: boolean;
   ollama?: {
@@ -44,11 +47,13 @@ interface AiConfigState {
     configured: boolean;
   };
   keys: {
+    deepseek: { configured: boolean; masked?: string | null };
     mistral: { configured: boolean; masked?: string | null };
     gemini: { configured: boolean; masked?: string | null };
   };
   models: {
     ollama: Record<AiModelArea, string>;
+    deepseek: Record<AiModelArea, string>;
     mistral: Record<AiModelArea, string>;
     gemini: Record<AiModelArea, string>;
   };
@@ -56,6 +61,13 @@ interface AiConfigState {
 }
 
 const DEFAULT_AI_MODELS: AiConfigState['models'] = {
+  deepseek: {
+    coach_workout: 'deepseek-chat',
+    coach_nutrition: 'deepseek-chat',
+    meal: 'deepseek-chat',
+    meal_vision: 'deepseek-chat',
+    workout_template: 'deepseek-chat',
+  },
   ollama: {
     coach_workout: 'gemma4:e2b',
     coach_nutrition: 'gemma4:e2b',
@@ -429,7 +441,7 @@ function ApiKeyEditor({
   authHeader,
   onSaved,
 }: {
-  provider: 'mistral' | 'gemini';
+  provider: 'deepseek' | 'mistral' | 'gemini';
   label: string;
   configured: boolean;
   masked?: string | null;
@@ -543,7 +555,7 @@ function ModelConfigPanel({
     setDraft(aiConfig.models);
   }, [aiConfig.models]);
 
-  const updateModel = (provider: 'ollama' | 'mistral' | 'gemini', area: AiModelArea, value: string) => {
+  const updateModel = (provider: 'ollama' | 'deepseek' | 'mistral' | 'gemini', area: AiModelArea, value: string) => {
     setDraft((prev) => ({
       ...prev,
       [provider]: { ...prev[provider], [area]: value },
@@ -587,6 +599,7 @@ function ModelConfigPanel({
             <tr className="border-b border-gray-100">
               <th className="py-2 pr-4 text-[9px] font-black uppercase tracking-widest text-gray-400">Bereich</th>
               <th className="py-2 px-2 text-[9px] font-black uppercase tracking-widest text-emerald-600">Ollama (Lokal)</th>
+              <th className="py-2 px-2 text-[9px] font-black uppercase tracking-widest text-gray-400">DeepSeek</th>
               <th className="py-2 px-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Mistral</th>
               <th className="py-2 pl-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Gemini</th>
             </tr>
@@ -608,6 +621,22 @@ function ModelConfigPanel({
                     <ModelRecommendationHint
                       rec={area.recommended.ollama}
                       current={draft.ollama?.[area.id] ?? ''}
+                    />
+                  )}
+                </td>
+                <td className="py-3 px-2 min-w-[220px]">
+                  <ModelSelect
+                    value={draft.deepseek?.[area.id] ?? area.recommended.deepseek?.model ?? 'deepseek-chat'}
+                    options={
+                      area.options?.deepseek ??
+                      getModelSelectOptions('deepseek' as AiProviderName, area.id, draft.deepseek?.[area.id])
+                    }
+                    onChange={(v) => updateModel('deepseek', area.id, v)}
+                  />
+                  {area.recommended.deepseek && (
+                    <ModelRecommendationHint
+                      rec={area.recommended.deepseek}
+                      current={draft.deepseek?.[area.id] ?? ''}
                     />
                   )}
                 </td>
@@ -1134,6 +1163,7 @@ export default function AdminPage() {
         const data = await res.json();
         const fallbackRec = (id: AiModelArea) => ({
           ollama: DEFAULT_AI_MODELS.ollama[id],
+          deepseek: DEFAULT_AI_MODELS.deepseek[id],
           mistral: DEFAULT_AI_MODELS.mistral[id],
           gemini: DEFAULT_AI_MODELS.gemini[id],
         });
@@ -1153,6 +1183,7 @@ export default function AdminPage() {
                     : 'Workout-Vorlagen',
           recommended: {
             ollama: { model: DEFAULT_AI_MODELS.ollama[id], hint: '' },
+            deepseek: { model: DEFAULT_AI_MODELS.deepseek[id], hint: '' },
             mistral: { model: DEFAULT_AI_MODELS.mistral[id], hint: '' },
             gemini: { model: DEFAULT_AI_MODELS.gemini[id], hint: '' },
           },
@@ -1165,6 +1196,10 @@ export default function AdminPage() {
               ollama: {
                 model: data.recommendations?.ollama?.[a.id]?.model ?? fallbackRec(a.id).ollama,
                 hint: data.recommendations?.ollama?.[a.id]?.hint ?? '',
+              },
+              deepseek: {
+                model: data.recommendations?.deepseek?.[a.id]?.model ?? fallbackRec(a.id).deepseek,
+                hint: data.recommendations?.deepseek?.[a.id]?.hint ?? '',
               },
               mistral: {
                 model: data.recommendations?.mistral?.[a.id]?.model ?? fallbackRec(a.id).mistral,
@@ -1181,10 +1216,12 @@ export default function AdminPage() {
         setAiConfig({
           active: data.active ?? 'none',
           ollamaConfigured: !!data.ollamaConfigured,
+          deepseekConfigured: !!data.deepseekConfigured,
           geminiConfigured: !!data.geminiConfigured,
           mistralConfigured: !!data.mistralConfigured,
           ollama: data.ollama,
           keys: {
+            deepseek: { configured: !!data.keys?.deepseek?.configured, masked: data.keys?.deepseek?.masked ?? null },
             mistral: { configured: !!data.keys?.mistral?.configured, masked: data.keys?.mistral?.masked ?? null },
             gemini: { configured: !!data.keys?.gemini?.configured, masked: data.keys?.gemini?.masked ?? null },
           },
@@ -1223,12 +1260,12 @@ export default function AdminPage() {
   }, [fetchUsers, fetchAiConfig]);
 
   const [aiSwitchModal, setAiSwitchModal] = useState<{
-    provider: 'ollama' | 'gemini' | 'mistral';
+    provider: 'ollama' | 'deepseek' | 'gemini' | 'mistral';
     phase: 'testing' | 'ok' | 'error';
     message?: string;
   } | null>(null);
 
-  const toggleAiProvider = async (provider: 'ollama' | 'gemini' | 'mistral') => {
+  const toggleAiProvider = async (provider: 'ollama' | 'deepseek' | 'gemini' | 'mistral') => {
     if (!authHeader || !aiConfig) return;
     if (aiConfig.active === provider) return;
 
@@ -1243,13 +1280,13 @@ export default function AdminPage() {
       });
       const data = (await res.json()) as {
         ok?: boolean;
-        active?: 'ollama' | 'gemini' | 'mistral' | 'none';
+        active?: 'ollama' | 'deepseek' | 'gemini' | 'mistral' | 'none';
         error?: string;
         reverted?: boolean;
       };
 
       const nextActive =
-        data.active === 'ollama' || data.active === 'gemini' || data.active === 'mistral'
+        data.active === 'ollama' || data.active === 'deepseek' || data.active === 'gemini' || data.active === 'mistral'
           ? data.active
           : aiConfig.active;
 
@@ -1598,6 +1635,19 @@ export default function AdminPage() {
                         Ollama (Lokal)
                       </button>
                       <button
+                        onClick={() => toggleAiProvider('deepseek')}
+                        disabled={!aiConfig.deepseekConfigured}
+                        className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                          aiConfig.active === 'deepseek'
+                            ? 'bg-black text-white shadow-md'
+                            : aiConfig.deepseekConfigured
+                              ? 'text-gray-500 hover:text-black hover:bg-white'
+                              : 'text-gray-300 cursor-not-allowed'
+                        }`}
+                      >
+                        DeepSeek {!aiConfig.deepseekConfigured && <KeyRound size={10} className="inline ml-1" />}
+                      </button>
+                      <button
                         onClick={() => toggleAiProvider('mistral')}
                         disabled={!aiConfig.mistralConfigured}
                         className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
@@ -1657,7 +1707,15 @@ export default function AdminPage() {
                     </div>
                   </div>
                 </div>
-                <motion.div layout className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <motion.div layout className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  <ApiKeyEditor
+                    provider="deepseek"
+                    label="DeepSeek API-Key"
+                    configured={aiConfig.deepseekConfigured}
+                    masked={aiConfig.keys?.deepseek?.masked}
+                    authHeader={authHeader}
+                    onSaved={fetchAiConfig}
+                  />
                   <ApiKeyEditor
                     provider="mistral"
                     label="Mistral API-Key"

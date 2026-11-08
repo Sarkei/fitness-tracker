@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type pg from 'pg';
 import { COACH_PROMPT_VERSION, MEAL_RECIPE_PROMPT_VERSION } from './coachPromptVersions';
 import { resolveAiCapabilities } from '../../aiProviders';
+import { getAiModel } from './aiModelConfig';
 
 function hashJson(obj: unknown): string {
   return createHash('sha256').update(JSON.stringify(obj ?? null)).digest('hex').slice(0, 32);
@@ -26,12 +27,8 @@ export async function logCoachAiRun(
   },
 ): Promise<void> {
   const caps = resolveAiCapabilities();
-  const modelId =
-    caps.provider === 'mistral'
-      ? 'mistral-large-latest'
-      : caps.provider === 'gemini'
-        ? 'gemini-2.0-flash'
-        : 'none';
+  // Tatsächlich konfiguriertes Modell protokollieren (nicht hartkodiert).
+  const modelId = caps.provider === 'none' ? 'none' : getAiModel(caps.provider, 'coach_workout');
   try {
     await pool.query(
       `INSERT INTO coach_ai_runs (
@@ -77,12 +74,7 @@ export async function logMealAiRun(
   },
 ): Promise<void> {
   const caps = resolveAiCapabilities();
-  const modelId =
-    caps.provider === 'mistral'
-      ? 'mistral-large-latest'
-      : caps.provider === 'gemini'
-        ? 'gemini-2.0-flash'
-        : 'none';
+  const modelId = caps.provider === 'none' ? 'none' : getAiModel(caps.provider, 'meal');
   try {
     await pool.query(
       `INSERT INTO meal_ai_runs (

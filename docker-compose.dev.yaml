@@ -78,6 +78,8 @@ services:
       LOCAL_LLM_MODEL: ${LOCAL_LLM_MODEL:-gemma4:e2b}
       OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-8192}
       AI_ACTIVE_PROVIDER: ${AI_ACTIVE_PROVIDER:-ollama}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
       CHOKIDAR_USEPOLLING: "true"
       WATCHPACK_POLLING: "true"
     depends_on:

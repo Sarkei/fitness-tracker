@@ -861,6 +861,7 @@ export function registerNutritionRoutes(
       sendApiError(res, 500, 'pipeline-failed', 'Analyse fehlgeschlagen.', {
         aiProvider: aiCaps.provider,
         aiConfigured: aiCaps.enabled,
+        deepseekConfigured: aiCaps.deepseekConfigured,
         mistralConfigured: aiCaps.mistralConfigured,
         geminiConfigured: aiCaps.geminiConfigured,
       });
