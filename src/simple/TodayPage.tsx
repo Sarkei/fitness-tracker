@@ -185,11 +185,11 @@ export default function TodayPage() {
               const isToday = day.ymd === date;
               return (
                 <div key={day.ymd} className="flex flex-1 flex-col items-center gap-1">
-                  <div className="relative flex w-full flex-1 items-end overflow-hidden rounded-md bg-[var(--border-muted)]/25">
+                  <div className="relative flex w-full flex-1 items-end overflow-hidden rounded-md bg-[var(--border-muted)]/45">
                     <div
                       className="w-full rounded-t-md transition-[height] duration-500"
                       style={{
-                        height: `${Math.max(3, ratio * 100)}%`,
+                        height: `${Math.max(6, ratio * 100)}%`,
                         background: isToday ? 'var(--simple-accent)' : 'var(--border-muted)',
                       }}
                       title={`${Math.round(day.kcal)} kcal`}
