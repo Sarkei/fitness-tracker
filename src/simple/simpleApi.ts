@@ -5,6 +5,7 @@ export type Macro = { kcal: number; protein: number; carbs: number; fat: number 
 export type FoodEntry = {
   id: string;
   meal: string;
+  category?: string;
   calories: number;
   protein: number;
   carbs: number;

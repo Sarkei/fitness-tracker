@@ -22,7 +22,20 @@ const MEALS = [
   { id: 'snack', label: 'Snacks', match: /snack|zwischen/i },
 ];
 
+const CATEGORY_ALIASES: Record<string, string> = {
+  breakfast: 'breakfast',
+  fruehstueck: 'breakfast',
+  lunch: 'lunch',
+  mittag: 'lunch',
+  dinner: 'dinner',
+  abend: 'dinner',
+  snack: 'snack',
+};
+
 function bucketOf(entry: FoodEntry): string {
+  // Zuerst die beim Erfassen gesetzte Kategorie, sonst der Name der Mahlzeit.
+  const category = CATEGORY_ALIASES[String(entry.category ?? '').toLowerCase()];
+  if (category) return category;
   const meal = String(entry.meal ?? '');
   const hit = MEALS.find((item) => item.match.test(meal));
   return hit?.id ?? 'snack';
