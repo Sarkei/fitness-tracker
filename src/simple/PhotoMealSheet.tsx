@@ -6,10 +6,12 @@ import { analyzeFood, fileToDataUrl, saveAnalyzedMeal, type V3Result } from './s
 /** Essen fotografieren → KI erkennt das Gericht → kurz prüfen → speichern. */
 export default function PhotoMealSheet({
   date,
+  initialCategory,
   onClose,
   onSaved,
 }: {
   date: string;
+  initialCategory?: string;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -19,7 +21,7 @@ export default function PhotoMealSheet({
   const [phase, setPhase] = useState<'pick' | 'working' | 'review'>('pick');
   const [result, setResult] = useState<V3Result | null>(null);
   const [grams, setGrams] = useState<Record<string, number>>({});
-  const [category, setCategory] = useState('lunch');
+  const [category, setCategory] = useState(initialCategory ?? 'lunch');
   const [error, setError] = useState<string | null>(null);
 
   const analyze = async (payload: { imageDataUrl?: string; text?: string }) => {
