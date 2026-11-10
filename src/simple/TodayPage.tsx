@@ -69,6 +69,7 @@ export default function TodayPage() {
   const plannedToday = weekPlan.filter((d) => !d.isRest).length;
   const maxHistory = Math.max(goalKcal, ...history.map((h) => h.kcal), 1);
   const trainingToday = workouts.find((w) => String(w.date).slice(0, 10) === date) ?? null;
+  const hasHistory = history.some((day) => day.kcal > 0);
 
   return (
     <div className="space-y-5 lg:space-y-6">
@@ -179,7 +180,12 @@ export default function TodayPage() {
 
         <Card className="p-5">
           <SectionTitle>Letzte 7 Tage</SectionTitle>
-          <div className="relative flex h-28 items-end gap-1.5">
+          {!hasHistory && (
+            <p className="py-10 text-center text-xs text-[var(--text-muted)]">
+              Sobald du Mahlzeiten erfasst, siehst du hier den Verlauf.
+            </p>
+          )}
+          <div className={`relative flex h-28 items-end gap-1.5 ${hasHistory ? '' : 'hidden'}`}>
             {history.map((day) => {
               const ratio = Math.min(1, day.kcal / maxHistory);
               const isToday = day.ymd === date;
