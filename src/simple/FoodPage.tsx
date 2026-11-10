@@ -92,7 +92,7 @@ export default function FoodPage() {
         }
       />
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-3 lg:items-start">
         <Card className="p-5 lg:col-span-2">
           <div className="flex items-center justify-between gap-3">
             <div>

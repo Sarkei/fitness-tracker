@@ -118,7 +118,7 @@ export default function TrainingPage() {
         </div>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-3 lg:items-start">
         <Card className="p-5 lg:col-span-2">
           <div className="flex items-start gap-3">
             <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--simple-accent-soft)] text-[var(--simple-accent)]">
