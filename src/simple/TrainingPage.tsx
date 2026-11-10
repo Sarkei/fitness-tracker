@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Dumbbell, Moon, Play, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ChevronRight, Dumbbell, Moon, Play, Trash2 } from 'lucide-react';
 import { Card, GhostButton, PageHeader, PrimaryButton, SectionTitle } from './ui';
 import SessionSheet from './SessionSheet';
 import {
@@ -157,6 +158,26 @@ export default function TrainingPage() {
             </p>
           )}
         </Card>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        {[
+          { to: '/coach', title: 'Trainingsplan erzeugen', hint: 'KI baut eine Woche nach deinen Zielen' },
+          { to: '/workouts', title: 'Vorlagen & Verlauf', hint: 'Eigene Einheiten und Historie' },
+          { to: '/stats', title: 'Statistik', hint: 'Volumen, Fortschritt, Bestleistungen' },
+        ].map((item) => (
+          <Link
+            key={item.to}
+            to={item.to}
+            className="group rounded-2xl border border-[var(--border-muted)] bg-[var(--card-bg)] p-4 transition hover:border-[var(--simple-accent)]"
+          >
+            <p className="flex items-center justify-between text-sm font-semibold">
+              {item.title}
+              <ChevronRight className="h-4 w-4 text-[var(--text-muted)] transition group-hover:text-[var(--simple-accent)]" />
+            </p>
+            <p className="mt-0.5 text-xs text-[var(--text-muted)]">{item.hint}</p>
+          </Link>
+        ))}
       </div>
 
       {error && <p className="rounded-xl bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-600">{error}</p>}

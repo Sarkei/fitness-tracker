@@ -137,8 +137,8 @@ export function PrimaryButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition disabled:opacity-40 ${full ? 'w-full' : ''} ${className}`}
-      style={{ background: 'var(--simple-accent)' }}
+      className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:opacity-40 ${full ? 'w-full' : ''} ${className}`}
+      style={{ background: 'var(--simple-accent)', color: 'var(--simple-accent-ink)' }}
     >
       {children}
     </button>

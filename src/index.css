@@ -38,6 +38,7 @@
   --simple-accent: #1f6f4a;
   --simple-accent-strong: #18583b;
   --simple-accent-soft: #e7f2ea;
+  --simple-accent-ink: #ffffff;
   --simple-warm: #faf7f0;
   --simple-clay: #b4552f;
   --simple-serif: Georgia, "Times New Roman", serif;
@@ -47,6 +48,7 @@
   --simple-accent: #6fbf94;
   --simple-accent-strong: #8fd2ae;
   --simple-accent-soft: rgb(111 191 148 / 0.14);
+  --simple-accent-ink: #10241a;
   --simple-warm: #1f1f1f;
   --simple-clay: #e08a63;
 }
