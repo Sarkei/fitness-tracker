@@ -10,6 +10,9 @@ import DataMigrationOverlay from './components/system/DataMigrationOverlay';
 import RouteErrorBoundary from './components/ui/RouteErrorBoundary';
 
 const DashboardPage = lazy(() => import('./components/dashboard/DashboardPage'));
+const TodayPage = lazy(() => import('./simple/TodayPage'));
+const TrainingPage = lazy(() => import('./simple/TrainingPage'));
+const FoodPage = lazy(() => import('./simple/FoodPage'));
 const WorkoutPage = lazy(() => import('./components/workout/WorkoutPage'));
 const NutritionPage = lazy(() => import('./components/nutrition/NutritionPage'));
 const CoachHubPage = lazy(() => import('./components/coach/CoachHubPage'));
@@ -50,6 +53,30 @@ const AppContent = () => {
       <Routes>
         <Route
           path="/"
+          element={
+            <RouteErrorBoundary title="Heute konnte nicht geladen werden">
+              <TodayPage />
+            </RouteErrorBoundary>
+          }
+        />
+        <Route
+          path="/training"
+          element={
+            <RouteErrorBoundary title="Training konnte nicht geladen werden">
+              <TrainingPage />
+            </RouteErrorBoundary>
+          }
+        />
+        <Route
+          path="/foods"
+          element={
+            <RouteErrorBoundary title="Essen konnte nicht geladen werden">
+              <FoodPage />
+            </RouteErrorBoundary>
+          }
+        />
+        <Route
+          path="/dashboard"
           element={
             <RouteErrorBoundary title="Dashboard konnte nicht geladen werden">
               <DashboardPage />

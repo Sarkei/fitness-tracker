@@ -4,13 +4,13 @@
  */
 
 import { ReactNode } from 'react';
-import Navbar from './Navbar';
+import SimpleTabBar from '../../simple/SimpleTabBar';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/src/lib/AuthContext';
 import { useEffect } from 'react';
 import { initMobileViewportInsets, resetMobileChromeAfterRouteChange } from '@/src/lib/mobileViewport';
-import MobileQuickActionsHost from './MobileQuickActionsHost';
-import ActiveWorkoutBar from './ActiveWorkoutBar';
+
+
 import { applyTheme, persistTheme, resolveTheme } from '@/src/lib/themePreference';
 import { ExerciseDetailProvider } from '@/src/lib/exerciseDetailContext';
 
@@ -40,11 +40,9 @@ export default function Shell({ children }: ShellProps) {
   return (
     <ExerciseDetailProvider>
       <div className="min-h-[100dvh] min-h-[-webkit-fill-available] bg-[var(--background)] text-[var(--foreground)] transition-colors duration-300">
-        <Navbar />
-        <ActiveWorkoutBar />
-        <MobileQuickActionsHost />
+        <SimpleTabBar />
         {/* Sidebar erst ab lg — Tablet behält Bottom-Nav */}
-        <main className="lg:pl-64 min-h-[100dvh] min-h-[-webkit-fill-available] safe-area-pt lg:pt-0">
+        <main className="min-h-[100dvh] min-h-[-webkit-fill-available] safe-area-pt lg:pt-0">
           <div
             className="shell-page max-w-6xl mx-auto px-3 pt-3 sm:px-4 sm:pt-6 max-lg:pb-[var(--shell-pad-bottom)] lg:px-10 lg:pt-12 lg:pb-12"
           >
