@@ -95,8 +95,7 @@ export default function ActiveWorkoutBar() {
           type="button"
           onClick={() => setMinimized(false)}
           aria-label={t('nav.activeWorkout.expand')}
-          className="fixed top-0 right-3 z-40 min-h-[44px] min-w-[72px] px-3 rounded-b-xl bg-brand text-[var(--on-accent)] text-[10px] font-black uppercase tracking-widest touch-manipulation flex items-center justify-center lg:left-64 lg:right-auto lg:ml-3"
-          style={{ marginTop: 'env(safe-area-inset-top, 0px)' }}
+          className="app-workout-bar app-workout-bar--min min-h-[44px] min-w-[72px] px-3 rounded-b-xl bg-brand text-[var(--on-accent)] text-[10px] font-black uppercase tracking-widest touch-manipulation flex items-center justify-center"
         >
           {timeStr}
         </button>
@@ -116,10 +115,7 @@ export default function ActiveWorkoutBar() {
   return (
     <>
       <div
-        className={cn(
-          'fixed top-0 left-0 right-0 z-40 bg-brand lg:left-64',
-          'pt-[env(safe-area-inset-top,0px)]',
-        )}
+        className={cn('app-workout-bar bg-brand')}
       >
         <div className="h-14 px-2 sm:px-4 flex items-center justify-between gap-2">
           <button

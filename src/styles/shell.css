@@ -6,10 +6,26 @@
 
 /* --- Grundgerüst ------------------------------------------------------- */
 .app {
+  --app-header-h: 69px;
   min-height: 100vh;
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-sans);
+}
+
+/* Laufende Einheit: Leiste sitzt unter der Sticky-Kopfzeile statt darüber. */
+.app-workout-bar {
+  position: fixed;
+  top: calc(var(--app-header-h) + env(safe-area-inset-top, 0px));
+  left: 0;
+  right: 0;
+  z-index: 40;
+}
+
+.app-workout-bar--min {
+  left: auto;
+  right: 12px;
+  width: auto;
 }
 
 .app-container {
