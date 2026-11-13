@@ -95,7 +95,7 @@ export default function ActiveWorkoutBar() {
           type="button"
           onClick={() => setMinimized(false)}
           aria-label={t('nav.activeWorkout.expand')}
-          className="fixed top-0 right-3 z-40 min-h-[44px] min-w-[72px] px-3 rounded-b-xl bg-brand text-white text-[10px] font-black uppercase tracking-widest touch-manipulation flex items-center justify-center lg:left-64 lg:right-auto lg:ml-3"
+          className="fixed top-0 right-3 z-40 min-h-[44px] min-w-[72px] px-3 rounded-b-xl bg-brand text-[var(--on-accent)] text-[10px] font-black uppercase tracking-widest touch-manipulation flex items-center justify-center lg:left-64 lg:right-auto lg:ml-3"
           style={{ marginTop: 'env(safe-area-inset-top, 0px)' }}
         >
           {timeStr}
@@ -125,7 +125,7 @@ export default function ActiveWorkoutBar() {
           <button
             type="button"
             onClick={() => setMinimized(true)}
-            className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-xl hover:bg-white/15 text-white/90 touch-manipulation"
+            className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-xl hover:bg-white/15 text-[var(--on-accent)]/90 touch-manipulation"
             aria-label={t('nav.activeWorkout.minimize')}
           >
             <ChevronUp size={20} />
@@ -136,21 +136,21 @@ export default function ActiveWorkoutBar() {
             onClick={handleNavigateToWorkout}
             className="flex-1 min-w-0 flex items-center gap-2 sm:gap-3 text-left touch-manipulation min-h-[44px]"
           >
-            <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-white/20 shrink-0">
-              <Play size={16} className="text-white fill-white" aria-hidden />
+            <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-white/20 shrink-0 text-[var(--on-accent)]">
+              <Play size={16} className="fill-current" aria-hidden />
             </div>
             <div className="min-w-0">
-              <p className="text-white font-black uppercase tracking-tight text-xs truncate">
+              <p className="text-[var(--on-accent)] font-black uppercase tracking-tight text-xs truncate">
                 {session.workoutName || t('work.today.resume')}
               </p>
-              <p className="text-white/85 text-[11px] font-bold tracking-wide tabular-nums">{timeStr}</p>
+              <p className="text-[var(--on-accent)]/85 text-[11px] font-bold tracking-wide tabular-nums">{timeStr}</p>
             </div>
           </button>
 
           <button
             type="button"
             onClick={() => setDiscardOpen(true)}
-            className="shrink-0 min-h-[44px] min-w-[44px] px-2 rounded-xl hover:bg-white/15 text-white/90 touch-manipulation flex items-center justify-center"
+            className="shrink-0 min-h-[44px] min-w-[44px] px-2 rounded-xl hover:bg-white/15 text-[var(--on-accent)]/90 touch-manipulation flex items-center justify-center"
             aria-label={t('nav.activeWorkout.discard')}
           >
             <X size={18} />
@@ -159,7 +159,7 @@ export default function ActiveWorkoutBar() {
           <button
             type="button"
             onClick={handleNavigateToWorkout}
-            className="shrink-0 min-h-[44px] px-3 rounded-xl bg-white/20 hover:bg-white/30 text-white font-black uppercase text-[10px] tracking-widest transition-colors touch-manipulation"
+            className="shrink-0 min-h-[44px] px-3 rounded-xl bg-white/20 hover:bg-white/30 text-[var(--on-accent)] font-black uppercase text-[10px] tracking-widest transition-colors touch-manipulation"
           >
             {t('work.resume')}
           </button>

@@ -121,15 +121,15 @@ export default function CardioGpsPanel({
     return (
       <div className="rounded-2xl border border-orange-500/30 bg-orange-500/5 p-4 space-y-3">
         <p className="text-[10px] font-black uppercase tracking-widest text-orange-400">{t('workout.session.gps.title')}</p>
-        <p className="text-xs text-neutral-400">{exercise.name}</p>
+        <p className="text-xs text-muted">{exercise.name}</p>
         <button
           type="button"
           onClick={() => setPhase('running')}
-          className="w-full min-h-[48px] rounded-xl bg-orange-500 text-white font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2"
+          className="w-full min-h-[48px] rounded-xl bg-orange-500 text-[var(--ink)] font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2"
         >
           <Play size={18} fill="white" /> {t('workout.session.gps.start')}
         </button>
-        <button type="button" onClick={onClose} className="w-full text-[10px] text-neutral-500 uppercase font-bold">
+        <button type="button" onClick={onClose} className="w-full text-[10px] text-muted uppercase font-bold">
           {t('workout.session.gps.manualOnly')}
         </button>
       </div>
@@ -138,7 +138,7 @@ export default function CardioGpsPanel({
 
   if (phase === 'running') {
     return (
-      <div className="rounded-2xl border border-orange-500/40 overflow-hidden bg-neutral-950">
+      <div className="rounded-2xl border border-orange-500/40 overflow-hidden bg-surface-2">
         {showMap && (
           <div className="h-48 w-full relative">
             <MapContainer
@@ -167,7 +167,7 @@ export default function CardioGpsPanel({
             <button
               type="button"
               onClick={() => setPaused(p => !p)}
-              className="flex-1 min-h-[44px] rounded-xl bg-neutral-800 text-[10px] font-black uppercase"
+              className="flex-1 min-h-[44px] rounded-xl bg-surface-2 text-[10px] font-black uppercase"
             >
               {paused ? t('cardio.resume') : t('cardio.pause')}
             </button>
@@ -177,7 +177,7 @@ export default function CardioGpsPanel({
                 setPhase('done');
                 setManualDistance(gpsDistance > 0 ? gpsDistance.toFixed(2) : '');
               }}
-              className="flex-1 min-h-[44px] rounded-xl bg-orange-500 text-white text-[10px] font-black uppercase flex items-center justify-center gap-1"
+              className="flex-1 min-h-[44px] rounded-xl bg-orange-500 text-[var(--ink)] text-[10px] font-black uppercase flex items-center justify-center gap-1"
             >
               <Square size={14} /> {t('cardio.finish')}
             </button>
@@ -188,19 +188,19 @@ export default function CardioGpsPanel({
   }
 
   return (
-    <div className="rounded-2xl border border-neutral-700 bg-neutral-900 p-4 space-y-3">
+    <div className="rounded-2xl border border-line bg-surface p-4 space-y-3">
       <p className="text-[10px] font-black uppercase text-brand">{t('cardio.done.title')}</p>
       <div className="grid grid-cols-2 gap-2 text-center">
-        <div className="bg-neutral-950 rounded-xl p-3">
+        <div className="bg-surface-2 rounded-xl p-3">
           <p className="text-xl font-black tabular-nums">{formatTime(elapsed)}</p>
         </div>
-        <div className="bg-neutral-950 rounded-xl p-3">
+        <div className="bg-surface-2 rounded-xl p-3">
           <input
             type="number"
             step="0.1"
             value={manualDistance}
             onChange={e => setManualDistance(e.target.value)}
-            className="w-full text-center text-xl font-black bg-transparent text-white"
+            className="w-full text-center text-xl font-black bg-transparent text-[var(--ink)]"
             placeholder="km"
           />
         </div>
@@ -213,7 +213,7 @@ export default function CardioGpsPanel({
             onClick={() => setRpe(n)}
             className={cn(
               'flex-1 h-10 rounded-lg font-black text-sm',
-              rpe === n ? 'ui-mark-selected' : 'bg-neutral-950 text-neutral-500',
+              rpe === n ? 'ui-mark-selected' : 'bg-surface-2 text-muted',
             )}
           >
             {n}

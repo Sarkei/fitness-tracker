@@ -111,11 +111,11 @@ export default function SessionEmomPanel({
         <p className="text-[10px] font-black uppercase tracking-widest text-violet-400">
           {t('workout.session.emom.minute', { current: minute, total: totalMinutes })}
         </p>
-        <span className="text-[9px] font-bold text-neutral-500 uppercase">{phaseLabel}</span>
+        <span className="text-[9px] font-bold text-muted uppercase">{phaseLabel}</span>
       </div>
 
       {activeEx && (
-        <p className="text-sm font-black uppercase tracking-tight text-white truncate">{activeEx.name}</p>
+        <p className="text-sm font-black uppercase tracking-tight text-[var(--ink)] truncate">{activeEx.name}</p>
       )}
 
       <div className="flex items-center justify-center gap-3">
@@ -127,7 +127,7 @@ export default function SessionEmomPanel({
 
       {(phase === 'work' || phase === 'rest') && activeExIdx != null && (
         <div className="space-y-2">
-          <label className="text-[9px] font-black uppercase tracking-widest text-neutral-500 block text-center">
+          <label className="text-[9px] font-black uppercase tracking-widest text-muted block text-center">
             {phase === 'work' ? t('workout.session.emom.repsDuring') : t('workout.session.emom.repsAfter')}
           </label>
           <input
@@ -140,7 +140,7 @@ export default function SessionEmomPanel({
               const reps = parseInt(e.target.value, 10) || 0;
               onUpdateSet(activeExIdx, setIdx, { reps, completed: reps > 0 });
             }}
-            className="w-full min-h-[52px] text-center text-2xl font-black tabular-nums bg-black/40 border border-violet-500/30 rounded-xl text-white focus:ring-2 focus:ring-violet-500 focus:outline-none"
+            className="w-full min-h-[52px] text-center text-2xl font-black tabular-nums bg-black/40 border border-violet-500/30 rounded-xl text-[var(--ink)] focus:ring-2 focus:ring-violet-500 focus:outline-none"
           />
           {targetReps != null && (
             <p className="text-[9px] text-center font-bold text-violet-300/80 uppercase tracking-widest">
@@ -155,7 +155,7 @@ export default function SessionEmomPanel({
           <button
             type="button"
             onClick={startEmom}
-            className="flex-1 min-h-[44px] rounded-xl bg-violet-600 text-white text-[10px] font-black uppercase tracking-widest"
+            className="flex-1 min-h-[44px] rounded-xl bg-violet-600 text-[var(--ink)] text-[10px] font-black uppercase tracking-widest"
           >
             {t('workout.session.emom.start')}
           </button>
@@ -164,7 +164,7 @@ export default function SessionEmomPanel({
             <button
               type="button"
               onClick={() => setSecondsLeft(s => Math.max(0, s - 15))}
-              className="min-h-[44px] px-3 rounded-xl bg-neutral-900 text-[10px] font-bold text-neutral-400"
+              className="min-h-[44px] px-3 rounded-xl bg-surface text-[10px] font-bold text-muted"
             >
               −15s
             </button>
@@ -175,7 +175,7 @@ export default function SessionEmomPanel({
                 setMinute(1);
                 setSecondsLeft(workSec);
               }}
-              className="min-h-[44px] px-3 rounded-xl bg-neutral-900 text-[10px] font-bold text-neutral-400 flex items-center gap-1"
+              className="min-h-[44px] px-3 rounded-xl bg-surface text-[10px] font-bold text-muted flex items-center gap-1"
             >
               <RotateCcw size={12} /> {t('workout.session.circuit.reset')}
             </button>

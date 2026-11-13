@@ -120,7 +120,7 @@ export default function CoachReportFacts({
                 {row.plannedDay} · {row.title}
               </span>
               <select
-                className="flex-1 rounded-lg border border-orange-200 bg-white px-2 py-1.5 text-xs font-bold"
+                className="flex-1 rounded-lg border border-orange-200 bg-surface px-2 py-1.5 text-xs font-bold"
                 defaultValue=""
                 disabled={savingKey === row.sessionKey}
                 onChange={(e) => {

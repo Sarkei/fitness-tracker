@@ -388,18 +388,18 @@ export default function Dashboard() {
 
   const intelligenceCard = useMemo(
     () => (
-      <div className={cn('bg-black text-white p-6 sm:p-8 lg:p-10 rounded-[2rem] lg:rounded-[2.5rem] shadow-2xl shadow-black/20 flex flex-col h-full min-h-0 relative overflow-hidden', dashCardHover)}>
+      <div className={cn('bg-surface-3 text-ink p-6 sm:p-8 lg:p-10 rounded-[2rem] lg:rounded-[2.5rem] shadow-black/5 flex flex-col h-full min-h-0 relative overflow-hidden', dashCardHover)}>
         <div className="absolute top-0 right-0 p-6 md:p-8 opacity-10 pointer-events-none">
           <Brain size={120} />
         </div>
         <div className="flex justify-between items-start gap-3 relative z-10 mb-6 md:mb-8 shrink-0">
-          <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">{t('dash.intelligence')}</h3>
+          <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted">{t('dash.intelligence')}</h3>
         </div>
         <div className="relative z-10 flex flex-col flex-1 min-h-0">
           {todayWorkout ? (
             <div className="space-y-4 md:space-y-6 flex flex-col flex-1 min-h-0">
               <div>
-                <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-1">{t('dash.intel.targetProtocol')}</p>
+                <p className="text-muted text-[10px] font-black uppercase tracking-widest mb-1">{t('dash.intel.targetProtocol')}</p>
                 <h4 className="text-xl md:text-2xl font-black italic uppercase tracking-tighter">
                   {todayWorkout.isRestDay ? t('dash.rest') : todayWorkout.title}
                 </h4>
@@ -424,7 +424,7 @@ export default function Dashboard() {
                 <button
                   type="button"
                   onClick={() => navigate('/workouts')}
-                  className="w-full bg-white text-black py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 hover:bg-brand hover:text-white transition-colors"
+                  className="w-full bg-brand text-on-accent py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 hover:bg-[var(--accent-hover)] transition-colors"
                 >
                   {t('dash.goCombat')} <ChevronRight size={14} />
                 </button>
@@ -432,7 +432,7 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="flex flex-col flex-1 gap-6 py-2">
-              <p className="text-gray-500 font-medium italic text-sm flex-1">{t('dash.noPlan')}</p>
+              <p className="text-muted font-medium italic text-sm flex-1">{t('dash.noPlan')}</p>
               <button
                 type="button"
                 onClick={() => navigate('/workouts')}
@@ -797,16 +797,16 @@ export default function Dashboard() {
               </div>
               <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch] p-5 md:p-7 space-y-6 pb-[max(1rem,env(safe-area-inset-bottom))]">
                 {/* Rating */}
-                <div className="bg-black text-white rounded-2xl p-6">
+                <div className="bg-surface-3 text-ink rounded-2xl p-6">
                   <div className="flex justify-between items-start mb-3">
-                    <p className="text-4xl font-black italic">{coachReport.report?.overallRating}<span className="text-lg text-gray-400">/10</span></p>
+                    <p className="text-4xl font-black italic">{coachReport.report?.overallRating}<span className="text-lg text-muted">/10</span></p>
                     <div className="flex gap-0.5">
                       {[...Array(5)].map((_: any, i: number) => (
-                        <Star key={i} size={14} className={i < Math.round((coachReport.report?.overallRating || 0) / 2) ? "text-yellow-400 fill-yellow-400" : "text-gray-600"} />
+                        <Star key={i} size={14} className={i < Math.round((coachReport.report?.overallRating || 0) / 2) ? "text-yellow-400 fill-yellow-400" : "text-muted"} />
                       ))}
                     </div>
                   </div>
-                  <p className="text-sm text-gray-300 font-medium leading-relaxed">{coachReport.report?.coachMessage}</p>
+                  <p className="text-sm text-muted font-medium leading-relaxed">{coachReport.report?.coachMessage}</p>
                 </div>
                 {/* Summary */}
                 {coachReport.report?.summary && (

@@ -77,7 +77,7 @@ export default function SessionExerciseRail({
     <>
       <div
         className={cn(
-          'flex-none border-neutral-800 bg-neutral-900/80',
+          'flex-none border-line bg-surface-2',
           vertical ? 'h-full border-r flex flex-col min-h-0' : 'border-b',
         )}
       >
@@ -136,7 +136,7 @@ export default function SessionExerciseRail({
                     ? 'border-brand bg-brand/15 ring-1 ring-brand/40'
                     : done
                       ? 'border-brand/30 bg-brand/5'
-                      : 'border-neutral-700 bg-neutral-800/80 hover:border-neutral-500',
+                      : 'border-line bg-surface-2 hover:border-line-strong',
                   isDragOver && 'border-cyan-400/60 bg-cyan-500/10',
                   dragExIdx === exIdx && 'opacity-50',
                 )}
@@ -150,7 +150,7 @@ export default function SessionExerciseRail({
                     <span
                       className={cn(
                         'w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-[10px] font-black',
-                        done ? 'bg-brand text-black' : 'bg-neutral-700 text-neutral-400',
+                        done ? 'bg-brand text-on-accent' : 'bg-surface-3 text-muted',
                       )}
                     >
                       {done ? <Check size={14} strokeWidth={3} /> : railPos + 1}
@@ -167,12 +167,12 @@ export default function SessionExerciseRail({
                       clearLongPress();
                       setMenuExIdx(exIdx);
                     }}
-                    className="min-h-[44px] min-w-[44px] rounded-lg flex items-center justify-center text-neutral-400 hover:text-brand hover:bg-neutral-700/80 touch-manipulation shrink-0"
+                    className="min-h-[44px] min-w-[44px] rounded-lg flex items-center justify-center text-muted hover:text-brand hover:bg-surface-3 touch-manipulation shrink-0"
                   >
                     <MoreHorizontal size={18} />
                   </button>
                   {vertical ? (
-                    <GripVertical size={14} className="text-neutral-600 shrink-0 mt-3" aria-hidden />
+                    <GripVertical size={14} className="text-muted shrink-0 mt-3" aria-hidden />
                   ) : null}
                 </div>
               </div>
@@ -180,7 +180,7 @@ export default function SessionExerciseRail({
           })}
         </div>
         {!vertical && (
-          <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-widest text-neutral-500 text-center">
+          <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-widest text-muted text-center">
             {t('workout.session.rail.hint')}
           </p>
         )}
@@ -189,10 +189,10 @@ export default function SessionExerciseRail({
       {menuExIdx != null && (
         <div className={mobileSheetOverlayClass()} onClick={() => setMenuExIdx(null)}>
           <div
-            className="w-full max-w-sm rounded-2xl border border-neutral-700 bg-neutral-900 p-2 shadow-2xl"
+            className="w-full max-w-sm rounded-2xl border border-line bg-surface p-2 shadow-2xl"
             onClick={e => e.stopPropagation()}
           >
-            <p className="px-3 py-2 text-[11px] font-black uppercase tracking-widest text-neutral-500 truncate">
+            <p className="px-3 py-2 text-[11px] font-black uppercase tracking-widest text-muted truncate">
               {exercises[menuExIdx]?.name}
             </p>
             <button
@@ -202,7 +202,7 @@ export default function SessionExerciseRail({
                 setMenuExIdx(null);
               }}
               disabled={railIndices.indexOf(menuExIdx) <= 0}
-              className="w-full min-h-[48px] px-4 rounded-xl text-left text-sm font-bold text-white hover:bg-neutral-800 disabled:opacity-30"
+              className="w-full min-h-[48px] px-4 rounded-xl text-left text-sm font-bold text-[var(--ink)] hover:bg-surface-2 disabled:opacity-30"
             >
               {t('workout.session.rail.moveUp')}
             </button>
@@ -213,7 +213,7 @@ export default function SessionExerciseRail({
                 setMenuExIdx(null);
               }}
               disabled={railIndices.indexOf(menuExIdx) >= railIndices.length - 1}
-              className="w-full min-h-[48px] px-4 rounded-xl text-left text-sm font-bold text-white hover:bg-neutral-800 disabled:opacity-30"
+              className="w-full min-h-[48px] px-4 rounded-xl text-left text-sm font-bold text-[var(--ink)] hover:bg-surface-2 disabled:opacity-30"
             >
               {t('workout.session.rail.moveDown')}
             </button>
@@ -223,7 +223,7 @@ export default function SessionExerciseRail({
                 onSwap(menuExIdx);
                 setMenuExIdx(null);
               }}
-              className="w-full min-h-[48px] px-4 rounded-xl text-left text-sm font-bold text-white hover:bg-neutral-800"
+              className="w-full min-h-[48px] px-4 rounded-xl text-left text-sm font-bold text-[var(--ink)] hover:bg-surface-2"
             >
               {t('workout.session.rail.swap')}
             </button>
@@ -240,7 +240,7 @@ export default function SessionExerciseRail({
             <button
               type="button"
               onClick={() => setMenuExIdx(null)}
-              className="w-full min-h-[44px] mt-1 rounded-xl text-[10px] font-black uppercase tracking-widest text-neutral-500 hover:bg-neutral-800"
+              className="w-full min-h-[44px] mt-1 rounded-xl text-[10px] font-black uppercase tracking-widest text-muted hover:bg-surface-2"
             >
               {t('workout.session.resume')}
             </button>

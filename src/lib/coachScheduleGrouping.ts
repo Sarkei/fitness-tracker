@@ -37,7 +37,7 @@ export function coachSessionKind(row: { sessionType?: string; title?: string }):
 export function coachSessionCardClasses(kind: CoachSessionKind): string {
   if (kind === 'cardio') return 'border-cyan-500/45 bg-cyan-500/10';
   if (kind === 'strength') return 'border-violet-500/45 bg-violet-500/10';
-  if (kind === 'hybrid') return 'border-teal-500/45 bg-teal-500/10';
+  if (kind === 'hybrid') return 'border-brand/45 bg-brand/10';
   return 'border-[var(--border-muted)] bg-[var(--background)]';
 }
 

@@ -32,10 +32,10 @@ export default function SetTypePickerSheet({ open, current, setNumber, onClose, 
   return (
     <div className={mobileSheetOverlayClass()} onClick={onClose}>
       <div
-        className="w-full max-w-sm rounded-2xl border border-neutral-700 bg-neutral-900 p-2 shadow-2xl"
+        className="w-full max-w-sm rounded-2xl border border-line bg-surface p-2 shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
-        <p className="px-3 py-2 text-[11px] font-black uppercase tracking-widest text-neutral-500">
+        <p className="px-3 py-2 text-[11px] font-black uppercase tracking-widest text-muted">
           {t('workout.session.setTypePicker.title', { n: String(setNumber) })}
         </p>
         {SET_TYPE_CYCLE.map(type => (
@@ -47,17 +47,17 @@ export default function SetTypePickerSheet({ open, current, setNumber, onClose, 
               onClose();
             }}
             className={`w-full min-h-[52px] px-4 rounded-xl text-left flex flex-col justify-center gap-0.5 touch-manipulation ${
-              current === type ? 'bg-brand/15 ring-1 ring-brand/40' : 'hover:bg-neutral-800'
+              current === type ? 'bg-brand/15 ring-1 ring-brand/40' : 'hover:bg-surface-2'
             }`}
           >
-            <span className="text-sm font-black text-white">{labelFor(type, t)}</span>
-            <span className="text-[11px] text-neutral-500">{hintFor(type, t)}</span>
+            <span className="text-sm font-black text-[var(--ink)]">{labelFor(type, t)}</span>
+            <span className="text-[11px] text-muted">{hintFor(type, t)}</span>
           </button>
         ))}
         <button
           type="button"
           onClick={onClose}
-          className="w-full min-h-[44px] mt-1 rounded-xl text-[10px] font-black uppercase tracking-widest text-neutral-500 hover:bg-neutral-800"
+          className="w-full min-h-[44px] mt-1 rounded-xl text-[10px] font-black uppercase tracking-widest text-muted hover:bg-surface-2"
         >
           {t('workout.session.resume')}
         </button>

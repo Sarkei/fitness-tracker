@@ -39,7 +39,7 @@ function getTrainingTypeIcons(session: Record<string, unknown>) {
 
 function kindLabelColor(kind: CoachSessionKind): string {
   if (kind === 'cardio') return 'text-cyan-600 dark:text-cyan-400';
-  if (kind === 'hybrid') return 'text-teal-600 dark:text-teal-400';
+  if (kind === 'hybrid') return 'text-brand dark:text-brand';
   if (kind === 'strength') return 'text-violet-600 dark:text-violet-400';
   return 'text-[var(--text-muted)]';
 }
@@ -113,10 +113,10 @@ export default function TrainingSessionCard({
               ) : null}
               {kind === 'hybrid' ? (
                 <div
-                  className="w-5 h-5 rounded-md bg-teal-500/15 flex items-center justify-center"
+                  className="w-5 h-5 rounded-md bg-brand/15 flex items-center justify-center"
                   title={t('work.type.hybrid')}
                 >
-                  <Activity size={12} className="text-teal-600 dark:text-teal-400" />
+                  <Activity size={12} className="text-brand dark:text-brand" />
                 </div>
               ) : null}
             </div>

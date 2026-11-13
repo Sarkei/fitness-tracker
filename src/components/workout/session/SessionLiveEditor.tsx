@@ -86,10 +86,10 @@ export default function SessionLiveEditor({
             exit={{ opacity: 0 }}
             className={mobileSheetOverlayClass()}
           >
-            <div className="bg-neutral-900 border border-neutral-800 rounded-3xl w-full max-w-md max-h-[85vh] flex flex-col">
-              <div className="p-4 border-b border-neutral-800 flex justify-between items-center">
+            <div className="bg-surface border border-line rounded-3xl w-full max-w-md max-h-[85vh] flex flex-col">
+              <div className="p-4 border-b border-line flex justify-between items-center">
                 <h3 className="font-black uppercase tracking-tight">{t('workout.session.liveEdit.title')}</h3>
-                <button type="button" onClick={onClose} className="p-2 text-neutral-500">
+                <button type="button" onClick={onClose} className="p-2 text-muted">
                   <X size={20} />
                 </button>
               </div>
@@ -97,13 +97,13 @@ export default function SessionLiveEditor({
                 {draft.map((ex, i) => (
                   <div
                     key={ex.id ?? i}
-                    className="flex items-center gap-2 bg-neutral-950 border border-neutral-800 rounded-xl p-3"
+                    className="flex items-center gap-2 bg-surface-2 border border-line rounded-xl p-3"
                   >
                     <div className="flex flex-col gap-0.5">
                       <button
                         type="button"
                         onClick={() => move(i, -1)}
-                        className="min-h-[36px] min-w-[36px] text-neutral-400 text-sm touch-manipulation"
+                        className="min-h-[36px] min-w-[36px] text-muted text-sm touch-manipulation"
                         aria-label={t('workout.session.rail.moveUp')}
                       >
                         ▲
@@ -111,13 +111,13 @@ export default function SessionLiveEditor({
                       <button
                         type="button"
                         onClick={() => move(i, 1)}
-                        className="min-h-[36px] min-w-[36px] text-neutral-400 text-sm touch-manipulation"
+                        className="min-h-[36px] min-w-[36px] text-muted text-sm touch-manipulation"
                         aria-label={t('workout.session.rail.moveDown')}
                       >
                         ▼
                       </button>
                     </div>
-                    <GripVertical size={14} className="text-neutral-600 shrink-0" />
+                    <GripVertical size={14} className="text-muted shrink-0" />
                     <button
                       type="button"
                       className="flex-1 text-sm font-bold truncate text-left hover:text-brand min-h-[44px]"
@@ -149,7 +149,7 @@ export default function SessionLiveEditor({
                           },
                         })
                       }
-                      className="min-h-[44px] min-w-[44px] text-neutral-500 hover:text-brand flex items-center justify-center touch-manipulation"
+                      className="min-h-[44px] min-w-[44px] text-muted hover:text-brand flex items-center justify-center touch-manipulation"
                       aria-label={t('exercise.action.swap')}
                     >
                       <RefreshCw size={18} />
@@ -159,7 +159,7 @@ export default function SessionLiveEditor({
                       onClick={() =>
                         openExerciseDetail({ exerciseKey: ex.exerciseKey, name: ex.name })
                       }
-                      className="min-h-[44px] min-w-[44px] text-neutral-500 hover:text-brand flex items-center justify-center touch-manipulation"
+                      className="min-h-[44px] min-w-[44px] text-muted hover:text-brand flex items-center justify-center touch-manipulation"
                       aria-label={t('exercise.action.info')}
                     >
                       <Info size={18} />
@@ -176,16 +176,16 @@ export default function SessionLiveEditor({
                 <button
                   type="button"
                   onClick={() => setShowPalette(true)}
-                  className="w-full min-h-[44px] border border-dashed border-neutral-700 rounded-xl text-[10px] font-black uppercase text-neutral-500 flex items-center justify-center gap-2"
+                  className="w-full min-h-[44px] border border-dashed border-line rounded-xl text-[10px] font-black uppercase text-muted flex items-center justify-center gap-2"
                 >
                   <Plus size={14} /> {t('workout.session.addExercise')}
                 </button>
               </div>
-              <div className="p-4 border-t border-neutral-800 flex gap-2">
+              <div className="p-4 border-t border-line flex gap-2">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex-1 min-h-[48px] rounded-xl bg-neutral-800 text-[10px] font-black uppercase"
+                  className="flex-1 min-h-[48px] rounded-xl bg-surface-2 text-[10px] font-black uppercase"
                 >
                   {t('profile.cancel')}
                 </button>

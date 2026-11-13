@@ -174,23 +174,23 @@ export function BarcodeSheet({
         )}
 
         {status === 'found' && product && (
-          <div className="rounded-2xl bg-white p-4 text-slate-900">
+          <div className="rounded-2xl bg-surface p-4 text-ink">
             <div className="flex gap-3">
               {product.imageUrl ? (
                 <img src={product.imageUrl} alt="" className="h-20 w-20 rounded-lg object-contain" />
               ) : (
-                <div className="flex h-20 w-20 items-center justify-center rounded-lg bg-slate-100">
-                  <Camera className="h-6 w-6 text-slate-400" />
+                <div className="flex h-20 w-20 items-center justify-center rounded-lg bg-surface-2">
+                  <Camera className="h-6 w-6 text-muted" />
                 </div>
               )}
               <div className="min-w-0">
                 <p className="truncate font-semibold">{product.name}</p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-muted">
                   {product.brand || ''} {product.quantity ? `· ${product.quantity}` : ''}
                 </p>
                 <p className="mt-1 text-sm">
                   {product.kcal ?? '—'} kcal · {product.protein ?? '—'} g P · {product.carbs ?? '—'} g K ·{' '}
-                  {product.fat ?? '—'} g F <span className="text-slate-400">pro 100 g</span>
+                  {product.fat ?? '—'} g F <span className="text-muted">pro 100 g</span>
                 </p>
               </div>
             </div>
@@ -200,9 +200,9 @@ export function BarcodeSheet({
                 min={1}
                 value={grams}
                 onChange={(e) => setGrams(Math.max(1, Number(e.target.value) || 1))}
-                className="w-24 rounded-lg border border-slate-300 px-2 py-1.5 text-center"
+                className="w-24 rounded-lg border border-line-strong px-2 py-1.5 text-center"
               />
-              <span className="text-sm text-slate-500">Gramm</span>
+              <span className="text-sm text-muted">Gramm</span>
               <button
                 onClick={() => void save()}
                 disabled={saving}
@@ -211,7 +211,7 @@ export function BarcodeSheet({
                 {saving ? 'Speichert …' : 'Hinzufügen'}
               </button>
             </div>
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-2 text-xs text-muted">
               {Math.round((product.kcal ?? 0) * (grams / 100))} kcal für {grams} g
             </p>
           </div>
@@ -225,11 +225,11 @@ export function BarcodeSheet({
               onChange={(e) => setManual(e.target.value)}
               inputMode="numeric"
               placeholder="z. B. 4008400402222"
-              className="flex-1 rounded-lg bg-white/90 px-3 py-2 text-slate-900"
+              className="flex-1 rounded-lg bg-white/90 px-3 py-2 text-ink"
             />
             <button
               onClick={() => manual.replace(/[^0-9]/g, '').length >= 6 && void loadProduct(manual.replace(/[^0-9]/g, ''))}
-              className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900"
+              className="rounded-lg bg-surface px-4 py-2 text-sm font-semibold text-ink"
             >
               Suchen
             </button>

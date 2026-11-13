@@ -89,7 +89,7 @@ export default function SessionCircuitPanel({ block, childCount, onAdvanceChild 
           {t('workout.session.circuit.round', { current: round, total: rounds })}
           {childCount > 1 ? ` · ${t('workout.session.circuit.ex', { n: childIdx + 1, total: childCount })}` : ''}
         </p>
-        <span className="text-[9px] font-bold text-neutral-500 uppercase">{phaseLabel}</span>
+        <span className="text-[9px] font-bold text-muted uppercase">{phaseLabel}</span>
       </div>
       <div className="flex items-center justify-center gap-3">
         <Timer size={20} className="text-cyan-400" />
@@ -102,7 +102,7 @@ export default function SessionCircuitPanel({ block, childCount, onAdvanceChild 
           <button
             type="button"
             onClick={startInterval}
-            className="flex-1 min-h-[44px] rounded-xl bg-cyan-600 text-white text-[10px] font-black uppercase tracking-widest"
+            className="flex-1 min-h-[44px] rounded-xl bg-cyan-600 text-[var(--ink)] text-[10px] font-black uppercase tracking-widest"
           >
             {t('workout.session.circuit.start')}
           </button>
@@ -111,7 +111,7 @@ export default function SessionCircuitPanel({ block, childCount, onAdvanceChild 
             <button
               type="button"
               onClick={() => setSecondsLeft(s => Math.max(0, s - 15))}
-              className="min-h-[44px] px-3 rounded-xl bg-neutral-900 text-[10px] font-bold text-neutral-400"
+              className="min-h-[44px] px-3 rounded-xl bg-surface text-[10px] font-bold text-muted"
             >
               −15s
             </button>
@@ -121,7 +121,7 @@ export default function SessionCircuitPanel({ block, childCount, onAdvanceChild 
                 setPhase('idle');
                 setSecondsLeft(workSec);
               }}
-              className="min-h-[44px] px-3 rounded-xl bg-neutral-900 text-[10px] font-bold text-neutral-400 flex items-center gap-1"
+              className="min-h-[44px] px-3 rounded-xl bg-surface text-[10px] font-bold text-muted flex items-center gap-1"
             >
               <RotateCcw size={12} /> {t('workout.session.circuit.reset')}
             </button>

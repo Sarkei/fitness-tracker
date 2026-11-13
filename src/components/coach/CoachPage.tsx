@@ -135,10 +135,10 @@ const DISCIPLINE_STYLE: Record<string, { icon: typeof Dumbbell; color: string }>
   cycling_marathon:  { icon: Bike,      color: 'bg-blue-500'   },
   hyrox:             { icon: Zap,       color: 'bg-yellow-500' },
   crossfit:          { icon: Flame,     color: 'bg-red-500'    },
-  calisthenics:      { icon: Target,    color: 'bg-teal-500'   },
+  calisthenics:      { icon: Target,    color: 'bg-brand'   },
   hybrid_athlete:    { icon: Activity,  color: 'bg-emerald-500'},
   triathlon:         { icon: Waves,     color: 'bg-cyan-500'   },
-  trail_running:     { icon: Mountain,  color: 'bg-stone-500'  },
+  trail_running:     { icon: Mountain,  color: 'bg-[var(--muted)]'  },
   powerlifting:      { icon: Dumbbell,  color: 'bg-pink-500'   },
   half_marathon:     { icon: Activity,  color: 'bg-amber-500'  },
   functional_fitness:{ icon: Target,    color: 'bg-indigo-500' },
@@ -150,7 +150,7 @@ function getDisciplineMeta(plan: CoachPlan, t: (k: string, vars?: Record<string,
     const s = DISCIPLINE_STYLE.nutrition;
     return { icon: s.icon, color: s.color, label: t('coach.discipline.nutrition') };
   }
-  const s = DISCIPLINE_STYLE[plan.discipline] ?? { icon: Brain, color: 'bg-gray-500' };
+  const s = DISCIPLINE_STYLE[plan.discipline] ?? { icon: Brain, color: 'bg-[var(--muted)]' };
   const k = `coach.discipline.${plan.discipline}`;
   const label = t(k);
   return { icon: s.icon, color: s.color, label: label === k ? plan.discipline.replace(/_/g, ' ') : label };
@@ -873,12 +873,12 @@ function WeeklyScheduleView({
               <div className="flex items-start gap-3 flex-shrink-0">
                 <div className={cn("w-10 h-10 rounded-xl flex flex-col items-center justify-center text-[10px] font-black flex-shrink-0 leading-none gap-0.5",
                   isTodayDay ? "ui-mark-selected" :
-                  isRest ? "bg-gray-100 text-gray-400" :
+                  isRest ? "bg-surface-2 text-muted" :
                   d.intensity === 'high' || d.intensity === 'very_high' ? "bg-red-50 text-red-500" :
                   d.intensity === 'moderate' ? "bg-orange-50 text-orange-500" : "bg-green-50 text-green-500")}>
                   <span>{formatCoachDayShort(group.day, t)}</span>
                   {dayDateLabel ? (
-                    <span className={cn('text-[10px] font-bold tracking-normal', isTodayDay ? 'text-white/90' : 'opacity-70')}>
+                    <span className={cn('text-[10px] font-bold tracking-normal', isTodayDay ? 'text-[var(--accent-ink)]' : 'opacity-70')}>
                       {dayDateLabel}
                     </span>
                   ) : null}
@@ -1241,22 +1241,22 @@ function WeeklyReportView({
         <CoachStaleReportBanner onRegenerate={onRegenerateReport} regenerating={regenerating} />
       )}
 
-      <div className="bg-black text-white rounded-[2rem] p-8">
+      <div className="bg-surface-3 text-ink rounded-[2rem] p-8">
         <div className="flex items-start justify-between mb-6">
           <div>
-            <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">{t('dash.coach.weekAnalysis', { n: weekNumber })}</p>
+            <p className="text-[9px] font-black uppercase tracking-widest text-muted">{t('dash.coach.weekAnalysis', { n: weekNumber })}</p>
             <p className="text-3xl font-black italic uppercase tracking-tighter mt-1">{report.summary?.split('.')[0] || t('dash.coach.weeklyAnalysis')}</p>
           </div>
           <div className="text-right">
-            <p className="text-4xl font-black italic">{report.overallRating}<span className="text-lg text-gray-400">/10</span></p>
+            <p className="text-4xl font-black italic">{report.overallRating}<span className="text-lg text-muted">/10</span></p>
             <div className="flex gap-0.5 justify-end mt-1">
               {[...Array(5)].map((_, i) => (
-                <Star key={i} size={14} className={i < STARS ? "text-yellow-400 fill-yellow-400" : "text-gray-600"} />
+                <Star key={i} size={14} className={i < STARS ? "text-yellow-400 fill-yellow-400" : "text-muted"} />
               ))}
             </div>
           </div>
         </div>
-        <p className="text-sm text-gray-300 font-medium leading-relaxed">{report.coachMessage}</p>
+        <p className="text-sm text-muted font-medium leading-relaxed">{report.coachMessage}</p>
       </div>
 
       {factsLoading && !facts && (
@@ -1777,7 +1777,7 @@ function PlanDetail({ planId, onBack, initialExpandedDay }: { planId: string; on
         </div>
         <span className={cn("text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full",
           plan.status === 'active' ? "bg-green-100 text-green-700" :
-          plan.status === 'paused' ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-500")}>
+          plan.status === 'paused' ? "bg-yellow-100 text-yellow-700" : "bg-surface-2 text-muted")}>
           {plan.status}
         </span>
       </div>
@@ -1969,7 +1969,7 @@ function PlanDetail({ planId, onBack, initialExpandedDay }: { planId: string; on
           {plan.schedules.map(s => (
             <button key={s.week_number} onClick={() => setSelectedWeek(s.week_number)}
               className={cn("flex-shrink-0 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all",
-                selectedWeek === s.week_number ? "border-black bg-black text-white" : "border-[var(--border-muted)] text-[var(--text-muted)] hover:border-[var(--text-muted)]")}>
+                selectedWeek === s.week_number ? "border-black bg-accent text-[var(--on-accent)]" : "border-[var(--border-muted)] text-[var(--text-muted)] hover:border-[var(--text-muted)]")}>
               {t('coach.wk.week', { n: s.week_number })}
             </button>
           ))}
@@ -2290,8 +2290,8 @@ export default function CoachPage({ planType, deepLink, autoStartOnboarding }: C
           disabled={aiCaps.loading || !aiCaps.enabled}
           onClick={() => aiCaps.enabled && setShowOnboarding(true)}
           className={cn(
-            'flex items-center justify-center gap-2 bg-black text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-800 transition-colors shadow-lg shadow-black/10 shrink-0',
-            (!aiCaps.enabled || aiCaps.loading) && 'opacity-40 cursor-not-allowed hover:bg-black',
+            'flex items-center justify-center gap-2 bg-accent text-[var(--on-accent)] px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[var(--accent-hover)] transition-colors shadow-lg shadow-black/10 shrink-0',
+            (!aiCaps.enabled || aiCaps.loading) && 'opacity-40 cursor-not-allowed hover:bg-[var(--accent)]',
           )}
         >
           <Plus size={14} /> {t('coach.newPlan')}
@@ -2362,8 +2362,8 @@ export default function CoachPage({ planType, deepLink, autoStartOnboarding }: C
             disabled={aiCaps.loading || !aiCaps.enabled}
             onClick={() => aiCaps.enabled && setShowOnboarding(true)}
             className={cn(
-              'inline-flex items-center gap-2 bg-black text-white px-7 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-800 transition-colors shadow-lg shadow-black/10',
-              (!aiCaps.enabled || aiCaps.loading) && 'opacity-40 cursor-not-allowed hover:bg-black',
+              'inline-flex items-center gap-2 bg-accent text-[var(--on-accent)] px-7 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[var(--accent-hover)] transition-colors shadow-lg shadow-black/10',
+              (!aiCaps.enabled || aiCaps.loading) && 'opacity-40 cursor-not-allowed hover:bg-[var(--accent)]',
             )}
           >
             <Plus size={14} /> {t('coach.empty.create', { label: typeLabel })}

@@ -1119,7 +1119,7 @@ export default function ProfilePage() {
                   type="button"
                   onClick={handleAddWeight}
                   disabled={saving || !newWeight}
-                  className="w-full min-h-[52px] bg-black text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-black/20 disabled:opacity-50 touch-manipulation"
+                  className="w-full min-h-[52px] bg-accent text-[var(--on-accent)] py-5 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-black/20 disabled:opacity-50 touch-manipulation"
                 >
                   {saving ? t('profile.updatingScan') : t('profile.confirmEntry')}
                 </button>

@@ -39,18 +39,18 @@ export default function CardioSessionFeedbackModal({ open, onSubmit, onSkip, has
       <motion.div
         initial={{ y: 24, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="relative w-full max-w-md rounded-3xl border border-neutral-800 bg-neutral-950 p-6 space-y-5 shadow-2xl"
+        className="relative w-full max-w-md rounded-3xl border border-line bg-surface-2 p-6 space-y-5 shadow-2xl"
       >
         <div className="text-center space-y-1">
           <Activity className="mx-auto text-brand" size={28} />
           <h3 className="text-lg font-black uppercase tracking-tight">{t('workout.cardioFeedback.title')}</h3>
-          <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest leading-relaxed">
+          <p className="text-[10px] font-bold text-muted uppercase tracking-widest leading-relaxed">
             {t('workout.cardioFeedback.subtitle')}
           </p>
         </div>
 
         <div>
-          <label className="text-[9px] font-black uppercase tracking-widest text-neutral-500 mb-2 block">
+          <label className="text-[9px] font-black uppercase tracking-widest text-muted mb-2 block">
             {t('workout.cardioFeedback.rpe')}
           </label>
           <div className="grid grid-cols-5 gap-2">
@@ -60,7 +60,7 @@ export default function CardioSessionFeedbackModal({ open, onSubmit, onSkip, has
                 type="button"
                 onClick={() => setRpe(n)}
                 className={`min-h-[44px] rounded-xl text-sm font-black ${
-                  rpe === n ? 'ui-mark-selected' : 'bg-neutral-900 text-neutral-400 border border-neutral-800'
+                  rpe === n ? 'ui-mark-selected' : 'bg-surface text-muted border border-line'
                 }`}
               >
                 {n}
@@ -72,7 +72,7 @@ export default function CardioSessionFeedbackModal({ open, onSubmit, onSkip, has
         {hasCardio ? (
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[9px] font-black uppercase tracking-widest text-neutral-500 mb-2 flex items-center gap-1">
+              <label className="text-[9px] font-black uppercase tracking-widest text-muted mb-2 flex items-center gap-1">
                 <Heart size={12} /> {t('workout.cardioFeedback.hrAvg')}
               </label>
               <input
@@ -83,11 +83,11 @@ export default function CardioSessionFeedbackModal({ open, onSubmit, onSkip, has
                 placeholder="145"
                 value={avgHr}
                 onChange={e => setAvgHr(e.target.value === '' ? '' : parseInt(e.target.value, 10) || '')}
-                className="w-full min-h-[48px] text-center text-xl font-black bg-neutral-900 border border-neutral-800 rounded-xl text-white focus:ring-2 focus:ring-brand focus:outline-none"
+                className="w-full min-h-[48px] text-center text-xl font-black bg-surface border border-line rounded-xl text-[var(--ink)] focus:ring-2 focus:ring-brand focus:outline-none"
               />
             </div>
             <div>
-              <label className="text-[9px] font-black uppercase tracking-widest text-neutral-500 mb-2 flex items-center gap-1">
+              <label className="text-[9px] font-black uppercase tracking-widest text-muted mb-2 flex items-center gap-1">
                 <Heart size={12} /> {t('workout.cardioFeedback.hrMax')}
               </label>
               <input
@@ -98,21 +98,21 @@ export default function CardioSessionFeedbackModal({ open, onSubmit, onSkip, has
                 placeholder="168"
                 value={maxHr}
                 onChange={e => setMaxHr(e.target.value === '' ? '' : parseInt(e.target.value, 10) || '')}
-                className="w-full min-h-[48px] text-center text-xl font-black bg-neutral-900 border border-neutral-800 rounded-xl text-white focus:ring-2 focus:ring-brand focus:outline-none"
+                className="w-full min-h-[48px] text-center text-xl font-black bg-surface border border-line rounded-xl text-[var(--ink)] focus:ring-2 focus:ring-brand focus:outline-none"
               />
             </div>
           </div>
         ) : null}
 
         <div>
-          <label className="text-[9px] font-black uppercase tracking-widest text-neutral-500 mb-2 block">
+          <label className="text-[9px] font-black uppercase tracking-widest text-muted mb-2 block">
             {t('workout.cardioFeedback.notes')}
           </label>
           <textarea
             value={notes}
             onChange={e => setNotes(e.target.value)}
             rows={2}
-            className="w-full rounded-xl bg-neutral-900 border border-neutral-800 text-sm text-white p-3 focus:ring-2 focus:ring-brand focus:outline-none resize-none"
+            className="w-full rounded-xl bg-surface border border-line text-sm text-[var(--ink)] p-3 focus:ring-2 focus:ring-brand focus:outline-none resize-none"
             placeholder={t('workout.cardioFeedback.notesPlaceholder')}
           />
         </div>
@@ -121,7 +121,7 @@ export default function CardioSessionFeedbackModal({ open, onSubmit, onSkip, has
           <button
             type="button"
             onClick={onSkip}
-            className="flex-1 min-h-[48px] rounded-xl bg-neutral-900 text-[10px] font-black uppercase tracking-widest text-neutral-400"
+            className="flex-1 min-h-[48px] rounded-xl bg-surface text-[10px] font-black uppercase tracking-widest text-muted"
           >
             {t('workout.cardioFeedback.skip')}
           </button>

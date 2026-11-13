@@ -489,7 +489,7 @@ export default function StatisticsPage() {
             days: nutritionDaysLogged,
           })}
           icon={Apple}
-          accent="bg-teal-500/15 text-teal-600"
+          accent="bg-brand/15 text-brand"
         />
         <Kpi
           label={t('stats.kpi.presence')}
@@ -573,7 +573,7 @@ export default function StatisticsPage() {
               title={t('stats.section.nutrition')}
               subtitle={t('stats.section.nutritionSub')}
               icon={Apple}
-              iconClass="bg-teal-500/15 text-teal-600"
+              iconClass="bg-brand/15 text-brand"
             />
             {!hasNutritionInRange ? (
               <EmptyState
@@ -747,7 +747,7 @@ export default function StatisticsPage() {
                 label={t('stats.cardio.km')}
                 value={`${cardioAgg.totalKm}`}
                 icon={Target}
-                accent="bg-teal-500/15 text-teal-600"
+                accent="bg-brand/15 text-brand"
               />
             </div>
           </section>
@@ -894,7 +894,7 @@ export default function StatisticsPage() {
             title={t('stats.history.title')}
             subtitle={t('stats.history.sub')}
             icon={Clock}
-            iconClass="bg-neutral-500/15 text-neutral-600"
+            iconClass="bg-surface-3 text-muted"
             className="mb-6"
           />
           <ul className="space-y-2">

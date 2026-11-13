@@ -104,7 +104,7 @@ function ModelSelect({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full text-xs font-medium text-slate-900 bg-gray-50 border border-gray-200 rounded-lg px-2 py-2.5 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
+      className="w-full text-xs font-medium text-ink bg-surface-2 border border-line rounded-lg px-2 py-2.5 focus:outline-none focus:ring-1 focus:ring-[var(--accent)] cursor-pointer"
     >
       {options.map((o) => (
         <option key={o.id} value={o.id}>
@@ -194,34 +194,34 @@ function AdminLogin({ onLogin }: { onLogin: (auth: string) => void }) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-surface-2 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-black rounded-2xl mb-4">
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-accent rounded-2xl mb-4">
             <ShieldCheck size={28} className="text-white" />
           </div>
           <h1 className="text-2xl font-black tracking-tighter uppercase italic">{t('admin.title')}</h1>
-          <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold mt-1">{t('admin.controlPanel')}</p>
+          <p className="text-[10px] text-muted uppercase tracking-widest font-bold mt-1">{t('admin.controlPanel')}</p>
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
+        <div className="bg-surface rounded-2xl border border-line shadow-sm p-8">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
+              <label className="text-[10px] font-bold text-muted uppercase tracking-widest block mb-1">
                 {t('admin.login.username')}
               </label>
               <input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full text-sm font-medium text-slate-900 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-1 focus:ring-black transition-shadow"
+                className="w-full text-sm font-medium text-ink bg-surface-2 border border-line rounded-xl px-4 py-3 focus:outline-none focus:ring-1 focus:ring-[var(--accent)] transition-shadow"
                 placeholder={t('admin.login.placeholderUser')}
                 required
               />
             </div>
             <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
+              <label className="text-[10px] font-bold text-muted uppercase tracking-widest block mb-1">
                 {t('admin.login.password')}
               </label>
               <div className="relative">
@@ -229,14 +229,14 @@ function AdminLogin({ onLogin }: { onLogin: (auth: string) => void }) {
                   type={showPw ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full text-sm font-medium text-slate-900 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 pr-12 focus:outline-none focus:ring-1 focus:ring-black transition-shadow"
+                  className="w-full text-sm font-medium text-ink bg-surface-2 border border-line rounded-xl px-4 py-3 pr-12 focus:outline-none focus:ring-1 focus:ring-[var(--accent)] transition-shadow"
                   placeholder={t('admin.login.placeholderPw')}
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPw(!showPw)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-ink transition-colors"
                 >
                   {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -252,7 +252,7 @@ function AdminLogin({ onLogin }: { onLogin: (auth: string) => void }) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-black text-white rounded-xl py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-800 transition-colors disabled:opacity-50 mt-2"
+              className="w-full bg-accent text-[var(--on-accent)] rounded-xl py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-50 mt-2"
             >
               {loading ? t('admin.login.signingIn') : t('admin.login.signIn')}
             </button>
@@ -321,19 +321,19 @@ function EditModal({
   return overlayPortal(
     <div className={mobileSheetOverlayClass()}>
       <div
-        className="max-h-[min(92dvh,calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)))] w-full max-w-md overflow-y-auto overscroll-contain rounded-t-2xl border border-gray-200 bg-white text-slate-900 shadow-2xl lg:max-h-[90vh] lg:rounded-2xl [-webkit-overflow-scrolling:touch]"
+        className="max-h-[min(92dvh,calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)))] w-full max-w-md overflow-y-auto overscroll-contain rounded-t-2xl border border-line bg-surface text-ink shadow-2xl lg:max-h-[90vh] lg:rounded-2xl [-webkit-overflow-scrolling:touch]"
         style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-100 p-6 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))] md:pt-6">
+        <div className="flex items-center justify-between border-b border-line p-6 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))] md:pt-6">
           <div>
-            <h2 className="text-lg font-black uppercase tracking-tighter text-slate-900">{t('admin.edit.title')}</h2>
-            <p className="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-gray-400">{t('admin.edit.id', { id: user.id })}</p>
+            <h2 className="text-lg font-black uppercase tracking-tighter text-ink">{t('admin.edit.title')}</h2>
+            <p className="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-muted">{t('admin.edit.id', { id: user.id })}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="flex min-h-[44px] min-w-[44px] touch-manipulation items-center justify-center rounded-xl p-2 text-gray-400 transition-colors hover:bg-gray-50 hover:text-gray-600 active:opacity-90"
+            className="flex min-h-[44px] min-w-[44px] touch-manipulation items-center justify-center rounded-xl p-2 text-muted transition-colors hover:bg-surface-2 hover:text-ink active:opacity-90"
             aria-label={t('admin.edit.cancel')}
           >
             <X size={20} />
@@ -344,7 +344,7 @@ function EditModal({
         <form onSubmit={handleSave} className="space-y-4 p-6">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-gray-400">
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-muted">
                 {t('admin.edit.firstName')}
               </label>
               <input
@@ -352,13 +352,13 @@ function EditModal({
                 autoComplete="given-name"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                className="min-h-[48px] w-full touch-manipulation rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-base font-medium text-slate-900 transition-shadow focus:outline-none focus:ring-1 focus:ring-black md:text-sm"
+                className="min-h-[48px] w-full touch-manipulation rounded-xl border border-line bg-surface-2 px-4 py-3 text-base font-medium text-ink transition-shadow focus:outline-none focus:ring-1 focus:ring-[var(--accent)] md:text-sm"
                 required
                 minLength={2}
               />
             </div>
             <div>
-              <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-gray-400">
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-muted">
                 {t('admin.edit.lastName')}
               </label>
               <input
@@ -366,24 +366,24 @@ function EditModal({
                 autoComplete="family-name"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                className="min-h-[48px] w-full touch-manipulation rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-base font-medium text-slate-900 transition-shadow focus:outline-none focus:ring-1 focus:ring-black md:text-sm"
+                className="min-h-[48px] w-full touch-manipulation rounded-xl border border-line bg-surface-2 px-4 py-3 text-base font-medium text-ink transition-shadow focus:outline-none focus:ring-1 focus:ring-[var(--accent)] md:text-sm"
                 required
                 minLength={2}
               />
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-gray-400">{t('admin.edit.email')}</label>
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-muted">{t('admin.edit.email')}</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="min-h-[48px] w-full touch-manipulation rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-base font-medium text-slate-900 transition-shadow focus:outline-none focus:ring-1 focus:ring-black md:text-sm"
+              className="min-h-[48px] w-full touch-manipulation rounded-xl border border-line bg-surface-2 px-4 py-3 text-base font-medium text-ink transition-shadow focus:outline-none focus:ring-1 focus:ring-[var(--accent)] md:text-sm"
               required
             />
           </div>
           <div>
-            <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-gray-400">
+            <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-muted">
               {t('admin.edit.newPw')}
             </label>
             <div className="relative">
@@ -391,13 +391,13 @@ function EditModal({
                 type={showPw ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="min-h-[48px] w-full touch-manipulation rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 pr-12 text-base font-medium text-slate-900 transition-shadow focus:outline-none focus:ring-1 focus:ring-black md:text-sm"
+                className="min-h-[48px] w-full touch-manipulation rounded-xl border border-line bg-surface-2 px-4 py-3 pr-12 text-base font-medium text-ink transition-shadow focus:outline-none focus:ring-1 focus:ring-[var(--accent)] md:text-sm"
                 placeholder={t('admin.edit.newPwPh')}
               />
               <button
                 type="button"
                 onClick={() => setShowPw(!showPw)}
-                className="absolute right-2 top-1/2 flex min-h-[44px] min-w-[44px] -translate-y-1/2 touch-manipulation items-center justify-center text-gray-400 transition-colors hover:text-gray-600"
+                className="absolute right-2 top-1/2 flex min-h-[44px] min-w-[44px] -translate-y-1/2 touch-manipulation items-center justify-center text-muted transition-colors hover:text-ink"
                 aria-label={showPw ? 'Hide password' : 'Show password'}
               >
                 {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -413,14 +413,14 @@ function EditModal({
             <button
               type="button"
               onClick={onClose}
-              className="min-h-[52px] flex-1 touch-manipulation rounded-xl border border-gray-200 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-700 transition-colors hover:bg-gray-50 active:opacity-90 md:min-h-[48px]"
+              className="min-h-[52px] flex-1 touch-manipulation rounded-xl border border-line py-3 text-[10px] font-bold uppercase tracking-widest text-ink transition-colors hover:bg-surface-2 active:opacity-90 md:min-h-[48px]"
             >
               {t('admin.edit.cancel')}
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="min-h-[52px] flex-1 touch-manipulation rounded-xl bg-black py-3 text-[10px] font-bold uppercase tracking-widest text-white transition-colors hover:bg-gray-800 disabled:opacity-50 active:opacity-90 md:min-h-[48px]"
+              className="min-h-[52px] flex-1 touch-manipulation rounded-xl bg-accent py-3 text-[10px] font-bold uppercase tracking-widest text-[var(--on-accent)] transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-50 active:opacity-90 md:min-h-[48px]"
             >
               {loading ? t('admin.edit.saving') : t('admin.edit.save')}
             </button>
@@ -482,18 +482,18 @@ function ApiKeyEditor({
   };
 
   return overlayPortal(
-    <motion.div layout className="bg-white rounded-2xl border border-gray-200 p-5 space-y-3 text-slate-900">
+    <motion.div layout className="bg-surface rounded-2xl border border-line p-5 space-y-3 text-ink">
       <motion.div layout className="flex items-center justify-between gap-2">
-        <p className="text-sm font-black uppercase tracking-tighter text-slate-900">{label}</p>
+        <p className="text-sm font-black uppercase tracking-tighter text-ink">{label}</p>
         {configured ? (
           <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">
             <CheckCircle2 size={12} /> Konfiguriert
           </span>
         ) : (
-          <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400">Nicht gesetzt</span>
+          <span className="text-[9px] font-bold uppercase tracking-widest text-muted">Nicht gesetzt</span>
         )}
       </motion.div>
-      <p className="text-[10px] text-gray-400">Gespeicherte Keys werden nie angezeigt. Nur ein neuer Key überschreibt den bestehenden.</p>
+      <p className="text-[10px] text-muted">Gespeicherte Keys werden nie angezeigt. Nur ein neuer Key überschreibt den bestehenden.</p>
       {configured && masked ? (
         <p className="rounded-lg bg-emerald-50 px-3 py-2 font-mono text-base font-semibold tracking-wide text-emerald-700">
           {masked}
@@ -506,12 +506,12 @@ function ApiKeyEditor({
           onChange={(e) => setApiKey(e.target.value)}
           placeholder="Neuen API-Key eingeben…"
           autoComplete="off"
-          className="w-full text-sm font-medium text-slate-900 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 pr-12 focus:outline-none focus:ring-1 focus:ring-black"
+          className="w-full text-sm font-medium text-ink bg-surface-2 border border-line rounded-xl px-4 py-3 pr-12 focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
         />
         <button
           type="button"
           onClick={() => setShowKey(!showKey)}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-ink"
         >
           {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
         </button>
@@ -521,7 +521,7 @@ function ApiKeyEditor({
           type="button"
           onClick={saveKey}
           disabled={saving || !apiKey.trim()}
-          className="w-full flex items-center justify-center gap-1.5 bg-black text-white rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest hover:bg-gray-800 disabled:opacity-40"
+          className="w-full flex items-center justify-center gap-1.5 bg-accent text-[var(--on-accent)] rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest hover:bg-[var(--accent-hover)] disabled:opacity-40"
         >
           <Save size={14} />
           {saving ? 'API Key aktualisieren…' : 'API Key aktualisieren'}
@@ -586,28 +586,28 @@ function ModelConfigPanel({
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4 text-slate-900">
+    <div className="bg-surface rounded-2xl border border-line p-6 space-y-4 text-ink">
       <motion.div layout>
-        <p className="text-sm font-black uppercase tracking-tighter text-slate-900">Modell-Mapping pro Bereich</p>
-        <p className="text-[9px] text-gray-400 uppercase tracking-widest font-bold mt-0.5">
+        <p className="text-sm font-black uppercase tracking-tighter text-ink">Modell-Mapping pro Bereich</p>
+        <p className="text-[9px] text-muted uppercase tracking-widest font-bold mt-0.5">
           Modell pro Bereich aus der Liste wählen – Änderungen landen in der .env
         </p>
       </motion.div>
       <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead>
-            <tr className="border-b border-gray-100">
-              <th className="py-2 pr-4 text-[9px] font-black uppercase tracking-widest text-gray-400">Bereich</th>
+            <tr className="border-b border-line">
+              <th className="py-2 pr-4 text-[9px] font-black uppercase tracking-widest text-muted">Bereich</th>
               <th className="py-2 px-2 text-[9px] font-black uppercase tracking-widest text-emerald-600">Ollama (Lokal)</th>
-              <th className="py-2 px-2 text-[9px] font-black uppercase tracking-widest text-gray-400">DeepSeek</th>
-              <th className="py-2 px-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Mistral</th>
-              <th className="py-2 pl-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Gemini</th>
+              <th className="py-2 px-2 text-[9px] font-black uppercase tracking-widest text-muted">DeepSeek</th>
+              <th className="py-2 px-2 text-[9px] font-black uppercase tracking-widest text-muted">Mistral</th>
+              <th className="py-2 pl-2 text-[9px] font-black uppercase tracking-widest text-muted">Gemini</th>
             </tr>
           </thead>
           <tbody>
             {aiConfig.areas.map((area) => (
-              <tr key={area.id} className="border-b border-gray-50 align-top">
-                <td className="py-3 pr-4 text-xs font-bold text-gray-700 whitespace-nowrap">{area.label}</td>
+              <tr key={area.id} className="border-b border-line align-top">
+                <td className="py-3 pr-4 text-xs font-bold text-ink whitespace-nowrap">{area.label}</td>
                 <td className="py-3 px-2 min-w-[220px]">
                   <ModelSelect
                     value={draft.ollama?.[area.id] ?? area.recommended.ollama?.model ?? 'gemma4:e2b'}
@@ -678,7 +678,7 @@ function ModelConfigPanel({
           type="button"
           onClick={saveModels}
           disabled={saving}
-          className="inline-flex items-center gap-1.5 bg-black text-white rounded-xl px-5 py-2.5 text-[10px] font-black uppercase tracking-widest hover:bg-gray-800 disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 bg-accent text-[var(--on-accent)] rounded-xl px-5 py-2.5 text-[10px] font-black uppercase tracking-widest hover:bg-[var(--accent-hover)] disabled:opacity-50"
         >
           <Save size={14} />
           {saving ? 'Speichern…' : 'Modelle speichern'}
@@ -758,9 +758,9 @@ function ExerciseDbKeyEditor({
   };
 
   return overlayPortal(
-    <motion.div layout className="bg-white rounded-2xl border border-gray-200 p-5 space-y-3 text-slate-900">
+    <motion.div layout className="bg-surface rounded-2xl border border-line p-5 space-y-3 text-ink">
       <motion.div layout className="flex items-center justify-between gap-2">
-        <p className="text-sm font-black uppercase tracking-tighter text-slate-900">ExerciseDB (RapidAPI)</p>
+        <p className="text-sm font-black uppercase tracking-tighter text-ink">ExerciseDB (RapidAPI)</p>
         {configured ? (
           <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">
             <CheckCircle2 size={12} /> Konfiguriert
@@ -769,7 +769,7 @@ function ExerciseDbKeyEditor({
           <span className="text-[9px] font-bold uppercase tracking-widest text-amber-600">Nicht in .env</span>
         )}
       </motion.div>
-      <p className="text-[10px] text-slate-500 leading-relaxed">
+      <p className="text-[10px] text-muted leading-relaxed">
         RapidAPI-Key von{' '}
         <a
           href="https://rapidapi.com/ascendapi/api/edb-with-videos-and-images-by-ascendapi"
@@ -780,7 +780,7 @@ function ExerciseDbKeyEditor({
           AscendAPI ExerciseDB V2
         </a>
         . Auf dem Server als Umgebungsvariable{' '}
-        <code className="bg-gray-100 px-1 rounded">EXERCISEDB_RAPIDAPI_KEY</code> (Docker/Panel) oder hier in die
+        <code className="bg-surface-2 px-1 rounded">EXERCISEDB_RAPIDAPI_KEY</code> (Docker/Panel) oder hier in die
         .env speichern. Lange alphanumerische Keys werden unterstützt.
       </p>
       <div className="relative">
@@ -790,12 +790,12 @@ function ExerciseDbKeyEditor({
           onChange={e => setApiKey(e.target.value)}
           placeholder="RapidAPI X-RapidAPI-Key…"
           autoComplete="off"
-          className="w-full text-sm font-medium text-slate-900 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 pr-12 focus:outline-none focus:ring-1 focus:ring-black"
+          className="w-full text-sm font-medium text-ink bg-surface-2 border border-line rounded-xl px-4 py-3 pr-12 focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
         />
         <button
           type="button"
           onClick={() => setShowKey(!showKey)}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-ink"
         >
           {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
         </button>
@@ -805,7 +805,7 @@ function ExerciseDbKeyEditor({
           type="button"
           onClick={() => void testKey()}
           disabled={testing || !apiKey.trim()}
-          className="flex-1 flex items-center justify-center gap-1.5 border border-gray-200 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-800 hover:bg-gray-50 disabled:opacity-40"
+          className="flex-1 flex items-center justify-center gap-1.5 border border-line rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest text-ink hover:bg-surface-2 disabled:opacity-40"
         >
           <FlaskConical size={14} />
           {testing ? 'Teste…' : 'Testen'}
@@ -814,7 +814,7 @@ function ExerciseDbKeyEditor({
           type="button"
           onClick={() => void saveKey()}
           disabled={saving || !apiKey.trim()}
-          className="flex-1 flex items-center justify-center gap-1.5 bg-black text-white rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest hover:bg-gray-800 disabled:opacity-40"
+          className="flex-1 flex items-center justify-center gap-1.5 bg-accent text-[var(--on-accent)] rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest hover:bg-[var(--accent-hover)] disabled:opacity-40"
         >
           <Save size={14} />
           {saving ? 'Speichern…' : 'In .env speichern'}
@@ -970,19 +970,19 @@ function DataMigrationPanel({ authHeader }: { authHeader: string }) {
   };
 
   return overlayPortal(
-    <motion.div layout className="mb-8 rounded-2xl border border-gray-200 bg-white p-6 space-y-4 text-slate-900">
+    <motion.div layout className="mb-8 rounded-2xl border border-line bg-surface p-6 space-y-4 text-ink">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <button
           type="button"
           onClick={() => setCollapsed((v) => !v)}
-          className="flex flex-1 gap-3 rounded-xl border border-transparent px-1 py-1 text-left hover:bg-gray-50"
+          className="flex flex-1 gap-3 rounded-xl border border-transparent px-1 py-1 text-left hover:bg-surface-2"
         >
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand">
             <Database size={22} />
           </div>
           <div>
-            <p className="text-sm font-black uppercase tracking-tighter text-slate-900">Daten-Migration</p>
-            <p className="mt-0.5 text-[9px] font-bold uppercase tracking-widest text-gray-400">
+            <p className="text-sm font-black uppercase tracking-tighter text-ink">Daten-Migration</p>
+            <p className="mt-0.5 text-[9px] font-bold uppercase tracking-widest text-muted">
               ExerciseDB · Open Food Facts · Zielversion{' '}
               {status?.targetVersion ?? '…'} · {collapsed ? 'Ausklappen' : 'Einklappen'}
             </p>
@@ -993,7 +993,7 @@ function DataMigrationPanel({ authHeader }: { authHeader: string }) {
             type="button"
             onClick={() => void fetchStatus()}
             disabled={loading || running}
-            className="flex min-h-[40px] items-center justify-center gap-1.5 self-start rounded-xl border border-gray-100 px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-500 hover:bg-gray-50 disabled:opacity-40"
+            className="flex min-h-[40px] items-center justify-center gap-1.5 self-start rounded-xl border border-line px-3 py-2 text-[9px] font-black uppercase tracking-widest text-muted hover:bg-surface-2 disabled:opacity-40"
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             Aktualisieren
@@ -1002,7 +1002,7 @@ function DataMigrationPanel({ authHeader }: { authHeader: string }) {
       </div>
       {!collapsed && (
         <>
-          <p className="text-xs text-gray-500 leading-relaxed">
+          <p className="text-xs text-muted leading-relaxed">
             Migriert alle aktiven Nutzer auf die aktuelle Datenbank-Version (inkl. Ernährung/Workout/Coach).
           </p>
 
@@ -1011,7 +1011,7 @@ function DataMigrationPanel({ authHeader }: { authHeader: string }) {
               type="button"
               onClick={() => void runMigration(false)}
               disabled={running || loading}
-              className="flex min-h-[52px] flex-1 items-center justify-center gap-2 rounded-xl bg-black text-white text-[10px] font-black uppercase tracking-widest hover:bg-gray-800 disabled:opacity-50"
+              className="flex min-h-[52px] flex-1 items-center justify-center gap-2 rounded-xl bg-accent text-[var(--on-accent)] text-[10px] font-black uppercase tracking-widest hover:bg-[var(--accent-hover)] disabled:opacity-50"
             >
               {running ? <Loader2 size={16} className="animate-spin" /> : <Database size={16} />}
               {running ? 'Migration läuft…' : 'Nur ausstehende Nutzer migrieren'}
@@ -1095,11 +1095,11 @@ function DataMigrationPanel({ authHeader }: { authHeader: string }) {
       )}
       {showJobModal && (
         <div className={mobileSheetOverlayClass()}>
-          <div className="w-full max-w-xl rounded-2xl border border-gray-200 bg-white p-6 text-slate-900 shadow-2xl">
+          <div className="w-full max-w-xl rounded-2xl border border-line bg-surface p-6 text-ink shadow-2xl">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-black uppercase tracking-tighter">Migration läuft</h3>
-                <p className="text-[10px] text-gray-500">
+                <p className="text-[10px] text-muted">
                   {job ? `${job.processedUsers}/${job.totalUsers} Nutzer verarbeitet` : 'Initialisiere…'}
                 </p>
               </div>
@@ -1107,28 +1107,28 @@ function DataMigrationPanel({ authHeader }: { authHeader: string }) {
                 <button
                   type="button"
                   onClick={() => setShowJobModal(false)}
-                  className="rounded-lg border border-gray-200 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-gray-600 hover:bg-gray-50"
+                  className="rounded-lg border border-line px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-muted hover:bg-surface-2"
                 >
                   Schließen
                 </button>
               )}
             </div>
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-gray-100">
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-2">
               <div
-                className="h-full bg-black transition-all"
+                className="h-full bg-accent transition-all"
                 style={{
                   width: job && job.totalUsers > 0 ? `${Math.min(100, Math.round((job.processedUsers / job.totalUsers) * 100))}%` : '8%',
                 }}
               />
             </div>
-            <div className="mt-4 max-h-72 overflow-y-auto rounded-xl border border-gray-100 bg-gray-50 p-3 space-y-1">
+            <div className="mt-4 max-h-72 overflow-y-auto rounded-xl border border-line bg-surface-2 p-3 space-y-1">
               {(job?.logs ?? []).slice(-80).map((l, i) => (
-                <p key={`${l.ts}-${l.userId}-${i}`} className="text-[11px] text-slate-700">
+                <p key={`${l.ts}-${l.userId}-${i}`} className="text-[11px] text-ink">
                   <span className="font-bold">User #{l.userId}</span> · {l.status} · {l.message}
                 </p>
               ))}
               {(job?.logs?.length ?? 0) === 0 && (
-                <p className="text-[11px] text-gray-500">Warte auf den ersten Nutzer…</p>
+                <p className="text-[11px] text-muted">Warte auf den ersten Nutzer…</p>
               )}
             </div>
           </div>
@@ -1383,19 +1383,19 @@ export default function AdminPage() {
       {/* Delete confirm overlay */}
       {deleteConfirm !== null && (
         <div className={mobileSheetOverlayClass()}>
-          <div className="w-full max-w-sm rounded-t-2xl bg-white p-6 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(2rem,env(safe-area-inset-top))] text-center text-slate-900 shadow-2xl lg:rounded-2xl md:p-8">
+          <div className="w-full max-w-sm rounded-t-2xl bg-surface p-6 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(2rem,env(safe-area-inset-top))] text-center text-ink shadow-2xl lg:rounded-2xl md:p-8">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50">
               <Trash2 size={24} className="text-red-500" />
             </div>
-            <h3 className="mb-2 text-xl font-black uppercase tracking-tighter text-slate-900">{t('admin.delete.title')}</h3>
-            <p className="mb-8 text-sm text-gray-500">
+            <h3 className="mb-2 text-xl font-black uppercase tracking-tighter text-ink">{t('admin.delete.title')}</h3>
+            <p className="mb-8 text-sm text-muted">
               {t('admin.delete.body')}
             </p>
             <div className="flex gap-3">
               <button
                 type="button"
                 onClick={() => setDeleteConfirm(null)}
-                className="min-h-[52px] flex-1 touch-manipulation rounded-xl border border-gray-200 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-700 transition-colors hover:bg-gray-50 active:opacity-90 md:min-h-[48px]"
+                className="min-h-[52px] flex-1 touch-manipulation rounded-xl border border-line py-3 text-[10px] font-bold uppercase tracking-widest text-ink transition-colors hover:bg-surface-2 active:opacity-90 md:min-h-[48px]"
               >
                 {t('admin.delete.cancel')}
               </button>
@@ -1416,11 +1416,11 @@ export default function AdminPage() {
       {/* KI-Wechsel: Test-Dialog */}
       {aiSwitchModal && (
         <div className={mobileSheetOverlayClass()}>
-          <div className="w-full max-w-sm rounded-2xl border border-gray-200 bg-white p-6 text-slate-900 shadow-2xl">
+          <div className="w-full max-w-sm rounded-2xl border border-line bg-surface p-6 text-ink shadow-2xl">
             <div className="flex items-center gap-3 mb-4">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gray-100">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-surface-2">
                 {aiSwitchModal.phase === 'testing' ? (
-                  <Loader2 size={22} className="animate-spin text-slate-700" />
+                  <Loader2 size={22} className="animate-spin text-ink" />
                 ) : aiSwitchModal.phase === 'ok' ? (
                   <CheckCircle2 size={22} className="text-emerald-600" />
                 ) : (
@@ -1435,7 +1435,7 @@ export default function AdminPage() {
                       ? 'KI-Wechsel erfolgreich'
                       : 'KI-Wechsel abgebrochen'}
                 </h3>
-                <p className="text-[10px] text-gray-500 font-medium mt-0.5">
+                <p className="text-[10px] text-muted font-medium mt-0.5">
                   {aiSwitchModal.phase === 'testing'
                     ? (aiSwitchModal.provider === 'ollama' ? 'Verbindung zum lokalen Ollama-Daemon auf dem NAS wird geprüft…' : 'Kurzer API-Test mit dem gespeicherten Key.')
                     : aiSwitchModal.phase === 'ok'
@@ -1459,7 +1459,7 @@ export default function AdminPage() {
               <button
                 type="button"
                 onClick={() => setAiSwitchModal(null)}
-                className="w-full min-h-[48px] rounded-xl bg-black text-white text-[10px] font-black uppercase tracking-widest hover:bg-gray-800"
+                className="w-full min-h-[48px] rounded-xl bg-accent text-[var(--on-accent)] text-[10px] font-black uppercase tracking-widest hover:bg-[var(--accent-hover)]"
               >
                 Schließen
               </button>
@@ -1479,28 +1479,28 @@ export default function AdminPage() {
       )}
 
       {/* Top bar */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-40 text-slate-900">
+      <header className="bg-surface border-b border-line sticky top-0 z-40 text-ink">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-black rounded-xl flex items-center justify-center">
+            <div className="w-9 h-9 bg-accent rounded-xl flex items-center justify-center">
               <ShieldCheck size={18} className="text-white" />
             </div>
             <div>
-              <h1 className="font-black uppercase tracking-tighter text-lg leading-none text-slate-900">{t('admin.title')}</h1>
-              <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold">{t('admin.controlPanel')}</p>
+              <h1 className="font-black uppercase tracking-tighter text-lg leading-none text-ink">{t('admin.title')}</h1>
+              <p className="text-[9px] text-muted uppercase tracking-widest font-bold">{t('admin.controlPanel')}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <button
               onClick={fetchUsers}
-              className="p-2 rounded-xl hover:bg-gray-50 transition-colors text-gray-400 hover:text-gray-600"
+              className="p-2 rounded-xl hover:bg-surface-2 transition-colors text-muted hover:text-ink"
               title={t('admin.header.refreshTitle')}
             >
               <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
             </button>
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2 border border-gray-100 rounded-xl px-4 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-50 transition-colors text-gray-600"
+              className="flex items-center gap-2 border border-line rounded-xl px-4 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-surface-2 transition-colors text-muted"
             >
               <LogOut size={14} />
               {t('admin.header.logout')}
@@ -1513,30 +1513,30 @@ export default function AdminPage() {
       <main className="max-w-7xl mx-auto px-6 py-8">
         <div className="mb-6" />
 
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden text-slate-900 mb-8">
+        <div className="bg-surface rounded-2xl border border-line shadow-sm overflow-hidden text-ink mb-8">
           <div className="overflow-x-auto">
-            <table className="w-full text-slate-900">
+            <table className="w-full text-ink">
               <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="text-left px-6 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400">{t('admin.table.hash')}</th>
-                  <th className="text-left px-6 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400">{t('admin.table.firstName')}</th>
-                  <th className="text-left px-6 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400">{t('admin.table.lastName')}</th>
-                  <th className="text-left px-6 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400">{t('admin.table.email')}</th>
-                  <th className="text-left px-6 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400">{t('admin.table.password')}</th>
-                  <th className="text-left px-6 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400">{t('admin.table.registered')}</th>
-                  <th className="text-right px-6 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400">{t('admin.table.actions')}</th>
+                <tr className="border-b border-line">
+                  <th className="text-left px-6 py-4 text-[9px] font-black uppercase tracking-widest text-muted">{t('admin.table.hash')}</th>
+                  <th className="text-left px-6 py-4 text-[9px] font-black uppercase tracking-widest text-muted">{t('admin.table.firstName')}</th>
+                  <th className="text-left px-6 py-4 text-[9px] font-black uppercase tracking-widest text-muted">{t('admin.table.lastName')}</th>
+                  <th className="text-left px-6 py-4 text-[9px] font-black uppercase tracking-widest text-muted">{t('admin.table.email')}</th>
+                  <th className="text-left px-6 py-4 text-[9px] font-black uppercase tracking-widest text-muted">{t('admin.table.password')}</th>
+                  <th className="text-left px-6 py-4 text-[9px] font-black uppercase tracking-widest text-muted">{t('admin.table.registered')}</th>
+                  <th className="text-right px-6 py-4 text-[9px] font-black uppercase tracking-widest text-muted">{t('admin.table.actions')}</th>
                 </tr>
               </thead>
               <tbody>
                 {loading && users.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-16 text-[10px] text-gray-400 uppercase tracking-widest font-bold">
+                    <td colSpan={7} className="text-center py-16 text-[10px] text-muted uppercase tracking-widest font-bold">
                       {t('admin.table.loading')}
                     </td>
                   </tr>
                 ) : users.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-16 text-[10px] text-gray-400 uppercase tracking-widest font-bold">
+                    <td colSpan={7} className="text-center py-16 text-[10px] text-muted uppercase tracking-widest font-bold">
                       {t('admin.table.empty')}
                     </td>
                   </tr>
@@ -1544,32 +1544,32 @@ export default function AdminPage() {
                   users.map((u) => {
                     const names = adminUserNames(u);
                     return (
-                      <tr key={u.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-                        <td className="px-6 py-4 text-xs font-black text-gray-300">#{u.id}</td>
+                      <tr key={u.id} className="border-b border-line hover:bg-surface-2 transition-colors">
+                        <td className="px-6 py-4 text-xs font-black text-muted">#{u.id}</td>
                         <td className="px-6 py-4">
-                          <span className="text-sm font-bold text-gray-900">{names.firstName || '—'}</span>
+                          <span className="text-sm font-bold text-ink">{names.firstName || '—'}</span>
                         </td>
                         <td className="px-6 py-4">
-                          <span className="text-sm font-bold text-gray-900">{names.lastName || '—'}</span>
+                          <span className="text-sm font-bold text-ink">{names.lastName || '—'}</span>
                         </td>
                         <td className="px-6 py-4">
-                          <span className="text-sm text-gray-600 font-medium">{u.email}</span>
+                          <span className="text-sm text-muted font-medium">{u.email}</span>
                         </td>
                         <td className="px-6 py-4">
                           {u.has_password ? (
-                            <span className="font-mono text-sm text-gray-400 tracking-widest">••••••••</span>
+                            <span className="font-mono text-sm text-muted tracking-widest">••••••••</span>
                           ) : (
-                            <span className="text-[10px] text-gray-300 uppercase tracking-widest font-bold">{t('admin.table.sso')}</span>
+                            <span className="text-[10px] text-muted uppercase tracking-widest font-bold">{t('admin.table.sso')}</span>
                           )}
                         </td>
                         <td className="px-6 py-4">
-                          <span className="text-xs text-gray-400 font-medium">{formatDate(u.created_at)}</span>
+                          <span className="text-xs text-muted font-medium">{formatDate(u.created_at)}</span>
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center justify-end gap-2">
                             <button
                               onClick={() => setEditUser(u)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-100 text-[9px] font-black uppercase tracking-widest text-gray-600 hover:bg-gray-50 hover:border-gray-200 transition-all"
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line text-[9px] font-black uppercase tracking-widest text-muted hover:bg-surface-2 hover:border-line transition-all"
                             >
                               <Pencil size={12} />
                               {t('admin.table.edit')}
@@ -1601,35 +1601,35 @@ export default function AdminPage() {
         </div>
 
         {aiConfig && authHeader && (
-          <motion.div layout className="mb-8 rounded-2xl border border-gray-200 bg-white p-4 text-slate-900">
+          <motion.div layout className="mb-8 rounded-2xl border border-line bg-surface p-4 text-ink">
             <button
               type="button"
               onClick={() => setModelsCollapsed((v) => !v)}
-              className="flex w-full items-center justify-between gap-3 rounded-xl border border-transparent px-1 py-1 text-left hover:bg-gray-50"
+              className="flex w-full items-center justify-between gap-3 rounded-xl border border-transparent px-1 py-1 text-left hover:bg-surface-2"
             >
               <div>
-                <p className="text-sm font-black uppercase tracking-tighter text-slate-900">generell: KI-Modelle</p>
-                <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400">Nur ausklappen wenn du etwas ändern willst</p>
+                <p className="text-sm font-black uppercase tracking-tighter text-ink">generell: KI-Modelle</p>
+                <p className="text-[9px] font-bold uppercase tracking-widest text-muted">Nur ausklappen wenn du etwas ändern willst</p>
               </div>
-              <span className="rounded-xl border border-gray-200 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-gray-600">
+              <span className="rounded-xl border border-line px-3 py-2 text-[10px] font-black uppercase tracking-widest text-muted">
                 {modelsCollapsed ? 'Ausklappen' : 'Einklappen'}
               </span>
             </button>
             {!modelsCollapsed && (
               <div className="mt-4 space-y-4">
-                <div className="bg-white rounded-2xl border border-gray-200 p-4 text-slate-900">
+                <div className="bg-surface rounded-2xl border border-line p-4 text-ink">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-sm font-black tracking-tighter uppercase text-slate-900">KI-Engine Steuerung</p>
-                      <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mt-0.5">Umschalten zwischen Ollama (Lokal), Gemini & Mistral</p>
+                      <p className="text-sm font-black tracking-tighter uppercase text-ink">KI-Engine Steuerung</p>
+                      <p className="text-[9px] text-muted uppercase tracking-widest font-bold mt-0.5">Umschalten zwischen Ollama (Lokal), Gemini & Mistral</p>
                     </div>
-                    <div className="flex gap-2 bg-gray-50 p-1 rounded-xl border border-gray-200">
+                    <div className="flex gap-2 bg-surface-2 p-1 rounded-xl border border-line">
                       <button
                         onClick={() => toggleAiProvider('ollama')}
                         className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
                           aiConfig.active === 'ollama'
-                            ? 'bg-emerald-600 text-white shadow-md'
-                            : 'text-gray-500 hover:text-black hover:bg-white'
+                            ? 'bg-accent text-on-accent shadow-md'
+                            : 'text-muted hover:text-ink hover:bg-surface'
                         }`}
                       >
                         Ollama (Lokal)
@@ -1639,10 +1639,10 @@ export default function AdminPage() {
                         disabled={!aiConfig.deepseekConfigured}
                         className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
                           aiConfig.active === 'deepseek'
-                            ? 'bg-black text-white shadow-md'
+                            ? 'bg-accent text-[var(--ink)] shadow-md'
                             : aiConfig.deepseekConfigured
-                              ? 'text-gray-500 hover:text-black hover:bg-white'
-                              : 'text-gray-300 cursor-not-allowed'
+                              ? 'text-muted hover:text-ink hover:bg-surface'
+                              : 'text-muted cursor-not-allowed'
                         }`}
                       >
                         DeepSeek {!aiConfig.deepseekConfigured && <KeyRound size={10} className="inline ml-1" />}
@@ -1652,10 +1652,10 @@ export default function AdminPage() {
                         disabled={!aiConfig.mistralConfigured}
                         className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
                           aiConfig.active === 'mistral'
-                            ? 'bg-black text-white shadow-md'
+                            ? 'bg-accent text-[var(--ink)] shadow-md'
                             : aiConfig.mistralConfigured
-                              ? 'text-gray-500 hover:text-black hover:bg-white'
-                              : 'text-gray-300 cursor-not-allowed'
+                              ? 'text-muted hover:text-ink hover:bg-surface'
+                              : 'text-muted cursor-not-allowed'
                         }`}
                       >
                         Mistral {!aiConfig.mistralConfigured && <KeyRound size={10} className="inline ml-1" />}
@@ -1665,10 +1665,10 @@ export default function AdminPage() {
                         disabled={!aiConfig.geminiConfigured}
                         className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
                           aiConfig.active === 'gemini'
-                            ? 'bg-black text-white shadow-md'
+                            ? 'bg-accent text-[var(--ink)] shadow-md'
                             : aiConfig.geminiConfigured
-                              ? 'text-gray-500 hover:text-black hover:bg-white'
-                              : 'text-gray-300 cursor-not-allowed'
+                              ? 'text-muted hover:text-ink hover:bg-surface'
+                              : 'text-muted cursor-not-allowed'
                         }`}
                       >
                         Gemini {!aiConfig.geminiConfigured && <KeyRound size={10} className="inline ml-1" />}
@@ -1677,16 +1677,16 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-3 text-slate-900">
+                <div className="bg-surface rounded-2xl border border-line p-5 space-y-3 text-ink">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                        <p className="text-sm font-black tracking-tighter uppercase text-slate-900">
+                        <p className="text-sm font-black tracking-tighter uppercase text-ink">
                           Lokales Modell (Ollama · Gemma 4 E2B)
                         </p>
                       </div>
-                      <p className="text-[10px] text-gray-500 font-medium mt-1">
+                      <p className="text-[10px] text-muted font-medium mt-1">
                         Kein API-Key für Benutzer erforderlich. Läuft lokal und privat im Docker-Netzwerk auf deinem NAS.
                       </p>
                     </div>
@@ -1696,14 +1696,14 @@ export default function AdminPage() {
                       </span>
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-gray-50 p-3.5 rounded-xl border border-gray-100 font-medium">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-surface-2 p-3.5 rounded-xl border border-line font-medium">
                     <div>
-                      <span className="text-[9px] uppercase tracking-wider font-bold text-gray-400 block">Ollama URL (Docker)</span>
-                      <span className="font-mono text-slate-700 font-semibold">{aiConfig.ollama?.baseUrl || 'http://ollama:11434'}</span>
+                      <span className="text-[9px] uppercase tracking-wider font-bold text-muted block">Ollama URL (Docker)</span>
+                      <span className="font-mono text-ink font-semibold">{aiConfig.ollama?.baseUrl || 'http://ollama:11434'}</span>
                     </div>
                     <div>
-                      <span className="text-[9px] uppercase tracking-wider font-bold text-gray-400 block">Lokales Modell</span>
-                      <span className="font-mono text-slate-700 font-semibold">{aiConfig.ollama?.model || 'gemma4:e2b'}</span>
+                      <span className="text-[9px] uppercase tracking-wider font-bold text-muted block">Lokales Modell</span>
+                      <span className="font-mono text-ink font-semibold">{aiConfig.ollama?.model || 'gemma4:e2b'}</span>
                     </div>
                   </div>
                 </div>

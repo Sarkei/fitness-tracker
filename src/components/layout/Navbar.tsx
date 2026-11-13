@@ -318,7 +318,7 @@ export default function Navbar() {
                 referrerPolicy="no-referrer"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-400 bg-[var(--background)]">
+              <div className="w-full h-full flex items-center justify-center text-muted bg-[var(--background)]">
                 <User size={16} />
               </div>
             )}

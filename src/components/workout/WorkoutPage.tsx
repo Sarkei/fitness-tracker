@@ -312,7 +312,7 @@ function DayAssignModal({
                   onClick={() => onAssign({ type: 'template', templateId: tpl.id, templateName: tpl.name })}
                   className="w-full min-h-[52px] flex items-center gap-3 p-4 rounded-2xl border border-[var(--border-muted)] hover:border-brand hover:bg-brand/5 transition-all text-left group mb-2 touch-manipulation">
                   <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-white flex-shrink-0",
-                    tpl.type === 'Strength' ? 'bg-blue-500' : tpl.type === 'Cardio' ? 'bg-orange-500' : 'bg-teal-500')}>
+                    tpl.type === 'Strength' ? 'bg-blue-500' : tpl.type === 'Cardio' ? 'bg-orange-500' : 'bg-brand')}>
                     <Dumbbell size={16} />
                   </div>
                   <div className="min-w-0">
@@ -1677,7 +1677,7 @@ export default function WorkoutPage() {
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex items-center gap-3">
                           <div className={cn("w-11 h-11 rounded-xl flex items-center justify-center text-white",
-                            template.type === 'Strength' ? "bg-blue-500" : template.type === 'Cardio' ? "bg-orange-500" : "bg-teal-500")}>
+                            template.type === 'Strength' ? "bg-blue-500" : template.type === 'Cardio' ? "bg-orange-500" : "bg-brand")}>
                             {template.type === 'Strength' ? <Dumbbell size={18} /> : template.type === 'Cardio' ? <Zap size={18} /> : <Activity size={18} />}
                           </div>
                           <div>
@@ -1802,7 +1802,7 @@ export default function WorkoutPage() {
 
                           <div>
                             <div className={cn("w-11 h-11 rounded-xl flex items-center justify-center mb-4 shadow-sm text-white",
-                              template.type === 'Strength' ? "bg-blue-500" : template.type === 'Cardio' ? "bg-orange-500" : "bg-teal-500")}>
+                              template.type === 'Strength' ? "bg-blue-500" : template.type === 'Cardio' ? "bg-orange-500" : "bg-brand")}>
                               {template.type === 'Strength' ? <Dumbbell size={18} /> : template.type === 'Cardio' ? <Zap size={18} /> : <Activity size={18} />}
                             </div>
                             <h4 className="text-base font-black italic uppercase tracking-tight mb-1">{template.name}</h4>

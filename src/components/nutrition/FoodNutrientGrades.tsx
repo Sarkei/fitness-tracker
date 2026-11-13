@@ -22,7 +22,7 @@ function levelColor(level: NutrientLevelGrade | undefined): string {
 function nutriScoreColor(grade: string | undefined): string {
   switch (grade?.toLowerCase()) {
     case 'a':
-      return 'bg-emerald-600 text-white';
+      return 'bg-accent text-on-accent';
     case 'b':
       return 'bg-lime-600 text-white';
     case 'c':

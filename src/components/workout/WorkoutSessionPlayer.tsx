@@ -180,14 +180,14 @@ function blockFormatLabel(ex: Exercise, t: (k: string) => string): string {
 function getSetColors(type: string, completed: boolean) {
   if (completed) {
     if (type === 'warmup') return 'bg-yellow-500 text-black border-yellow-500';
-    if (type === 'dropset') return 'bg-orange-500 text-white border-orange-500';
-    if (type === 'failure') return 'bg-red-500 text-white border-red-500';
+    if (type === 'dropset') return 'bg-orange-500 text-[var(--ink)] border-orange-500';
+    if (type === 'failure') return 'bg-red-500 text-[var(--ink)] border-red-500';
     return 'border-2 border-brand bg-brand/15 text-[var(--text-primary)]';
   }
   if (type === 'warmup') return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20 hover:border-yellow-500/40';
   if (type === 'dropset') return 'bg-orange-500/10 text-orange-500 border-orange-500/20 hover:border-orange-500/40';
   if (type === 'failure') return 'bg-red-500/10 text-red-500 border-red-500/20 hover:border-red-500/40';
-  return 'bg-neutral-900/80 text-neutral-300 border-neutral-800 hover:border-neutral-600';
+  return 'bg-surface-2 text-ink border-line hover:border-line-strong';
 }
 
 function canAccessSet(sets: SetDetail[], setIdx: number): boolean {
@@ -813,18 +813,18 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
   const renderStrengthSets = (exIdx: number, sets: SetDetail[]) => (
     <div className="mt-1">
       <div className="grid grid-cols-[2.75rem_1fr_1fr_2.5rem_3rem_2.5rem] gap-1.5 px-1 mb-2">
-        <span className="text-center text-[10px] font-black uppercase tracking-widest text-neutral-500">
+        <span className="text-center text-[10px] font-black uppercase tracking-widest text-muted">
           {t('workout.session.col.type')}
         </span>
-        <span className="text-center text-[10px] font-black uppercase tracking-widest text-neutral-500">
+        <span className="text-center text-[10px] font-black uppercase tracking-widest text-muted">
           {unitLabel}
         </span>
-        <span className="text-center text-[10px] font-black uppercase tracking-widest text-neutral-500">
+        <span className="text-center text-[10px] font-black uppercase tracking-widest text-muted">
           {t('workout.session.col.reps')}
         </span>
-        <span className="text-center text-[10px] font-black uppercase tracking-widest text-neutral-500">RPE</span>
-        <span className="text-center text-[10px] font-black uppercase tracking-widest text-neutral-500">✓</span>
-        <span className="text-center text-[10px] font-black uppercase tracking-widest text-neutral-500" aria-hidden>
+        <span className="text-center text-[10px] font-black uppercase tracking-widest text-muted">RPE</span>
+        <span className="text-center text-[10px] font-black uppercase tracking-widest text-muted">✓</span>
+        <span className="text-center text-[10px] font-black uppercase tracking-widest text-muted" aria-hidden>
           {' '}
         </span>
       </div>
@@ -877,7 +877,7 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
               }}
               className={cn(
                 'w-full min-h-[48px] text-center text-lg font-black tabular-nums bg-black/40 rounded-xl focus:outline-none focus:ring-2 appearance-none',
-                s.completed ? 'text-white focus:ring-white/50' : 'text-white focus:ring-brand',
+                s.completed ? 'text-[var(--ink)] focus:ring-white/50' : 'text-[var(--ink)] focus:ring-brand',
               )}
             />
             <input
@@ -897,7 +897,7 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
               }}
               className={cn(
                 'w-full min-h-[48px] text-center text-lg font-black tabular-nums bg-black/40 rounded-xl focus:outline-none focus:ring-2 appearance-none',
-                s.completed ? 'text-white focus:ring-white/50' : 'text-white focus:ring-brand',
+                s.completed ? 'text-[var(--ink)] focus:ring-white/50' : 'text-[var(--ink)] focus:ring-brand',
               )}
             />
             <input
@@ -923,7 +923,7 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
                   else focusAfterSet(exIdx, idx);
                 }
               }}
-              className="w-full min-h-[48px] text-center text-sm font-black tabular-nums bg-black/40 rounded-xl text-white focus:ring-2 focus:ring-brand focus:outline-none"
+              className="w-full min-h-[48px] text-center text-sm font-black tabular-nums bg-black/40 rounded-xl text-[var(--ink)] focus:ring-2 focus:ring-brand focus:outline-none"
             />
             <button
               type="button"
@@ -935,10 +935,10 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
               className={cn(
                 'w-12 h-12 rounded-xl flex items-center justify-center transition-all bg-black/40 border-2 mx-auto touch-manipulation min-h-[48px] min-w-[48px]',
                 s.completed
-                  ? 'border-transparent text-white bg-brand/30'
+                  ? 'border-transparent text-[var(--accent-ink)] bg-brand/30'
                   : locked
-                    ? 'border-neutral-800 text-neutral-700'
-                    : 'border-neutral-700 text-neutral-600 hover:border-neutral-500',
+                    ? 'border-line text-placeholder'
+                    : 'border-line text-muted hover:border-line-strong',
               )}
               aria-label={t('workout.session.setDone')}
             >
@@ -948,7 +948,7 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
               type="button"
               onClick={() => deleteSet(exIdx, idx)}
               disabled={sets.length <= 1}
-              className="w-11 h-11 min-h-[44px] min-w-[44px] rounded-xl flex items-center justify-center text-neutral-500 hover:text-red-400 disabled:opacity-20 touch-manipulation mx-auto"
+              className="w-11 h-11 min-h-[44px] min-w-[44px] rounded-xl flex items-center justify-center text-muted hover:text-red-400 disabled:opacity-20 touch-manipulation mx-auto"
               aria-label={t('workout.session.deleteSet')}
             >
               <Trash2 size={16} />
@@ -960,7 +960,7 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
       <button
         type="button"
         onClick={() => addSet(exIdx)}
-        className="w-full min-h-[44px] flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-neutral-500 border-2 border-dashed border-neutral-800 rounded-2xl hover:bg-neutral-900 transition-colors touch-manipulation"
+        className="w-full min-h-[44px] flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted border-2 border-dashed border-line rounded-2xl hover:bg-surface transition-colors touch-manipulation"
       >
         <Plus size={14} /> {t('workout.session.addSet')}
       </button>
@@ -1004,7 +1004,7 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
       )}
       <div className={cn('grid gap-3', showDistance ? 'grid-cols-2' : 'grid-cols-1')}>
         <div>
-          <label className="text-[9px] font-black uppercase tracking-widest text-neutral-500 mb-1.5 block">
+          <label className="text-[9px] font-black uppercase tracking-widest text-muted mb-1.5 block">
             {t('workout.session.col.duration')}
           </label>
           <input
@@ -1024,12 +1024,12 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
                 else focusAfterSet(exIdx, 0);
               }
             }}
-            className="w-full min-h-[52px] text-center text-xl font-black tabular-nums bg-neutral-900 border border-neutral-800 rounded-xl text-white focus:ring-2 focus:ring-brand focus:outline-none"
+            className="w-full min-h-[52px] text-center text-xl font-black tabular-nums bg-surface border border-line rounded-xl text-[var(--ink)] focus:ring-2 focus:ring-brand focus:outline-none"
           />
         </div>
         {showDistance ? (
           <div>
-            <label className="text-[9px] font-black uppercase tracking-widest text-neutral-500 mb-1.5 block">
+            <label className="text-[9px] font-black uppercase tracking-widest text-muted mb-1.5 block">
               {t('workout.session.col.distance')}
             </label>
             <input
@@ -1049,13 +1049,13 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
                   else focusAfterSet(exIdx, 0);
                 }
               }}
-              className="w-full min-h-[52px] text-center text-xl font-black tabular-nums bg-neutral-900 border border-neutral-800 rounded-xl text-white focus:ring-2 focus:ring-brand focus:outline-none"
+              className="w-full min-h-[52px] text-center text-xl font-black tabular-nums bg-surface border border-line rounded-xl text-[var(--ink)] focus:ring-2 focus:ring-brand focus:outline-none"
             />
           </div>
         ) : null}
       </div>
       {exCardio.coachPrescription?.targetPace && (
-        <p className="text-xs text-neutral-400 font-medium text-center">
+        <p className="text-xs text-muted font-medium text-center">
           {t('workout.session.cardio.paceTarget', { pace: exCardio.coachPrescription.targetPace })}
         </p>
       )}
@@ -1064,7 +1064,7 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
         onClick={() => toggleSet(exIdx, 0)}
         className={cn(
           'w-full min-h-[52px] rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 transition-all touch-manipulation',
-          sets[0]?.completed ? 'ui-mark-selected' : 'bg-neutral-900 border border-neutral-700 text-neutral-400',
+          sets[0]?.completed ? 'ui-mark-selected' : 'bg-surface border border-line text-muted',
         )}
       >
         <Check size={18} strokeWidth={3} />
@@ -1078,7 +1078,7 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
     <div className="mt-2 space-y-3">
       <p className="text-[10px] font-black uppercase tracking-widest text-brand">{blockFormatLabel(ex, t)}</p>
       {(ex.structureMinutes != null || ex.structureRounds != null) && (
-        <p className="text-xs text-neutral-400 font-medium">
+        <p className="text-xs text-muted font-medium">
           {ex.structureMinutes != null ? `${ex.structureMinutes} min` : ''}
           {ex.structureMinutes != null && ex.structureRounds != null ? ' · ' : ''}
           {ex.structureRounds != null ? `${ex.structureRounds} ${t('workout.session.rounds')}` : ''}
@@ -1092,7 +1092,7 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
         }}
         className={cn(
           'w-full min-h-[52px] rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 touch-manipulation',
-          sets[0]?.completed ? 'ui-mark-selected' : 'bg-neutral-900 border border-neutral-700 text-neutral-400',
+          sets[0]?.completed ? 'ui-mark-selected' : 'bg-surface border border-line text-muted',
         )}
       >
         <Check size={18} strokeWidth={3} />
@@ -1149,7 +1149,7 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
     const mobilityDone = ex.mobilityTimer && sets[0]?.completed;
 
     return (
-      <div className={cn(nested && 'pt-3 border-t border-neutral-800/80 first:border-0 first:pt-0')}>
+      <div className={cn(nested && 'pt-3 border-t border-line first:border-0 first:pt-0')}>
         <div className={cn('flex items-start gap-2', nested || ex.mobilityTimer ? 'mb-2' : 'mb-0')}>
           {nested ? (
             <div className="flex-1 min-w-0">
@@ -1182,7 +1182,7 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
               <button
                 type="button"
                 onClick={openDetail}
-                className="min-h-[44px] min-w-[44px] p-2 flex items-center justify-center text-neutral-500 hover:text-brand touch-manipulation"
+                className="min-h-[44px] min-w-[44px] p-2 flex items-center justify-center text-muted hover:text-brand touch-manipulation"
                 aria-label={t('exercise.action.info')}
               >
                 <Info size={18} />
@@ -1190,7 +1190,7 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
               <button
                 type="button"
                 onClick={openSwap}
-                className="min-h-[44px] min-w-[44px] p-2 flex items-center justify-center text-neutral-500 hover:text-brand touch-manipulation"
+                className="min-h-[44px] min-w-[44px] p-2 flex items-center justify-center text-muted hover:text-brand touch-manipulation"
                 aria-label={t('exercise.action.swap')}
               >
                 <RefreshCw size={18} />
@@ -1198,7 +1198,7 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
               <button
                 type="button"
                 onClick={() => setEditNotesIdx(exIdx)}
-                className="min-h-[44px] min-w-[44px] p-2 flex items-center justify-center text-neutral-500 hover:text-white touch-manipulation"
+                className="min-h-[44px] min-w-[44px] p-2 flex items-center justify-center text-muted hover:text-ink touch-manipulation"
                 aria-label={t('workout.session.editNotes')}
               >
                 <Pencil size={18} />
@@ -1207,7 +1207,7 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
           )}
         </div>
         {ex.notes && !ex.mobilityTimer && (
-          <p className="text-xs text-neutral-400 mb-2 leading-relaxed">{ex.notes}</p>
+          <p className="text-xs text-muted mb-2 leading-relaxed">{ex.notes}</p>
         )}
         {prescriptionHint && mode !== 'block' && (
           <p className="text-[9px] font-black uppercase tracking-widest text-brand/90 bg-brand/10 px-2 py-1.5 rounded-lg mb-2">
@@ -1423,7 +1423,7 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
         key={exKey}
         className={cn(
           'rounded-2xl border transition-all',
-          done ? 'border-brand/40 bg-brand/5' : 'border-neutral-800 bg-neutral-900/60',
+          done ? 'border-brand/40 bg-brand/5' : 'border-line bg-surface-2',
           open && 'ring-1 ring-brand/30',
         )}
       >
@@ -1438,14 +1438,14 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
           <div
             className={cn(
               'w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-black text-xs',
-              done ? 'ui-mark-selected' : 'bg-neutral-800 text-neutral-500',
+              done ? 'ui-mark-selected' : 'bg-surface-2 text-muted',
             )}
           >
             {done ? <Check size={16} strokeWidth={3} /> : itemIndex + 1}
           </div>
           <motion.div className="flex-1 min-w-0">
             <p className="font-black uppercase tracking-tight text-sm leading-tight pr-6">{ex.name}</p>
-            <p className="text-[9px] font-black uppercase tracking-widest text-neutral-500 mt-1">
+            <p className="text-[9px] font-black uppercase tracking-widest text-muted mt-1">
               {exerciseSessionMode(ex) === 'cardio'
                 ? t('workout.session.type.cardio')
                 : exerciseSessionMode(ex) === 'block'
@@ -1456,7 +1456,7 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
                     })}
             </p>
           </motion.div>
-          {open ? <ChevronUp size={18} className="text-neutral-500 shrink-0" /> : <ChevronDown size={18} className="text-neutral-500 shrink-0" />}
+          {open ? <ChevronUp size={18} className="text-muted shrink-0" /> : <ChevronDown size={18} className="text-muted shrink-0" />}
         </button>
         <AnimatePresence initial={false}>
           {open && (
@@ -1466,7 +1466,7 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
               exit={{ height: 0, opacity: 0 }}
               className="overflow-hidden"
             >
-              <div className="px-4 pb-4 border-t border-neutral-800/80">{renderExerciseBody(exIdx)}</div>
+              <div className="px-4 pb-4 border-t border-line">{renderExerciseBody(exIdx)}</div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -1476,7 +1476,7 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
 
   return (
     <div
-      className="fixed left-0 right-0 lg:left-64 z-50 bg-neutral-950 flex flex-col text-white touch-manipulation overflow-hidden overscroll-y-contain [-webkit-overflow-scrolling:touch]"
+      className="fixed left-0 right-0 lg:left-64 z-50 bg-surface-2 flex flex-col text-[var(--ink)] touch-manipulation overflow-hidden overscroll-y-contain [-webkit-overflow-scrolling:touch]"
       style={{
         top: 'var(--vv-top-inset, 0px)',
         height: 'var(--vv-height, 100dvh)',
@@ -1484,17 +1484,17 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
       }}
     >
-      <motion.div className="flex-none p-4 pt-[max(1rem,env(safe-area-inset-top))] flex items-center justify-between bg-neutral-900 border-b border-neutral-800 shadow-sm z-10">
+      <motion.div className="flex-none p-4 pt-[max(1rem,env(safe-area-inset-top))] flex items-center justify-between bg-surface border-b border-line shadow-sm z-10">
         <button
           type="button"
           onClick={() => setShowAbortConfirm(true)}
-          className="p-2 -ml-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-neutral-500 hover:text-white"
+          className="p-2 -ml-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-muted hover:text-ink"
           aria-label={t('workout.session.abort')}
         >
           <X size={24} />
         </button>
         <div className="text-center truncate px-2 flex-1 min-w-0">
-          <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-400 truncate">
+          <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted truncate">
             {workout.name || t('workout.new')}
           </h2>
           <button
@@ -1507,7 +1507,7 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
               {Math.floor(elapsedTime / 60)}:{String(elapsedTime % 60).padStart(2, '0')}
             </span>
           </button>
-          <p className="text-[9px] font-black uppercase tracking-widest text-neutral-600 mt-0.5">
+          <p className="text-[9px] font-black uppercase tracking-widest text-muted mt-0.5">
             {t('workout.session.progress', { done: completedCount, total: exercises.length })}
           </p>
         </div>
@@ -1515,7 +1515,7 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
           <button
             type="button"
             onClick={completeWorkout}
-            className="flex items-center gap-1.5 bg-neutral-800 text-neutral-300 px-3 py-2 min-h-[44px] rounded-lg text-[10px] font-black uppercase tracking-widest border border-neutral-700"
+            className="flex items-center gap-1.5 bg-surface-2 text-ink px-3 py-2 min-h-[44px] rounded-lg text-[10px] font-black uppercase tracking-widest border border-line"
           >
             <Check size={14} /> {t('workout.finishBtn')}
           </button>
@@ -1528,25 +1528,25 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
         </div>
       )}
 
-      <div className="flex-none px-4 py-2 flex flex-wrap gap-2 border-b border-neutral-800/80 bg-neutral-900/50">
+      <div className="flex-none px-4 py-2 flex flex-wrap gap-2 border-b border-line bg-surface-2">
         <button
           type="button"
           onClick={() => setShowLiveEdit(true)}
-          className="min-h-[44px] px-3 rounded-xl bg-neutral-800 text-[10px] font-black uppercase tracking-widest text-neutral-300 flex items-center gap-1.5 touch-manipulation"
+          className="min-h-[44px] px-3 rounded-xl bg-surface-2 text-[10px] font-black uppercase tracking-widest text-ink flex items-center gap-1.5 touch-manipulation"
         >
           <ListOrdered size={16} /> {t('workout.session.liveEdit.short')}
         </button>
         <button
           type="button"
           onClick={() => setShowPalette(true)}
-          className="min-h-[44px] px-3 rounded-xl bg-neutral-800 text-[10px] font-black uppercase tracking-widest text-neutral-300 flex items-center gap-1.5 touch-manipulation"
+          className="min-h-[44px] px-3 rounded-xl bg-surface-2 text-[10px] font-black uppercase tracking-widest text-ink flex items-center gap-1.5 touch-manipulation"
         >
           <Plus size={14} /> {t('workout.session.addExercise')}
         </button>
         <button
           type="button"
           onClick={toggleWeightUnit}
-          className="min-h-[40px] px-3 rounded-xl bg-neutral-800 text-[10px] font-black uppercase tracking-widest text-neutral-300"
+          className="min-h-[40px] px-3 rounded-xl bg-surface-2 text-[10px] font-black uppercase tracking-widest text-ink"
         >
           {weightUnit.toUpperCase()}
         </button>
@@ -1556,7 +1556,7 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
             setPlateTarget(60);
             setShowPlate(true);
           }}
-          className="min-h-[40px] px-3 rounded-xl bg-neutral-800 text-[10px] font-black uppercase tracking-widest text-neutral-300 flex items-center gap-1.5"
+          className="min-h-[40px] px-3 rounded-xl bg-surface-2 text-[10px] font-black uppercase tracking-widest text-ink flex items-center gap-1.5"
         >
           <Scale size={14} /> {t('workout.session.plates')}
         </button>
@@ -1592,7 +1592,7 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
                     persistDraftNow(exercises, { resting: true, restEndsAt: ends });
                   }
                 }}
-                className="min-h-[44px] px-3 bg-neutral-900 rounded-lg text-[10px] font-bold text-neutral-400 touch-manipulation"
+                className="min-h-[44px] px-3 bg-surface rounded-lg text-[10px] font-bold text-muted touch-manipulation"
               >
                 -15s
               </button>
@@ -1605,7 +1605,7 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
                   setRestEndsAt(ends);
                   persistDraftNow(exercises, { resting: true, restEndsAt: ends });
                 }}
-                className="min-h-[44px] px-3 bg-neutral-900 rounded-lg text-[10px] font-bold text-neutral-400 touch-manipulation"
+                className="min-h-[44px] px-3 bg-surface rounded-lg text-[10px] font-bold text-muted touch-manipulation"
               >
                 +15s
               </button>
@@ -1633,7 +1633,7 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
                   exerciseRestSeconds: setExerciseRestInProfile(profile, ex.name, secs),
                 });
               }}
-              className="w-full min-h-[44px] rounded-xl bg-neutral-900/80 border border-brand/30 text-[10px] font-black uppercase tracking-widest text-brand touch-manipulation"
+              className="w-full min-h-[44px] rounded-xl bg-surface-2 border border-brand/30 text-[10px] font-black uppercase tracking-widest text-brand touch-manipulation"
             >
               {t('workout.session.restSaveDefault', {
                 sec: formatRestSeconds(Math.max(15, restTimer)),
@@ -1697,7 +1697,7 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
         )}
       >
         {exercises.length === 0 ? (
-          <div className="flex flex-col items-center justify-center min-h-[40vh] text-center text-neutral-500">
+          <div className="flex flex-col items-center justify-center min-h-[40vh] text-center text-muted">
             <LayoutList size={48} className="mb-4 opacity-20" />
             <p className="text-sm font-medium">{t('workout.session.empty')}</p>
           </div>
@@ -1721,12 +1721,12 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
                 </p>
               </div>
             )}
-            <div className="rounded-2xl border border-neutral-800 bg-neutral-900/60 overflow-hidden">
-              <div className="px-4 pt-4 pb-2 border-b border-neutral-800/80">
+            <div className="rounded-2xl border border-line bg-surface-2 overflow-hidden">
+              <div className="px-4 pt-4 pb-2 border-b border-line">
                 <p className="font-black uppercase tracking-tight text-base leading-tight">
                   {exercises[focusedExIdx].name}
                 </p>
-                <p className="text-[9px] font-black uppercase tracking-widest text-neutral-500 mt-1">
+                <p className="text-[9px] font-black uppercase tracking-widest text-muted mt-1">
                   {exercises[focusedExIdx].mobilityTimer
                     ? t(
                         `workout.session.phase.${exercises[focusedExIdx].sessionPhase ?? 'warmup'}` as 'workout.session.phase.warmup',
@@ -1762,7 +1762,7 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
             initial={{ y: 80, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 80, opacity: 0 }}
-            className="fixed bottom-0 left-0 right-0 lg:left-64 z-30 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-neutral-950 via-neutral-950 to-transparent pointer-events-none"
+            className="fixed bottom-0 left-0 right-0 lg:left-64 z-30 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-[var(--surface)] via-[var(--surface)] to-transparent pointer-events-none"
           >
             <div className={cn('mx-auto pointer-events-auto', desktopTwoPane ? 'max-w-2xl' : 'max-w-lg')}>
               <button
@@ -1840,21 +1840,21 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4"
           >
-            <motion.div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 w-full max-w-sm">
+            <motion.div className="bg-surface border border-line rounded-3xl p-6 w-full max-w-sm">
               <h3 className="text-lg font-black uppercase tracking-tight mb-4">{t('workout.session.plates')}</h3>
               <input
                 type="number"
                 value={plateTarget}
                 onChange={e => setPlateTarget(parseFloat(e.target.value) || 0)}
-                className="w-full min-h-[48px] text-center text-xl font-black bg-neutral-800 rounded-xl text-white mb-4"
+                className="w-full min-h-[48px] text-center text-xl font-black bg-surface-2 rounded-xl text-[var(--ink)] mb-4"
               />
-              <p className="text-sm text-neutral-300 mb-2">
+              <p className="text-sm text-ink mb-2">
                 {t('workout.session.plateResult', {
                   bar: plateResult.barKg,
                   total: plateResult.total,
                 })}
               </p>
-              <p className="text-xs text-neutral-500 mb-6">
+              <p className="text-xs text-muted mb-6">
                 {plateResult.perSide.length
                   ? t('workout.session.platePerSide', { plates: plateResult.perSide.join(' + ') })
                   : t('workout.session.plateEmpty')}
@@ -1879,10 +1879,10 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6"
           >
-            <motion.div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 w-full max-w-sm">
+            <motion.div className="bg-surface border border-line rounded-3xl p-6 w-full max-w-sm">
               <h3 className="text-lg font-black uppercase tracking-tight mb-3">{t('workout.session.editNotes')}</h3>
               <textarea
-                className="w-full min-h-[100px] bg-neutral-800 rounded-xl p-3 text-sm text-white mb-4"
+                className="w-full min-h-[100px] bg-surface-2 rounded-xl p-3 text-sm text-[var(--ink)] mb-4"
                 defaultValue={exercises[editNotesIdx]?.notes || ''}
                 id="session-notes-edit"
               />
@@ -1890,7 +1890,7 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
                 <button
                   type="button"
                   onClick={() => setEditNotesIdx(null)}
-                  className="flex-1 min-h-[48px] bg-neutral-800 rounded-xl text-[10px] font-black uppercase"
+                  className="flex-1 min-h-[48px] bg-surface-2 rounded-xl text-[10px] font-black uppercase"
                 >
                   {t('workout.session.resume')}
                 </button>
@@ -1923,12 +1923,12 @@ export default function WorkoutSessionPlayer({ workout, onComplete, onCancel }: 
               initial={{ scale: 0.95 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0.95 }}
-              className="bg-neutral-900 border border-neutral-800 p-8 rounded-3xl w-full max-w-sm text-center"
+              className="bg-surface border border-line p-8 rounded-3xl w-full max-w-sm text-center"
             >
               <h3 className="text-xl font-black uppercase tracking-tight mb-2">{t('workout.session.abortTitle')}</h3>
-              <p className="text-neutral-400 text-sm mb-8">{t('workout.session.abortBody')}</p>
+              <p className="text-muted text-sm mb-8">{t('workout.session.abortBody')}</p>
               <div className="flex gap-3">
-                <button type="button" onClick={() => setShowAbortConfirm(false)} className="flex-1 min-h-[48px] bg-neutral-800 text-white font-black uppercase tracking-widest text-[10px] rounded-xl">
+                <button type="button" onClick={() => setShowAbortConfirm(false)} className="flex-1 min-h-[48px] bg-surface-2 text-[var(--ink)] font-black uppercase tracking-widest text-[10px] rounded-xl">
                   {t('workout.session.resume')}
                 </button>
                 <button

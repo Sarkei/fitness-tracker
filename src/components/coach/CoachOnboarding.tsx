@@ -870,7 +870,7 @@ export default function CoachOnboarding({ planType, onComplete, onClose }: Props
                   {[
                     { id: 'strength', icon: Dumbbell, labelKey: 'coach.onb.style.strength.label', subKey: 'coach.onb.style.strength.sub', color: 'bg-violet-500' },
                     { id: 'endurance', icon: Activity, labelKey: 'coach.onb.style.endurance.label', subKey: 'coach.onb.style.endurance.sub', color: 'bg-blue-500' },
-                    { id: 'hybrid', icon: Zap, labelKey: 'coach.onb.style.hybrid.label', subKey: 'coach.onb.style.hybrid.sub', color: 'bg-teal-500' },
+                    { id: 'hybrid', icon: Zap, labelKey: 'coach.onb.style.hybrid.label', subKey: 'coach.onb.style.hybrid.sub', color: 'bg-brand' },
                   ].map(s => {
                     const sel = d.trainingStyle === s.id;
                     return (

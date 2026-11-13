@@ -67,13 +67,13 @@ export default function MobilityTimerPanel({
 
   return (
     <div className="mt-3 space-y-3">
-      {notes ? <p className="text-xs text-neutral-400 leading-relaxed">{notes}</p> : null}
+      {notes ? <p className="text-xs text-muted leading-relaxed">{notes}</p> : null}
       <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/5 p-4 text-center">
         <p className="text-[9px] font-black uppercase tracking-[0.2em] text-yellow-500/90 mb-2 truncate">
           {label?.trim() || t('workout.session.mobility.label')}
         </p>
-        <p className="text-4xl font-black tabular-nums text-white mb-3">{completed ? '0:00' : display}</p>
-        <div className="h-1.5 rounded-full bg-neutral-800 overflow-hidden mb-4">
+        <p className="text-4xl font-black tabular-nums text-[var(--ink)] mb-3">{completed ? '0:00' : display}</p>
+        <div className="h-1.5 rounded-full bg-surface-2 overflow-hidden mb-4">
           <div
             className="h-full bg-yellow-500 transition-all duration-1000"
             style={{ width: `${completed ? 100 : progress}%` }}
@@ -83,7 +83,7 @@ export default function MobilityTimerPanel({
           <button
             type="button"
             onClick={onUndo}
-            className="w-full min-h-[48px] rounded-xl border border-neutral-700 text-[10px] font-black uppercase tracking-widest text-neutral-400"
+            className="w-full min-h-[48px] rounded-xl border border-line text-[10px] font-black uppercase tracking-widest text-muted"
           >
             {t('workout.session.mobility.reopen')}
           </button>
@@ -114,7 +114,7 @@ export default function MobilityTimerPanel({
               <button
                 type="button"
                 onClick={onComplete}
-                className="min-h-[48px] px-4 rounded-xl bg-neutral-800 text-[10px] font-black uppercase text-neutral-300 flex items-center gap-1"
+                className="min-h-[48px] px-4 rounded-xl bg-surface-2 text-[10px] font-black uppercase text-ink flex items-center gap-1"
               >
                 <Check size={16} /> {t('workout.session.mobility.done')}
               </button>
