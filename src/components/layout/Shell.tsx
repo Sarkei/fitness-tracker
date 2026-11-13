@@ -50,11 +50,18 @@ export default function Shell({ children }: ShellProps) {
           {fullBleed ? (
             children
           ) : (
-            <div className="shell-page mx-auto max-w-6xl px-4 pt-4 pb-16 sm:px-5 sm:pt-6 lg:px-5 lg:pt-8 lg:pb-20">
+            <div className="shell-page mx-auto max-w-[1360px] px-4 pt-4 pb-16 sm:px-5 sm:pt-6 lg:px-5 lg:pt-8 lg:pb-20">
               {children}
             </div>
           )}
         </main>
+
+        <footer className="app-footer">
+          <div className="app-container app-footer__inner">
+            <span>{t('app.footer')}</span>
+            <span>{t('app.name')}</span>
+          </div>
+        </footer>
       </div>
     </ExerciseDetailProvider>
   );
