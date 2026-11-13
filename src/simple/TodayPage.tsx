@@ -185,30 +185,53 @@ export default function TodayPage() {
               Sobald du Mahlzeiten erfasst, siehst du hier den Verlauf.
             </p>
           )}
-          <div className={`relative flex h-28 items-end gap-1.5 ${hasHistory ? '' : 'hidden'}`}>
-            {history.map((day) => {
-              const ratio = Math.min(1, day.kcal / maxHistory);
-              const isToday = day.ymd === date;
-              return (
-                <div key={day.ymd} className="flex flex-1 flex-col items-center gap-1">
-                  <div className="relative flex w-full flex-1 items-end overflow-hidden rounded-md bg-[var(--surface-3)]">
-                    <div
-                      className="w-full rounded-t-md transition-[height] duration-500"
-                      style={{
-                        height: `${Math.max(8, ratio * 100)}%`,
-                        background: isToday
-                          ? 'var(--simple-accent)'
-                          : 'color-mix(in srgb, var(--simple-accent) 45%, transparent)',
-                      }}
-                      title={`${Math.round(day.kcal)} kcal`}
-                    />
-                  </div>
-                  <span className={`text-[10px] ${isToday ? 'font-semibold text-[var(--foreground)]' : 'text-[var(--text-muted)]'}`}>
-                    {new Date(`${day.ymd}T12:00:00`).toLocaleDateString('de-DE', { weekday: 'short' }).slice(0, 2)}
-                  </span>
-                </div>
-              );
-            })}
+          <div className={hasHistory ? '' : 'hidden'}>
+            <svg
+              viewBox="0 0 100 40"
+              preserveAspectRatio="none"
+              className="h-28 w-full text-[var(--accent)]"
+              role="img"
+              aria-label="Kalorien der letzten sieben Tage"
+            >
+              <line
+                x1="0"
+                x2="100"
+                y1={40 - Math.min(1, goalKcal / maxHistory) * 40}
+                y2={40 - Math.min(1, goalKcal / maxHistory) * 40}
+                stroke="var(--line-strong)"
+                strokeWidth="0.4"
+                strokeDasharray="1.6 1.2"
+              />
+              {history.map((day, i) => {
+                const slot = 100 / history.length;
+                const barW = slot * 0.6;
+                const h = Math.max(1.2, Math.min(1, day.kcal / maxHistory) * 40);
+                const isToday = day.ymd === date;
+                return (
+                  <rect
+                    key={day.ymd}
+                    x={slot * i + (slot - barW) / 2}
+                    y={40 - h}
+                    width={barW}
+                    height={h}
+                    fill="currentColor"
+                    opacity={isToday ? 1 : 0.42}
+                  >
+                    <title>{`${Math.round(day.kcal)} kcal`}</title>
+                  </rect>
+                );
+              })}
+            </svg>
+            <div className="mt-1 flex gap-1.5 text-[10px]">
+              {history.map((day) => (
+                <span
+                  key={day.ymd}
+                  className={`flex-1 text-center ${day.ymd === date ? 'font-semibold text-[var(--foreground)]' : 'text-[var(--text-muted)]'}`}
+                >
+                  {new Date(`${day.ymd}T12:00:00`).toLocaleDateString('de-DE', { weekday: 'short' }).slice(0, 2)}
+                </span>
+              ))}
+            </div>
           </div>
           <p className="mt-2 text-xs text-[var(--text-muted)]">
             Ø {Math.round(history.reduce((acc, d) => acc + d.kcal, 0) / Math.max(1, history.length))} kcal pro Tag
