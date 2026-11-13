@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import AppRoot from './AppRoot.tsx';
 import './index.css';
+import './styles/shell.css';
 import { applyTheme, getStoredTheme } from './lib/themePreference.ts';
 import { AiCapabilitiesProvider } from './lib/AiCapabilitiesContext.tsx';
 

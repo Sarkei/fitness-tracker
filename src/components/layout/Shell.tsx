@@ -3,25 +3,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ReactNode } from 'react';
-import SimpleTabBar from '../../simple/SimpleTabBar';
+import { ReactNode, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/src/lib/AuthContext';
-import { useEffect } from 'react';
+import { useI18n } from '@/src/lib/i18n';
 import { initMobileViewportInsets, resetMobileChromeAfterRouteChange } from '@/src/lib/mobileViewport';
-
 
 import { applyTheme, persistTheme, resolveTheme } from '@/src/lib/themePreference';
 import { ExerciseDetailProvider } from '@/src/lib/exerciseDetailContext';
-
+import AppHeader from './AppHeader';
 
 interface ShellProps {
   children: ReactNode;
 }
 
+/** Seiten mit eigenem Vollbreite-Aufbau (Übersicht) bringen ihren Container selbst mit. */
+const FULL_BLEED_ROUTES = new Set(['/']);
+
 export default function Shell({ children }: ShellProps) {
   const location = useLocation();
   const { profile } = useAuth();
+  const { t } = useI18n();
 
   useEffect(() => {
     resetMobileChromeAfterRouteChange();
@@ -37,18 +39,29 @@ export default function Shell({ children }: ShellProps) {
     }
   }, [profile?.themePreference]);
 
+  const fullBleed = FULL_BLEED_ROUTES.has(location.pathname);
+
   return (
     <ExerciseDetailProvider>
-      <div className="min-h-[100dvh] min-h-[-webkit-fill-available] bg-[var(--background)] text-[var(--foreground)] transition-colors duration-300">
-        <SimpleTabBar />
-        {/* Sidebar erst ab lg — Tablet behält Bottom-Nav */}
-        <main className="min-h-[100dvh] min-h-[-webkit-fill-available] safe-area-pt lg:pt-0">
-          <div
-            className="shell-page max-w-6xl mx-auto px-3 pt-3 sm:px-4 sm:pt-6 max-lg:pb-[var(--shell-pad-bottom)] lg:px-10 lg:pt-12 lg:pb-12"
-          >
-            {children}
-          </div>
+      <div className="app">
+        <AppHeader />
+
+        <main>
+          {fullBleed ? (
+            children
+          ) : (
+            <div className="shell-page mx-auto max-w-6xl px-4 pt-4 pb-16 sm:px-5 sm:pt-6 lg:px-5 lg:pt-8 lg:pb-20">
+              {children}
+            </div>
+          )}
         </main>
+
+        <footer className="app-footer">
+          <div className="app-container app-footer__inner">
+            <span>{t('app.footer')}</span>
+            <span>{t('app.name')}</span>
+          </div>
+        </footer>
       </div>
     </ExerciseDetailProvider>
   );

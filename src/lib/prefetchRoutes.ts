@@ -3,7 +3,10 @@
  */
 
 const MAIN_ROUTE_IMPORTS = [
-  () => import('../components/dashboard/DashboardPage'),
+  () => import('../pages/OverviewPage'),
+  () => import('../simple/TodayPage'),
+  () => import('../simple/TrainingPage'),
+  () => import('../simple/FoodPage'),
   () => import('../components/workout/WorkoutPage'),
   () => import('../components/nutrition/NutritionPage'),
   () => import('../components/coach/CoachHubPage'),
