@@ -55,13 +55,6 @@ export default function Shell({ children }: ShellProps) {
             </div>
           )}
         </main>
-
-        <footer className="app-footer">
-          <div className="app-container app-footer__inner">
-            <span>{t('app.footer')}</span>
-            <span>{t('app.name')}</span>
-          </div>
-        </footer>
       </div>
     </ExerciseDetailProvider>
   );
