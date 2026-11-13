@@ -226,11 +226,11 @@ export function buildUserWeekFacts(params: {
   const beforeWeights = weightHist.filter((e) => ymd(e.date) < weekStartYmd);
   const currentWeight =
     weekWeights.length > 0
-      ? weekWeights[weekWeights.length - 1].weight
+      ? weekWeights[weekWeights.length - 1].value
       : beforeWeights.length > 0
-        ? beforeWeights[beforeWeights.length - 1].weight
+        ? beforeWeights[beforeWeights.length - 1].value
         : params.profile.measurements?.weight ?? null;
-  const startWeight = weekWeights.length > 0 ? weekWeights[0].weight : null;
+  const startWeight = weekWeights.length > 0 ? weekWeights[0].value : null;
   const weightDeltaWeekKg =
     currentWeight != null && startWeight != null ? Math.round((currentWeight - startWeight) * 10) / 10 : null;
 
@@ -248,10 +248,7 @@ export function buildUserWeekFacts(params: {
     profile: {
       displayName: params.profile.displayName ?? null,
       goalType: params.profile.goals?.type ?? null,
-      goalWeightKg:
-        params.profile.goals?.targetWeightKg ??
-        params.profile.goals?.targetWeight ??
-        null,
+      goalWeightKg: params.profile.goals?.targetWeight ?? null,
       currentWeightKg: currentWeight,
       weightDeltaWeekKg,
       dailyCalories: dailyTarget,

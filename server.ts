@@ -3483,7 +3483,7 @@ ${startDayName ? `TODAY IS ${startDayName.toUpperCase()}. This is a PARTIAL firs
       userContextBlock: ctxBlock,
       exerciseDbBlock,
       repairBlock,
-      outputLanguage: coachOutputLanguageForLocale(uiLocale),
+      outputLanguage: coachOutputLanguageForLocale(uiLocale === "en" ? "en" : "de"),
     });
   }
 
@@ -3586,7 +3586,7 @@ COMPARISON WITH WEEK ${plan.current_week - 1}:
       ),
       workoutSummary,
       nutritionSummary,
-      outputLanguage: coachOutputLanguageForLocale(uiLocale),
+      outputLanguage: coachOutputLanguageForLocale(uiLocale === "en" ? "en" : "de"),
     });
   }
 
@@ -4305,7 +4305,7 @@ COMPARISON WITH WEEK ${plan.current_week - 1}:
         prevReport,
         uiLocale,
         callAi: (msgs) => callCoachAiForPlan(plan, msgs),
-        outputLanguage: coachOutputLanguageForLocale(uiLocale),
+        outputLanguage: coachOutputLanguageForLocale(uiLocale === "en" ? "en" : "de"),
       });
 
       const z = weeklyReportSchema.safeParse(report);
@@ -4842,7 +4842,7 @@ ${JSON.stringify(userCtx, null, 2)}
             prevReport,
             uiLocale,
             callAi: (msgs) => callCoachAiForPlan(plan, msgs),
-            outputLanguage: coachOutputLanguageForLocale(uiLocale),
+            outputLanguage: coachOutputLanguageForLocale(uiLocale === "en" ? "en" : "de"),
           });
           report = gen.report;
 
@@ -5038,7 +5038,7 @@ ${JSON.stringify(userCtx, null, 2)}
     const aiEnabled = resolveAiCapabilities().enabled;
     const gen = await generateUserWeeklyReport({
       facts,
-      outputLanguage: coachOutputLanguageForLocale(uiLocale),
+      outputLanguage: coachOutputLanguageForLocale(uiLocale === "en" ? "en" : "de"),
       callAi: aiEnabled ? (msgs) => callCoachAi(msgs, "coach_workout") : undefined,
     });
     const z = userWeeklyReportSchema.safeParse(gen.report);
