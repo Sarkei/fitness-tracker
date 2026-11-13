@@ -153,8 +153,8 @@ export function buildUserWeekFacts(params: {
     for (const ex of w.exercises ?? []) {
       if (isCardioExercise(ex)) {
         const c = cardioSummaryFromExercise(ex);
-        if (c.durationMin > 0) {
-          cardioMinutes += c.durationMin;
+        if (c.minutes > 0) {
+          cardioMinutes += c.minutes;
           cardioSessions += 1;
         }
         continue;

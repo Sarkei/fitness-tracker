@@ -92,6 +92,7 @@ export function buildFallbackUserWeeklyReport(facts: UserWeekFacts): UserWeeklyR
       sections: [
         {
           title: t(facts, 'Was gut lief', 'What went well'),
+          paragraphs: [],
           bullets: [
             facts.activity.workoutSessions > 0
               ? t(facts, `${facts.activity.workoutSessions} Sessions — Konstanz zählt.`, `${facts.activity.workoutSessions} sessions — consistency counts.`)
@@ -106,6 +107,7 @@ export function buildFallbackUserWeeklyReport(facts: UserWeekFacts): UserWeeklyR
         },
         {
           title: t(facts, 'Energie & Alltag', 'Energy & lifestyle'),
+          paragraphs: [],
           bullets: [
             t(
               facts,
@@ -124,6 +126,7 @@ export function buildFallbackUserWeeklyReport(facts: UserWeekFacts): UserWeeklyR
         },
         {
           title: t(facts, 'Ernährung im Blick', 'Nutrition focus'),
+          paragraphs: [],
           bullets: [
             t(
               facts,
@@ -147,6 +150,7 @@ export function buildFallbackUserWeeklyReport(facts: UserWeekFacts): UserWeeklyR
         },
         {
           title: t(facts, 'Training & Belastung', 'Training load'),
+          paragraphs: [],
           bullets: [
             t(
               facts,
@@ -172,6 +176,7 @@ export function buildFallbackUserWeeklyReport(facts: UserWeekFacts): UserWeeklyR
         },
         {
           title: t(facts, 'Ausblick', 'Outlook'),
+          paragraphs: [],
           bullets: [
             t(
               facts,
@@ -268,12 +273,14 @@ export function buildFallbackUserWeeklyReport(facts: UserWeekFacts): UserWeeklyR
       ],
       trainingSection: {
         title: t(facts, 'Krafttraining', 'Strength training'),
+        paragraphs: [],
         bullets: facts.training.topExercisesByVolume.map(
           (e) => `${e.name}: ${e.volumeKg} kg Volumen`,
         ),
       },
       nutritionSection: {
         title: t(facts, 'Ernährung', 'Nutrition'),
+        paragraphs: [],
         bullets: [
           `${facts.nutrition.daysLogged} ${t(facts, 'Tage geloggt', 'days logged')}`,
           `${facts.nutrition.totalKcal} kcal ${t(facts, 'gesamt', 'total')}`,
@@ -282,6 +289,7 @@ export function buildFallbackUserWeeklyReport(facts: UserWeekFacts): UserWeeklyR
       },
       cardioSection: {
         title: t(facts, 'Cardio & NEAT', 'Cardio & NEAT'),
+        paragraphs: [],
         bullets: [
           `${facts.training.cardioMinutes} min / ${facts.training.cardioSessions} Sessions`,
           `${facts.activity.avgSteps} ${t(facts, 'Ø Schritte', 'avg steps')}`,
@@ -289,6 +297,7 @@ export function buildFallbackUserWeeklyReport(facts: UserWeekFacts): UserWeeklyR
       },
       comparisonSection: {
         title: t(facts, 'Woche vs. Vorwoche', 'Week vs prior week'),
+        paragraphs: [],
         bullets: [
           t(facts, `Volumen: ${facts.training.totalVolumeKg} kg (Vorwoche ${facts.training.prevWeekVolumeKg} kg)`, `Volume: ${facts.training.totalVolumeKg} kg (prior ${facts.training.prevWeekVolumeKg} kg)`),
           t(facts, `Verbrauch Training: ${facts.training.caloriesBurned} kcal`, `Training burn: ${facts.training.caloriesBurned} kcal`),
