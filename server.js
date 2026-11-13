@@ -18326,6 +18326,23 @@ JSON repair: ${repair}` : prompt;
       res.status(500).json({ error: "Login failed" });
     }
   });
+  app.post("/api/auth/demo", async (_req, res) => {
+    try {
+      const result = await pool.query(
+        "SELECT * FROM users WHERE lower(email)='demo@example.com' AND is_active=true LIMIT 1"
+      );
+      if (!result.rows.length) {
+        res.status(404).json({ error: "Demo not set up" });
+        return;
+      }
+      const user = result.rows[0];
+      const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: "30d" });
+      res.json({ token, profile: mapUser(user) });
+    } catch (err) {
+      console.error("demo login error:", err);
+      res.status(500).json({ error: "Demo login failed" });
+    }
+  });
   app.post("/api/auth/cancel-registration", requireAuth, async (req, res) => {
     try {
       const row = await pool.query("SELECT onboarded FROM users WHERE id=$1", [req.userId]);
