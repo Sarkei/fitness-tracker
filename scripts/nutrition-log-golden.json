@@ -1,0 +1,68 @@
+{
+  "cases": [
+    { "id": "tpl_cheeseburger", "type": "template", "input": "1 Cheeseburger", "templateId": "cheeseburger", "minComponents": 5 },
+    { "id": "tpl_hotdog", "type": "template", "input": "Hot Dog", "templateId": "hotdog", "minComponents": 3 },
+    { "id": "tpl_hamburger", "type": "template", "input": "hamburger", "templateId": "hamburger", "minComponents": 4 },
+    { "id": "tpl_leberkas", "type": "template", "input": "Leberkässemmel", "templateId": "leberkaessemmel", "minComponents": 2 },
+    { "id": "tpl_doener", "type": "template", "input": "Döner", "templateId": "doener", "minComponents": 5 },
+    { "id": "tpl_bolognese", "type": "template", "input": "Spaghetti Bolognese", "templateId": "spaghetti_bolognese", "minComponents": 4 },
+    { "id": "tpl_carbonara", "type": "template", "input": "Pasta Carbonara", "templateId": "pasta_carbonara", "minComponents": 4 },
+    { "id": "tpl_caesar", "type": "template", "input": "Caesar Salad", "templateId": "caesar_salad", "minComponents": 4 },
+    { "id": "tpl_greek", "type": "template", "input": "griechischer salat", "templateId": "griechischer_salat", "minComponents": 5 },
+    { "id": "tpl_currywurst", "type": "template", "input": "Currywurst", "templateId": "currywurst", "minComponents": 3 },
+    { "id": "tpl_schnitzel", "type": "template", "input": "Schnitzel mit Pommes", "templateId": "schnitzel_pommes", "minComponents": 2 },
+    { "id": "tpl_muesli", "type": "template", "input": "Müsli mit Milch", "templateId": "muesli", "minComponents": 3 },
+    { "id": "tpl_avocado", "type": "template", "input": "Avocado Toast", "templateId": "avocado_toast", "minComponents": 3 },
+    { "id": "tpl_club", "type": "template", "input": "Club Sandwich", "templateId": "club_sandwich", "minComponents": 5 },
+    { "id": "tpl_falafel", "type": "template", "input": "Falafel Teller", "templateId": "falafel_teller", "minComponents": 3 },
+    { "id": "tpl_padthai", "type": "template", "input": "Pad Thai", "templateId": "pad_thai", "minComponents": 4 },
+    { "id": "tpl_wings", "type": "template", "input": "Chicken Wings", "templateId": "chicken_wings", "minComponents": 2 },
+
+    { "id": "seg_three", "type": "segment", "input": "Apfel, Banane und Joghurt", "minSegments": 3 },
+    { "id": "seg_two", "type": "segment", "input": "Reis und Hähnchen", "minSegments": 2 },
+    { "id": "seg_comma", "type": "segment", "input": "Tomate, Gurke, Salat", "minSegments": 3 },
+    { "id": "seg_und", "type": "segment", "input": "Kaffee und Brötchen", "minSegments": 2 },
+
+    { "id": "heur_apfel", "type": "heuristic", "input": "1 Apfel", "minItems": 1, "hintIncludes": "apfel" },
+    { "id": "heur_multi", "type": "heuristic", "input": "2x Cheeseburger", "templateId": "cheeseburger" },
+    { "id": "heur_doener_phrase", "type": "heuristic", "input": "Doener Kebab", "templateId": "doener" },
+
+    { "id": "rank_haehnchen", "type": "rank", "query": "Hähnchenbrust", "expectTopIncludes": "Hähnchen", "rejectIncludes": "Nuggets" },
+    { "id": "rank_reis", "type": "rank", "query": "Reis gekocht", "expectTopIncludes": "Reis" },
+    { "id": "rank_apfel", "type": "rank", "query": "Apfel", "expectTopIncludes": "Apfel" },
+    { "id": "rank_joghurt", "type": "rank", "query": "Joghurt", "expectTopIncludes": "Joghurt" },
+    { "id": "rank_lachs", "type": "rank", "query": "Lachs", "expectTopIncludes": "Lachs" },
+    { "id": "rank_banane", "type": "rank", "query": "Banane", "expectTopIncludes": "Banane" },
+    { "id": "rank_tomate", "type": "rank", "query": "Tomate", "expectTopIncludes": "Tomate" },
+    { "id": "rank_kaese", "type": "rank", "query": "Käse Scheibe", "expectTopIncludes": "Käse" },
+
+    { "id": "gen_lachs", "type": "generic", "query": "Lachs roh", "expectId": "generic_lachs_roh" },
+    { "id": "gen_reis", "type": "generic", "query": "reis gekocht", "expectId": "generic_reis_gekocht" },
+    { "id": "gen_quark", "type": "generic", "query": "Magerquark", "expectId": "generic_magerquark" },
+    { "id": "gen_avocado", "type": "generic", "query": "Avocado", "expectId": "generic_avocado" },
+    { "id": "gen_falafel", "type": "generic", "query": "Falafel", "expectId": "generic_falafel" },
+    { "id": "gen_doener", "type": "generic", "query": "Dönerfleisch", "expectId": "generic_doener_fleisch" },
+    { "id": "gen_pommes", "type": "generic", "query": "Pommes", "expectId": "generic_pommes_frites" },
+    { "id": "gen_hafer", "type": "generic", "query": "Haferflocken", "expectId": "generic_haferflocken" },
+
+    { "id": "syn_huhn", "type": "generic", "query": "Huhn", "expectId": "generic_haehnchenbrust" },
+    { "id": "syn_pasta", "type": "generic", "query": "Pasta", "expectId": "generic_nudeln_gekocht" },
+    { "id": "syn_pommes", "type": "generic", "query": "Pommes", "expectId": "generic_pommes_frites" },
+
+    { "id": "plaus_ok", "type": "plausibility", "kcal": 650, "protein": 40, "carbs": 60, "fat": 20, "maxIssues": 0 },
+    { "id": "plaus_high", "type": "plausibility", "kcal": 5000, "protein": 10, "carbs": 10, "fat": 10, "expectCode": "meal_too_high" },
+
+    { "id": "thresh_block", "type": "threshold", "score": 0.5, "requiresPick": true },
+    { "id": "thresh_ok", "type": "threshold", "score": 0.75, "requiresPick": false },
+    { "id": "thresh_high", "type": "threshold", "score": 0.9, "uncertainty": "high" },
+
+    { "id": "tpl_pizza", "type": "template", "input": "Pizza Margherita", "templateId": "pizza_margherita_stueck", "minComponents": 2 },
+    { "id": "tpl_sushi", "type": "template", "input": "Sushi Set", "templateId": "sushi_set", "minComponents": 2 },
+    { "id": "tpl_fruehstueck", "type": "template", "input": "Spiegelei", "templateId": "fruehstuecksei", "minComponents": 2 },
+
+    { "id": "rank_nuggets_penalty", "type": "rank", "query": "Hähnchenbrust roh", "expectTopIncludes": "Hähnchen" },
+    { "id": "gen_tofu", "type": "generic", "query": "Tofu", "expectId": "generic_tofu" },
+    { "id": "gen_cola", "type": "generic", "query": "Cola", "expectId": "generic_cola" },
+    { "id": "heur_salat", "type": "heuristic", "input": "Griechischer Salat", "templateId": "griechischer_salat" }
+  ]
+}

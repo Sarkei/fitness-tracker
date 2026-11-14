@@ -1,0 +1,504 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+/* ============================================================
+   Tim-Designsystem · Grau + Grün
+   Tokens aus knowledge/design-system/theme.css — verbindlich.
+   Apps setzen nur diese Tokens ein, keine eigenen Hex-Werte.
+   ============================================================ */
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+
+  /* Akzent (Grün) — Utility-Namen der App bleiben `brand` */
+  --color-brand: var(--accent);
+  --color-brand-muted: var(--accent-soft);
+
+  /* Semantische Grau-Palette: Flächen / Text / Linien getrennt */
+  --color-canvas: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-placeholder: var(--placeholder);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  /* Akzent-Utilities */
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+  --color-on-accent: var(--on-accent);
+
+  /* Status */
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+
+  --color-surface-gray: var(--surface-2);
+}
+
+/* Light mode (default) */
+:root {
+  /* Flächen: neutrales Grau, kein Blau-, kein Creme-Stich */
+  --bg: #f3f5f4;
+  --surface: #ffffff;
+  --surface-2: #eaeeec;
+  --surface-3: #e1e6e3;
+
+  /* Text */
+  --ink: #121a16;
+  --muted: #55635c;
+  --placeholder: #8a978f;
+
+  /* Linien */
+  --line: #dde3df;
+  --line-strong: #c6cfc9;
+
+  /* Akzent: Grün */
+  --accent: #2f7d5a;
+  --accent-hover: #276a4b;
+  --accent-soft: #e6f1eb;
+  --accent-ink: #123a28;
+  --on-accent: #ffffff;
+
+  /* Status */
+  --danger: #b4453a;
+  --danger-soft: #fbecea;
+  --warn: #8a5410;
+  --warn-soft: #f8eede;
+  --success: #2f7d5a;
+  --success-soft: #e6f1eb;
+
+  /* Form — eigener Namensraum, die Tailwind-Radius-Skala bleibt unangetastet */
+  --ds-radius-sm: 8px;
+  --ds-radius: 12px;
+  --ds-radius-lg: 16px;
+  --ds-radius-pill: 999px;
+  --ds-shadow-sm: 0 1px 2px rgb(18 26 22 / 0.06);
+  --ds-shadow: 0 1px 2px rgb(18 26 22 / 0.05), 0 10px 30px -22px rgb(18 26 22 / 0.4);
+
+  color-scheme: light;
+
+  /* Alte App-Variablen → neue Tokens (Bestandsklassen laufen weiter) */
+  --background: var(--bg);
+  --foreground: var(--ink);
+  --text-primary: var(--ink);
+  --card-bg: var(--surface);
+  --border-muted: var(--line);
+  --text-muted: var(--muted);
+  --text-placeholder: var(--placeholder);
+  --brand: var(--accent);
+  --text-success: var(--success);
+
+  /* Vereinfachte Oberfläche */
+  --simple-accent: var(--accent);
+  --simple-accent-strong: var(--accent-hover);
+  --simple-accent-soft: var(--accent-soft);
+  --simple-accent-ink: var(--on-accent);
+  --simple-warm: var(--bg);
+  --simple-clay: var(--warn);
+  --simple-serif: var(--font-serif);
+}
+
+/* Dark mode */
+[data-theme='dark'],
+.dark {
+  --bg: #101312;
+  --surface: #16211c;
+  --surface-2: #1b1e1d;
+  --surface-3: #242625;
+
+  --ink: #e9edeb;
+  --muted: #a4aaa7;
+  --placeholder: #7b807d;
+
+  --line: #2b2f2d;
+  --line-strong: #383c3a;
+
+  --accent: #4fbf8b;
+  --accent-hover: #63cf9b;
+  --accent-soft: rgb(79 191 139 / 0.14);
+  --accent-ink: #b9e8d0;
+  --on-accent: #08150f;
+
+  --danger: #f08a7a;
+  --danger-soft: rgb(240 138 122 / 0.14);
+  --warn: #e8b25f;
+  --warn-soft: rgb(232 178 95 / 0.14);
+  --success: #4fbf8b;
+  --success-soft: rgb(79 191 139 / 0.14);
+
+  --ds-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --ds-shadow: 0 1px 2px rgb(0 0 0 / 0.35), 0 12px 32px -24px rgb(0 0 0 / 0.9);
+
+  color-scheme: dark;
+
+  /* Alias-Mapping im Dark-Mode erneut auflösen */
+  --background: var(--bg);
+  --foreground: var(--ink);
+  --text-primary: var(--ink);
+  --card-bg: var(--surface);
+  --border-muted: var(--line);
+  --text-muted: var(--muted);
+  --text-placeholder: var(--placeholder);
+  --brand: var(--accent);
+  --text-success: var(--success);
+
+  --simple-accent: var(--accent);
+  --simple-accent-strong: var(--accent-hover);
+  --simple-accent-soft: var(--accent-soft);
+  --simple-accent-ink: var(--on-accent);
+  --simple-warm: var(--surface-2);
+  --simple-clay: var(--warn);
+}
+
+.safe-area-pt {
+  padding-top: max(0.5rem, env(safe-area-inset-top));
+}
+
+@media print {
+  nav, aside {
+    display: none !important;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-[var(--line)];
+  }
+
+  html,
+  body {
+    background-color: var(--bg);
+    color: var(--ink);
+  }
+
+  ::selection {
+    background: var(--accent-soft);
+    color: var(--ink);
+  }
+
+  /* Tastatur / Screenreader: sichtbarer Fokus ohne Maus-Ring bei Klick */
+  :where(
+    a,
+    button,
+    input:not([type="hidden"]),
+    select,
+    textarea,
+    summary,
+    [role="button"],
+    [tabindex]:not([tabindex="-1"])
+  ):focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+    outline-offset: 2px;
+  }
+
+  /* Einheitliche, gut abgesetzte Platzhalter — unabhängig von Tailwind-Varianten pro Komponente */
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--placeholder);
+    opacity: 1;
+    font-weight: 500;
+  }
+  input::-webkit-input-placeholder,
+  textarea::-webkit-input-placeholder {
+    color: var(--placeholder);
+    opacity: 1;
+    font-weight: 500;
+  }
+}
+
+/* Intentional carousels / chip rails — hide scrollbars only here */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+html, body {
+  height: 100%;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
+  /* Prevent rubber-band scrolling from affecting fixed elements on iOS */
+  overscroll-behavior-y: none;
+}
+
+:root {
+  --vv-bottom-inset: 0px;
+  --vv-top-inset: 0px;
+  --vv-height: 100dvh;
+  /* FAB (3.5rem) + Labels + Safe-Area-Clearance */
+  --mobile-tab-bar-h: 5.75rem;
+  --mobile-quick-sheet-bottom: calc(var(--mobile-tab-bar-h) + env(safe-area-inset-bottom, 0px));
+  --shell-pad-bottom: max(6.5rem, calc(var(--mobile-tab-bar-h) + env(safe-area-inset-bottom, 0px) + 0.5rem));
+}
+
+/* Installierte PWA / iOS Home-Screen: Tab-Leiste fest am unteren Rand */
+html.app-standalone-pwa {
+  --vv-bottom-inset: 0px !important;
+  height: 100%;
+  height: 100dvh;
+}
+
+html.app-standalone-pwa body {
+  min-height: 100%;
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+.mobile-bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding-bottom: max(0.25rem, env(safe-area-inset-bottom, 0px));
+  /* iOS: fixed am Layout-Viewport, nicht am scrollenden Inhalt */
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  will-change: transform;
+}
+
+html:not(.workout-session-active) .mobile-bottom-nav {
+  bottom: 0 !important;
+  transform: translate3d(0, 0, 0) !important;
+}
+
+html.app-standalone-pwa .mobile-bottom-nav {
+  bottom: 0 !important;
+  transform: translate3d(0, 0, 0) !important;
+  padding-bottom: max(0.25rem, env(safe-area-inset-bottom, 0px));
+}
+
+/* Live-Workout: Tab-Leiste ausblenden, Viewport nicht mitziehen */
+html.workout-session-active {
+  --vv-bottom-inset: 0px !important;
+}
+
+html.workout-session-active .mobile-bottom-nav {
+  display: none !important;
+}
+
+/* Vollflächige Overlays: Tab-Bar ausblenden, Backdrop bleibt randlos dunkel */
+html.mobile-overlay-open .mobile-bottom-nav {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Quick-Actions-Sheet: ohne Tab-Bar-Offset, solange die Bar versteckt ist */
+html.mobile-overlay-open {
+  --mobile-quick-sheet-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+}
+
+html.active-workout-bar-visible main {
+  padding-top: calc(3.5rem + env(safe-area-inset-top, 0px));
+}
+
+html.active-workout-bar-minimized main {
+  padding-top: calc(0.85rem + env(safe-area-inset-top, 0px));
+}
+
+/* Innerer Page-Padding nicht nochmal volle lg:pt-12 stapeln */
+html.active-workout-bar-visible .shell-page,
+html.active-workout-bar-minimized .shell-page {
+  padding-top: 0.75rem !important;
+}
+
+@media (min-width: 1024px) {
+  html.active-workout-bar-visible .shell-page,
+  html.active-workout-bar-minimized .shell-page {
+    padding-top: 1rem !important;
+  }
+}
+
+html.workout-session-active,
+html.workout-session-active body {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.mobile-quick-actions-sheet {
+  bottom: var(
+    --mobile-quick-sheet-bottom,
+    calc(var(--mobile-tab-bar-h) + max(0.25rem, env(safe-area-inset-bottom, 0px)))
+  );
+}
+
+@keyframes barcode-scan {
+  0%,
+  100% {
+    top: 6%;
+    opacity: 0.35;
+  }
+  50% {
+    top: 90%;
+    opacity: 1;
+  }
+}
+
+.barcode-scan-line {
+  animation: barcode-scan 2.2s ease-in-out infinite;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 80%, transparent);
+}
+
+/* Universal weekly report — A4 print layout */
+.weekly-report-a4-page {
+  min-height: 280mm;
+}
+
+@media print {
+  .weekly-report-a4-page {
+    width: 210mm;
+    min-height: 297mm;
+    max-height: none;
+    page-break-after: always;
+    break-after: page;
+    margin: 0 auto;
+    box-shadow: none !important;
+  }
+  .user-weekly-report-doc .weekly-report-a4-page:last-child {
+    page-break-after: auto;
+  }
+}
+
+#root {
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  @apply transition-colors duration-300;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
+}
+
+.card-minimal {
+  background-color: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--ds-radius-lg);
+  transition: all 0.2s ease-out;
+}
+
+.card-minimal:hover {
+  border-color: var(--line-strong);
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--on-accent);
+  padding: 0.625rem 1.5rem;
+  border-radius: var(--ds-radius-pill);
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+}
+
+@layer components {
+  /* Global: keine Glow-/Shadow-Effekte unter Buttons — außer Nav-FAB */
+  button:not(.mobile-nav-fab),
+  [role='button']:not(.mobile-nav-fab),
+  .ui-btn-brand:not(.mobile-nav-fab) {
+    --tw-shadow: 0 0 #0000 !important;
+    --tw-shadow-colored: 0 0 #0000 !important;
+    box-shadow: none !important;
+  }
+
+  .mobile-nav-fab {
+    color: var(--on-accent);
+    box-shadow: 0 12px 28px color-mix(in srgb, var(--accent) 35%, transparent) !important;
+  }
+
+  .ui-choice {
+    @apply border-2 transition-colors border-[var(--line)];
+  }
+  .ui-choice:hover {
+    border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  }
+  .ui-choice[data-selected='true'],
+  .ui-choice-selected {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--ink);
+  }
+  .ui-btn-brand {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border font-black uppercase tracking-widest transition-colors disabled:opacity-50;
+    border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+    box-shadow: none;
+  }
+  .ui-btn-brand:hover:not(:disabled) {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 20%, var(--surface));
+  }
+  .ui-btn-brand-sm {
+    @apply inline-flex items-center justify-center gap-1 rounded-lg border font-black uppercase tracking-widest transition-colors disabled:opacity-50;
+    border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+    box-shadow: none;
+  }
+  .ui-btn-brand-sm:hover:not(:disabled) {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 20%, var(--surface));
+  }
+  .ui-mark-selected {
+    border: 2px solid var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+  }
+}
+
+/* Admin-Panel: immer Light Mode (unabhängig von .dark auf html) */
+.admin-page {
+  color-scheme: light;
+  --bg: #f3f5f4;
+  --surface: #ffffff;
+  --surface-2: #eaeeec;
+  --surface-3: #e1e6e3;
+  --ink: #121a16;
+  --muted: #55635c;
+  --placeholder: #8a978f;
+  --line: #dde3df;
+  --line-strong: #c6cfc9;
+  --accent: #2f7d5a;
+  --accent-hover: #276a4b;
+  --accent-soft: #e6f1eb;
+  --accent-ink: #123a28;
+  --on-accent: #ffffff;
+  --background: var(--bg);
+  --foreground: var(--ink);
+  --text-primary: var(--ink);
+  --card-bg: var(--surface);
+  --border-muted: var(--line);
+  --text-muted: var(--muted);
+  --text-placeholder: var(--placeholder);
+  background-color: var(--bg);
+  color: var(--ink);
+}
+
+.admin-page input:not([type="checkbox"]):not([type="radio"]),
+.admin-page select,
+.admin-page textarea {
+  color: var(--ink);
+}
+
+.admin-page input::placeholder,
+.admin-page textarea::placeholder {
+  color: var(--placeholder);
+}
