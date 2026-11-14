@@ -1,0 +1,18 @@
+# Postgres für Playwright-E2E (Port 5433, um lokale 5432 nicht zu blockieren)
+# Start: docker compose -f docker-compose.e2e.yaml up -d --wait
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fitness-tracker-db-e2e
+    environment:
+      POSTGRES_DB: fitness_tracker
+      POSTGRES_USER: vrtx
+      POSTGRES_PASSWORD: vrtx_secret
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vrtx -d fitness_tracker"]
+      interval: 3s
+      timeout: 5s
+      retries: 12

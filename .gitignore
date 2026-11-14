@@ -1,0 +1,43 @@
+node_modules/
+e2e/.auth/
+playwright-report-staging/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env
+data/.env
+!.env.example
+
+# System
+Thumbs.db
+desktop.ini
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs und Temp
+*.tmp
+
+# Node
+.next/
+.nuxt/
+*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Docker / lokal
+.env.local
+.env.*.local
+docker-compose.override.yml
+
+# Datenbanken und Dumps
+*.sqlite
+*.sqlite3
+*.db
+dumps/

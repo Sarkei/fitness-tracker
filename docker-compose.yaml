@@ -1,0 +1,123 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fitness-tracker-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fitness_tracker
+      POSTGRES_USER: vrtx
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vrtx_secret}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vrtx -d fitness_tracker"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Optionaler lokaler LLM-Stack — nur mit `docker compose --profile ollama up` starten.
+  ollama:
+    image: ollama/ollama:latest
+    container_name: fitness-tracker-ollama
+    restart: unless-stopped
+    profiles: ["ollama"]
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  ollama-pull:
+    image: ollama/ollama:latest
+    container_name: fitness-tracker-ollama-pull
+    restart: "no"
+    profiles: ["ollama"]
+    networks:
+      - default
+    environment:
+      - OLLAMA_HOST=ollama:11434
+      - LOCAL_LLM_MODEL=${LOCAL_LLM_MODEL:-gemma4:e2b}
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "[ollama-pull] Waiting for Ollama service to be ready..."
+        until ollama list > /dev/null 2>&1; do
+          sleep 2
+        done
+        echo "[ollama-pull] Checking and downloading local model: $${LOCAL_LLM_MODEL}..."
+        ollama pull "$${LOCAL_LLM_MODEL}"
+        echo "[ollama-pull] Model $${LOCAL_LLM_MODEL} is ready for all users!"
+
+  fitness-tracker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: fitness_tracker-fitness-tracker:latest
+    container_name: fitness-tracker
+    restart: unless-stopped
+    ports:
+      - "22222:3000"
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      # Host muss eine echte Datei .env sein (kein Ordner — sonst EISDIR)
+      - ./.env:/app/.env
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=fitness_tracker
+      - POSTGRES_USER=vrtx
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-vrtx_secret}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
+      - JWT_SECRET=${JWT_SECRET:-vrtx-docker-secret-change-in-production}
+      # KI-Provider: deepseek (Standard), ollama (nur mit --profile ollama), mistral, gemini
+      - AI_ACTIVE_PROVIDER=${AI_ACTIVE_PROVIDER:-deepseek}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      # Nur setzen, wenn der Ollama-Stack als Profil mitläuft — leer = kein lokaler Fallback.
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-}
+      - LOCAL_LLM_MODEL=${LOCAL_LLM_MODEL:-}
+      - OLLAMA_NUM_CTX=${OLLAMA_NUM_CTX:-8192}
+      - EXERCISEDB_RAPIDAPI_KEY=${EXERCISEDB_RAPIDAPI_KEY:-}
+      - EXERCISEDB_RAPIDAPI_HOST=${EXERCISEDB_RAPIDAPI_HOST:-edb-with-videos-and-images-by-ascendapi.p.rapidapi.com}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - default
+      - cloudflare
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  postgres_data:
+  ollama_models:
+
+networks:
+  default:
+    driver: bridge
+  cloudflare:
+    external: true
+    name: cloudflare-tunnel-net

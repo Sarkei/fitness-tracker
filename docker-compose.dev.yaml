@@ -1,0 +1,96 @@
+# Lokale Entwicklung mit Hot Reload (Vite + tsx server.ts)
+# Start: docker compose -f docker-compose.dev.yaml up
+# App: http://localhost:3000  (iPhone/LAN: http://<deine-IP>:3000)
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fitness-tracker-db-dev
+    environment:
+      POSTGRES_DB: fitness_tracker
+      POSTGRES_USER: vrtx
+      POSTGRES_PASSWORD: vrtx_secret
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vrtx -d fitness_tracker"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: fitness-tracker-ollama-dev
+    restart: unless-stopped
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama_models_dev:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ollama-pull:
+    image: ollama/ollama:latest
+    container_name: fitness-tracker-ollama-pull-dev
+    restart: "no"
+    environment:
+      - OLLAMA_HOST=ollama:11434
+      - LOCAL_LLM_MODEL=${LOCAL_LLM_MODEL:-gemma4:e2b}
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "[ollama-pull-dev] Waiting for Ollama..."
+        until ollama list > /dev/null 2>&1; do sleep 2; done
+        echo "[ollama-pull-dev] Pulling $${LOCAL_LLM_MODEL}..."
+        ollama pull "$${LOCAL_LLM_MODEL}"
+        echo "[ollama-pull-dev] Ready!"
+
+  app:
+    image: node:20-alpine
+    container_name: fitness-tracker-dev
+    working_dir: /app
+    command: sh -c "npm ci --legacy-peer-deps && npm run dev"
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      # Windows/macOS: node_modules im Container, nicht vom Host überschreiben
+      - app_node_modules:/app/node_modules
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: fitness_tracker
+      POSTGRES_USER: vrtx
+      POSTGRES_PASSWORD: vrtx_secret
+      OLLAMA_BASE_URL: http://ollama:11434
+      LOCAL_LLM_MODEL: ${LOCAL_LLM_MODEL:-gemma4:e2b}
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-8192}
+      AI_ACTIVE_PROVIDER: ${AI_ACTIVE_PROVIDER:-ollama}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+      ollama-pull:
+        condition: service_completed_successfully
+
+volumes:
+  postgres_data_dev:
+  app_node_modules:
+  ollama_models_dev:
