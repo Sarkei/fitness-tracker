@@ -1758,6 +1758,27 @@ ${exerciseCatalog}
     }
   });
 
+  /** Demo-Zugang für die Portfolio-Vorschau: nur über demo-*-Domains oder DEMO_LOGIN=1. */
+  app.post("/api/auth/demo", async (req, res) => {
+    try {
+      const host = String(req.headers.host ?? "").toLowerCase();
+      if (!host.startsWith("demo-") && !host.startsWith("demo.") && process.env.DEMO_LOGIN !== "1") {
+        res.status(404).json({ error: "Demo ist nicht verfügbar" });
+        return;
+      }
+      const result = await pool.query(
+        "SELECT * FROM users WHERE lower(email)='demo@example.com' AND is_active=true LIMIT 1"
+      );
+      if (!result.rows.length) { res.status(404).json({ error: "Demo ist nicht eingerichtet" }); return; }
+      const user = result.rows[0];
+      const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: "30d" });
+      res.json({ token, profile: mapUser(user) });
+    } catch (err) {
+      console.error("demo login error:", err);
+      res.status(500).json({ error: "Demo konnte nicht geladen werden" });
+    }
+  });
+
   /** Registrierung abbrechen: nur solange Onboarding nicht abgeschlossen (kein Passwort nötig). */
   app.post("/api/auth/cancel-registration", requireAuth, async (req: AuthRequest, res) => {
     try {
