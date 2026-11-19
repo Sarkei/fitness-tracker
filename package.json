@@ -56,7 +56,8 @@
     "test:e2e:coach": "playwright test e2e/coach-refine-report.spec.ts",
     "test:e2e:coach:live": "playwright test -c playwright.staging.config.ts",
     "test:e2e:ui": "playwright test --ui",
-    "ci:coach": "npm run test:coach:all && npm run test:e2e:coach"
+    "ci:coach": "npm run test:coach:all && npm run test:e2e:coach",
+    "test:analytics": "tsx scripts/analytics-selftest.ts"
   },
   "dependencies": {
     "@google/genai": "^1.51.0",
