@@ -4,6 +4,7 @@
  */
 
 import type { FoodEntry, WorkoutEntry } from './simpleApi';
+import { gruppeAusTabelle } from './uebungen';
 
 export type Ymd = string; // YYYY-MM-DD
 
@@ -156,10 +157,22 @@ const MUSKEL_MUSTER: Array<{ gruppe: Muskelgruppe; woerter: string[] }> = [
 
 export function muskelgruppe(exerciseName: string): Muskelgruppe {
   const n = String(exerciseName ?? '').toLowerCase();
+  if (!n.trim()) return 'Sonstiges';
+
+  // Erst die genaue Tabelle (kennt auch deutsche Namen und Mehrdeutiges),
+  // dann die einfache Wortsuche als Rueckfall.
+  const genau = gruppeAusTabelle(exerciseName);
+  if (genau) return genau;
+
+  let beste: { gruppe: Muskelgruppe; laenge: number } | null = null;
   for (const { gruppe, woerter } of MUSKEL_MUSTER) {
-    if (woerter.some((w) => n.includes(w))) return gruppe;
+    for (const w of woerter) {
+      if (w.length > 2 && n.includes(w) && (!beste || w.length > beste.laenge)) {
+        beste = { gruppe, laenge: w.length };
+      }
+    }
   }
-  return 'Sonstiges';
+  return beste?.gruppe ?? 'Sonstiges';
 }
 
 /** Sätze pro Muskelgruppe in den letzten N Tagen. */
@@ -271,4 +284,182 @@ export function dayLabelShort(ymd: Ymd): string {
   const [y, m, d] = ymd.split('-').map(Number);
   if (!y || !m || !d) return '';
   return new Date(y, m - 1, d).toLocaleDateString('de-DE', { weekday: 'short' }).slice(0, 2);
+}
+
+// ============================================================ Gewicht
+
+export type Gewichtspunkt = { ymd: Ymd; weight: number };
+
+/** Gewichtsverlauf aus `weight_history` sortiert und auf N Tage begrenzt. */
+export function gewichtsverlauf(history: unknown, tage = 90): Gewichtspunkt[] {
+  if (!Array.isArray(history)) return [];
+  const punkte: Gewichtspunkt[] = [];
+  for (const roh of history) {
+    const e = roh as { date?: unknown; weight?: unknown };
+    const ymd = toYmd(e?.date);
+    const weight = Number(e?.weight);
+    if (!ymd || !Number.isFinite(weight) || weight <= 0) continue;
+    punkte.push({ ymd, weight });
+  }
+  punkte.sort((a, b) => a.ymd.localeCompare(b.ymd));
+
+  // Duplikate pro Tag: der letzte Eintrag gewinnt
+  const proTag = new Map<Ymd, number>();
+  for (const p of punkte) proTag.set(p.ymd, p.weight);
+
+  const grenze = shiftYmdLocal(todayYmdLocal(), -tage + 1);
+  return [...proTag.entries()]
+    .filter(([ymd]) => ymd >= grenze)
+    .map(([ymd, weight]) => ({ ymd, weight }))
+    .sort((a, b) => a.ymd.localeCompare(b.ymd));
+}
+
+/** Veraenderung ueber den ganzen Verlauf. */
+export function gewichtsTrend(punkte: Gewichtspunkt[]): {
+  aktuell: number | null;
+  start: number | null;
+  delta: number | null;
+  proWoche: number | null;
+} {
+  if (!punkte.length) return { aktuell: null, start: null, delta: null, proWoche: null };
+  const start = punkte[0].weight;
+  const aktuell = punkte[punkte.length - 1].weight;
+  const delta = Math.round((aktuell - start) * 10) / 10;
+
+  let proWoche: number | null = null;
+  if (punkte.length > 1) {
+    const tage = Math.max(1, daysBetween(punkte[0].ymd, punkte[punkte.length - 1].ymd));
+    proWoche = Math.round((delta / (tage / 7)) * 100) / 100;
+  }
+  return { aktuell, start, delta, proWoche };
+}
+
+/** Gleitender Durchschnitt, da Tagesgewicht stark schwankt. */
+export function geglaettet(punkte: Gewichtspunkt[], fenster = 7): number[] {
+  if (!punkte.length) return [];
+  const out: number[] = [];
+  for (let i = 0; i < punkte.length; i += 1) {
+    const von = Math.max(0, i - fenster + 1);
+    const teil = punkte.slice(von, i + 1);
+    out.push(teil.reduce((s, p) => s + p.weight, 0) / teil.length);
+  }
+  return out;
+}
+
+// ============================================================ Wochenrueckblick
+
+export type Wochenvergleich = {
+  einheiten: { jetzt: number; vorher: number };
+  volumen: { jetzt: number; vorher: number };
+  minuten: { jetzt: number; vorher: number };
+  kcalSchnitt: { jetzt: number; vorher: number };
+  proteinTreffer: { jetzt: number; vorher: number };
+};
+
+function imZeitraum(ymd: Ymd, von: Ymd, bis: Ymd): boolean {
+  return ymd >= von && ymd <= bis;
+}
+
+/** Diese Woche (Mo–So) gegen die Vorwoche. */
+export function wochenvergleich(
+  workouts: WorkoutEntry[],
+  entries: FoodEntry[],
+  proteinZiel: number,
+  trainingsTage = 7,
+): Wochenvergleich {
+  const heute = todayYmdLocal();
+  const wochentag = (new Date().getDay() + 6) % 7; // Mo=0
+  const dieserMo = shiftYmdLocal(heute, -wochentag);
+  const letzterMo = shiftYmdLocal(dieserMo, -7);
+  const letzterSo = shiftYmdLocal(dieserMo, -1);
+
+  const zeit = { jetzt: [dieserMo, heute], vorher: [letzterMo, letzterSo] } as const;
+
+  const zaehle = (von: Ymd, bis: Ymd) => {
+    const w = workouts.filter((x) => imZeitraum(toYmd(x.date), von, bis));
+    const minuten = w.reduce((s, x) => s + (Number(x.duration) || 0), 0);
+    return { w, minuten };
+  };
+
+  const jetzt = zaehle(...zeit.jetzt);
+  const vorher = zaehle(...zeit.vorher);
+
+  const kcalMap = kcalByDay(entries);
+  const schnitt = ([von, bis]: readonly [Ymd, Ymd]) => {
+    let summe = 0;
+    let n = 0;
+    let cur = von;
+    while (cur <= bis) {
+      const v = kcalMap.get(cur);
+      if (v && v > 0) {
+        summe += v;
+        n += 1;
+      }
+      cur = shiftYmdLocal(cur, 1);
+    }
+    return n ? Math.round(summe / n) : 0;
+  };
+
+  // Proteintreffer: Tage, an denen das Proteinziel erreicht wurde
+  const proteinMap = new Map<Ymd, number>();
+  for (const e of entries) {
+    const ymd = toYmd(e.date);
+    if (!ymd) continue;
+    proteinMap.set(ymd, (proteinMap.get(ymd) ?? 0) + (Number(e.protein) || 0));
+  }
+  const treffer = ([von, bis]: readonly [Ymd, Ymd]) => {
+    let n = 0;
+    let cur = von;
+    while (cur <= bis) {
+      if ((proteinMap.get(cur) ?? 0) >= proteinZiel) n += 1;
+      cur = shiftYmdLocal(cur, 1);
+    }
+    return n;
+  };
+
+  return {
+    einheiten: { jetzt: jetzt.w.length, vorher: vorher.w.length },
+    volumen: {
+      jetzt: jetzt.w.reduce((s, x) => s + volumen([x], 400), 0),
+      vorher: vorher.w.reduce((s, x) => s + volumen([x], 400), 0),
+    },
+    minuten: { jetzt: jetzt.minuten, vorher: vorher.minuten },
+    kcalSchnitt: { jetzt: schnitt(zeit.jetzt), vorher: schnitt(zeit.vorher) },
+    proteinTreffer: { jetzt: treffer(zeit.jetzt), vorher: treffer(zeit.vorher) },
+  };
+}
+
+// ============================================================ Bestleistungen
+
+export type Bestleistung = { uebung: string; gewicht: number; reps: number; datum: Ymd };
+
+/** Hoechstes Gewicht pro Uebung (aus allen Saetzen). */
+export function bestleistungen(workouts: WorkoutEntry[], limit = 8): Bestleistung[] {
+  const map = new Map<string, Bestleistung>();
+
+  for (const w of workouts) {
+    const ex = w.exercises;
+    if (!Array.isArray(ex)) continue;
+    const ymd = toYmd(w.date);
+    for (const e of ex) {
+      const name = String((e as { name?: unknown })?.name ?? '').trim();
+      if (!name) continue;
+      const sets = (e as { sets?: unknown })?.sets;
+      if (!Array.isArray(sets)) continue;
+
+      for (const satz of sets) {
+        const s = satz as { reps?: unknown; weight?: unknown };
+        const gewicht = Number(s?.weight) || 0;
+        const reps = Number(s?.reps) || 0;
+        if (gewicht <= 0) continue;
+
+        const alt = map.get(name);
+        if (!alt || gewicht > alt.gewicht) {
+          map.set(name, { uebung: name, gewicht, reps, datum: ymd });
+        }
+      }
+    }
+  }
+
+  return [...map.values()].sort((a, b) => b.gewicht - a.gewicht).slice(0, limit);
 }

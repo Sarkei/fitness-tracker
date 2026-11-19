@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Check, Plus, Trash2, X } from 'lucide-react';
 import { PrimaryButton } from './ui';
 import { saveWorkout, todayYmd, type PlanDay, type SaveExercise } from './simpleApi';
+import { uebungVorschlaege } from './uebungen';
 
 /** Training erfassen — bewusst eine Liste: Übung, Sätze, Wiederholungen, Gewicht. */
 export default function SessionSheet({
@@ -29,6 +30,12 @@ export default function SessionSheet({
 
   const [name, setName] = useState(title);
   const [rows, setRows] = useState<SaveExercise[]>(initial);
+  const [vorschlagFuer, setVorschlagFuer] = useState<number | null>(null);
+
+  const vorschlaege =
+    vorschlagFuer !== null && rows[vorschlagFuer]
+      ? uebungVorschlaege(rows[vorschlagFuer].name, 6)
+      : [];
   const [minutes, setMinutes] = useState(day?.estimatedDuration ?? 60);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,12 +104,37 @@ export default function SessionSheet({
             {rows.map((row, index) => (
               <div key={index} className="rounded-2xl border border-[var(--border-muted)] p-2.5">
                 <div className="flex items-center gap-2">
-                  <input
-                    className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none"
-                    value={row.name}
-                    onChange={(e) => update(index, { name: e.target.value })}
-                    placeholder="Übung (z. B. Bankdrücken)"
-                  />
+                  <div className="relative min-w-0 flex-1">
+                    <input
+                      className="w-full bg-transparent text-sm font-semibold outline-none"
+                      value={row.name}
+                      onChange={(e) => {
+                        update(index, { name: e.target.value });
+                        setVorschlagFuer(index);
+                      }}
+                      onBlur={() => window.setTimeout(() => setVorschlagFuer(null), 150)}
+                      placeholder="Übung (z. B. Bankdrücken)"
+                    />
+                    {vorschlagFuer === index && vorschlaege.length > 0 && (
+                      <ul className="absolute left-0 right-0 top-full z-10 mt-1 overflow-hidden rounded-lg border border-[var(--border-muted)] bg-[var(--card-bg)] shadow-lg">
+                        {vorschlaege.map((v) => (
+                          <li key={v}>
+                            <button
+                              type="button"
+                              className="w-full px-2.5 py-1.5 text-left text-[12.5px] transition hover:bg-[var(--simple-accent-soft)]"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                update(index, { name: v });
+                                setVorschlagFuer(null);
+                              }}
+                            >
+                              {v}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                   <button
                     className="rounded-lg p-1 text-[var(--text-muted)] hover:text-red-500"
                     onClick={() => setRows((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== index) : prev))}

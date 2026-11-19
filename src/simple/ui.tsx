@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 
 /** Ruhige Karte: weisse Flaeche, feine Kante, kaum Schatten. */
@@ -249,10 +250,22 @@ export function BarRow({
 export function Heatmap({
   days,
   weeks = 12,
+  weeksMobil = 6,
 }: {
   days: Array<{ ymd: string; value: number }>;
   weeks?: number;
+  weeksMobil?: number;
 }) {
+  // Auf kleinen Bildschirmen sind 12 Wochen zu eng — dort die Haelfte zeigen.
+  const [mobil, setMobil] = useState(false);
+  useEffect(() => {
+    const abfrage = () => setMobil(window.innerWidth < 640);
+    abfrage();
+    window.addEventListener('resize', abfrage);
+    return () => window.removeEventListener('resize', abfrage);
+  }, []);
+
+  const sichtbar = mobil ? Math.min(weeksMobil, weeks) : weeks;
   const byDate = new Map(days.map((d) => [d.ymd, d.value]));
   const max = Math.max(1, ...days.map((d) => d.value));
 
@@ -260,10 +273,10 @@ export function Heatmap({
   const today = new Date();
   const dow = (today.getDay() + 6) % 7; // Mo=0
   const start = new Date(today);
-  start.setDate(today.getDate() - dow - (weeks - 1) * 7);
+  start.setDate(today.getDate() - dow - (sichtbar - 1) * 7);
 
   const grid: Array<Array<{ ymd: string; value: number }>> = [];
-  for (let w = 0; w < weeks; w += 1) {
+  for (let w = 0; w < sichtbar; w += 1) {
     const row: Array<{ ymd: string; value: number }> = [];
     for (let d = 0; d < 7; d += 1) {
       const cur = new Date(start);

@@ -33,7 +33,7 @@ import {
   dayKeyOf,
   deleteFood,
   fetchActivePlan,
-  fetchDay,
+  fetchMonth,
   formatDay,
   shiftYmd,
   todayYmd,
@@ -87,19 +87,14 @@ export default function FoodPage() {
   const load = useCallback(async () => {
     setLaedt(true);
     try {
-      const [food, plan] = await Promise.all([fetchDay(date), fetchActivePlan().catch(() => null)]);
-      setEntries(food);
+      // Ein Aufruf fuer 30 Tage statt 30 einzelne
+      const [month, plan] = await Promise.all([fetchMonth(), fetchActivePlan().catch(() => null)]);
+      setMonat(month);
+      setEntries(month.filter((e) => toYmd(e.date) === date));
       const key = dayKeyOf(date);
       const day = (plan?.week?.schedule ?? []).find((d) => d.day === key);
       setTrainingDay(Boolean(day && !day.isRest));
       setError(null);
-
-      // 30 Tage für Schnitt und Heatmap
-      const tage = Array.from({ length: 30 }, (_, i) => shiftYmd(date, -i));
-      const alle = await Promise.all(
-        tage.map(async (ymd) => (ymd === date ? food : fetchDay(ymd).catch(() => [] as FoodEntry[]))),
-      );
-      setMonat(alle.flat());
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Konnte nicht laden.');
     } finally {

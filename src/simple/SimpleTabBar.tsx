@@ -1,18 +1,18 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { CalendarCheck, Dumbbell, MoreHorizontal, Utensils, X } from 'lucide-react';
+import { CalendarCheck, Dumbbell, MoreHorizontal, TrendingUp, Utensils, X } from 'lucide-react';
 
 const TABS = [
   { to: '/', label: 'Heute', icon: CalendarCheck },
   { to: '/training', label: 'Training', icon: Dumbbell },
   { to: '/foods', label: 'Essen', icon: Utensils },
+  { to: '/progress', label: 'Fortschritt', icon: TrendingUp },
 ];
 
 const MORE = [
   { to: '/coach', label: 'Coach & Pläne', hint: 'Trainings- und Ernährungsplan erzeugen' },
   { to: '/workouts', label: 'Training (ausführlich)', hint: 'Vorlagen, Verlauf, Übungsbibliothek' },
   { to: '/nutrition', label: 'Ernährung (ausführlich)', hint: 'Vorlagen, Tagesreview, Details' },
-  { to: '/stats', label: 'Statistik', hint: 'Fortschritt und Auswertungen' },
   { to: '/profile', label: 'Profil & Ziele', hint: 'Kalorienziel, Makros, Einstellungen' },
 ];
 

@@ -92,6 +92,16 @@ export async function fetchDay(date: string): Promise<FoodEntry[]> {
   return Array.isArray(rows) ? rows : [];
 }
 
+/**
+ * Alle Einträge der letzten 30 Tage in EINEM Aufruf.
+ * Ohne `date`-Parameter liefert /api/nutrition genau das — vorher wurden
+ * 30 einzelne Anfragen gestellt, was die Seite spuerbar verzoegerte.
+ */
+export async function fetchMonth(): Promise<FoodEntry[]> {
+  const rows = await api<FoodEntry[]>('/api/nutrition');
+  return Array.isArray(rows) ? rows : [];
+}
+
 export async function fetchWorkouts(): Promise<WorkoutEntry[]> {
   const rows = await api<WorkoutEntry[]>('/api/workouts');
   return Array.isArray(rows) ? rows : [];

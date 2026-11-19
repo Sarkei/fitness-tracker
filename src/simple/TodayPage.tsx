@@ -34,7 +34,7 @@ import {
   DAY_LABELS,
   dayKeyOf,
   fetchActivePlan,
-  fetchDay,
+  fetchMonth,
   fetchWorkouts,
   formatDay,
   shiftYmd,
@@ -75,26 +75,18 @@ export default function TodayPage() {
 
   const load = useCallback(async () => {
     setLaedt(true);
-    const [food, list, plan] = await Promise.all([
-      fetchDay(date).catch(() => []),
+    // Ein Aufruf fuer 30 Tage statt 30 einzelne
+    const [month, list, plan] = await Promise.all([
+      fetchMonth().catch(() => []),
       fetchWorkouts().catch(() => []),
       fetchActivePlan().catch(() => null),
     ]);
-    setEntries(food);
+    setWocheEntries(month);
+    setEntries(month.filter((e) => toYmd(e.date) === date));
     setWorkouts(list);
     const schedule = plan?.week?.schedule ?? [];
     setWeekPlan(schedule);
     setPlanDay(schedule.find((d) => d.day === dayKeyOf(date)) ?? null);
-
-    // 30 Tage Ernährung für Verlauf und Heatmap
-    const tage = Array.from({ length: 30 }, (_, i) => shiftYmd(date, -i));
-    const alle = await Promise.all(
-      tage.map(async (ymd) => {
-        if (ymd === date) return food;
-        return fetchDay(ymd).catch(() => [] as FoodEntry[]);
-      }),
-    );
-    setWocheEntries(alle.flat());
     setLaedt(false);
   }, [date]);
 
@@ -113,7 +105,6 @@ export default function TodayPage() {
   const goalProtein = Number(goals.macros?.protein) || 180;
   const goalCarbs = Number(goals.macros?.carbs) || 240;
   const goalFat = Number(goals.macros?.fat) || 80;
-  const firstName = (profile?.displayName ?? '').split(' ')[0];
 
   // Auswertungen
   const streak = workoutStreak(workouts);
@@ -146,7 +137,10 @@ export default function TodayPage() {
     <div className="space-y-5 lg:space-y-6">
       <PageHeader
         eyebrow={new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })}
-        title={firstName ? `Guten Tag, ${firstName}` : 'Heute'}
+        title="Heute"
+        /* Persoenliche Anrede absichtlich weg: kostet eine Zeile, die die
+           Kennzahlen besser nutzen. */
+
         hint={
           entries.length
             ? `${entries.length} Mahlzeiten · ${ueber ? `${Math.round(sum.kcal - goalKcal)} kcal über dem Ziel` : `${uebrig} kcal übrig`}`

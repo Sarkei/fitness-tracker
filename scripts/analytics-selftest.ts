@@ -20,6 +20,14 @@ import {
   workoutsInLastDays,
   workoutsThisMonth,
 } from '../src/simple/analytics';
+import {
+  bestleistungen,
+  geglaettet,
+  gewichtsTrend,
+  gewichtsverlauf,
+  wochenvergleich,
+} from '../src/simple/analytics';
+import { gruppeAusTabelle, uebungVorschlaege } from '../src/simple/uebungen';
 import type { FoodEntry, WorkoutEntry } from '../src/simple/simpleApi';
 
 let fehler = 0;
@@ -127,5 +135,68 @@ pruefe('Ø über 7 Tage (nur erfasste)', kcalDurchschnitt(essen, 7), 900);
 pruefe('erfasste Tage 7', erfassteTage(essen, 7), 2);
 pruefe('leere Liste Ø', kcalDurchschnitt([], 7), 0);
 
+
+console.log('\n=== Gewichtsverlauf ===');
+const roheHistorie = [
+  { date: '2026-11-01', weight: 82.4 },
+  { date: '2026-11-08', weight: 81.9 },
+  { date: '2026-11-15', weight: 81.2 },
+  { date: '2026-10-01', weight: 84.0 },
+  { date: 'kaputt', weight: 80 },
+  { date: '2026-11-15', weight: 81.0 },
+];
+const verlauf = gewichtsverlauf(roheHistorie, 90);
+pruefe('sortiert nach Datum', verlauf.map((p) => p.ymd), [
+  '2026-10-01',
+  '2026-11-01',
+  '2026-11-08',
+  '2026-11-15',
+]);
+pruefe('Duplikat: letzter Wert gewinnt', verlauf.find((p) => p.ymd === '2026-11-15')?.weight, 81.0);
+pruefe('ungueltige Zeilen verworfen', verlauf.length, 4);
+pruefe('leere Historie', gewichtsverlauf(null, 90).length, 0);
+pruefe('kein Array', gewichtsverlauf('quatsch', 90).length, 0);
+
+const trend = gewichtsTrend(verlauf);
+pruefe('aktuell 81.0', trend.aktuell, 81);
+pruefe('start 84.0', trend.start, 84);
+pruefe('delta -3.0', trend.delta, -3);
+const trendLeer = gewichtsTrend([]);
+pruefe('leer: aktuell null', trendLeer.aktuell, null);
+
+const gl = geglaettet(verlauf, 2);
+pruefe('glaettung: Laenge', gl.length, 4);
+pruefe('glaettung: Mittel der letzten zwei (81.9+81)/2', Math.round(gl[gl.length - 1] * 100) / 100, 81.45);
+
+console.log('\n=== Wochenvergleich ===');
+const heuteW = todayYmdLocal();
+const dieseWoche: WorkoutEntry[] = [
+  w('x1', 0, [{ name: 'Bankdrücken', sets: [satz(10, 80)] }], 60),
+];
+const vergl = wochenvergleich(dieseWoche, essen, 180);
+pruefe('Einheiten jetzt >= 1', vergl.einheiten.jetzt >= 1, true);
+pruefe('Minuten jetzt', vergl.minuten.jetzt, 60);
+pruefe('Volumen jetzt (10*80)', vergl.volumen.jetzt, 800);
+
+console.log('\n=== Bestleistungen ===');
+const rek = bestleistungen(mitDaten, 5);
+pruefe('Anzahl Rekorde', rek.length, 3);
+pruefe('hoechstes Gewicht zuerst', rek[0].gewicht, 120);
+pruefe('Rekord-Uebung', rek[0].uebung, 'Kniebeuge');
+pruefe('Rekord-Wdh', rek[0].reps, 5);
+
+console.log('\n=== Uebungsbibliothek ===');
+pruefe('Face Pull', gruppeAusTabelle('Face Pull'), 'Schultern');
+pruefe('Cable Crossover', gruppeAusTabelle('Cable Crossover'), 'Brust');
+pruefe('Rumaenisches Kreuzheben', gruppeAusTabelle('Rumänisches Kreuzheben'), 'Beine');
+pruefe('Laufband', gruppeAusTabelle('Laufband'), 'Cardio');
+pruefe('Seitheben', gruppeAusTabelle('Seitheben'), 'Schultern');
+pruefe('Engbankdruecken', gruppeAusTabelle('Engbankdrücken'), 'Arme');
+pruefe('Unbekannt -> null', gruppeAusTabelle('Zauberei'), null);
+pruefe('Vorschlaege fuer "bank"', uebungVorschlaege('bank', 3).length > 0, true);
+pruefe('Vorschlaege fuer "xyz"', uebungVorschlaege('xyz', 3).length, 0);
+pruefe('leere Suche', uebungVorschlaege('', 3).length, 0);
+
 console.log(`\n=== ERGEBNIS: ${fehler} Fehler ===`);
 process.exit(fehler > 0 ? 1 : 0);
+
