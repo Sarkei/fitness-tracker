@@ -23,6 +23,10 @@ desktop.ini
 # Logs und Temp
 *.tmp
 
+# Lokale Testreste
+tmp/
+test-results/
+
 # Node
 .next/
 .nuxt/
