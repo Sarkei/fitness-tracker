@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowDown,
   ArrowRight,
@@ -23,6 +23,7 @@ import {
   StatTile,
 } from './ui';
 import { fetchMonth, fetchWorkouts, formatDay, type FoodEntry, type WorkoutEntry } from './simpleApi';
+import { TrainingTagesdetail, TagesZeileKlick } from '../components/training/TrainingTagesdetail';
 import {
   bestleistungen,
   dayLabelShort,
@@ -76,6 +77,7 @@ function Entwicklung({
 export default function ProgressPage() {
   const { profile } = useAuth();
   const [workouts, setWorkouts] = useState<WorkoutEntry[]>([]);
+  const [tagOffen, setTagOffen] = useState<string | null>(null);
   const [entries, setEntries] = useState<FoodEntry[]>([]);
   const [laedt, setLaedt] = useState(true);
   const [fehler, setFehler] = useState<string | null>(null);
@@ -115,6 +117,47 @@ export default function ProgressPage() {
   const hatGewicht = punkte.length >= 1;
 
   // Training
+  // Tage mit Training und/oder Mahlzeiten, neueste zuerst
+  const tagListe = useMemo(() => {
+    const map = new Map<string, { datum: string; workouts: WorkoutEntry[]; mahlzeiten: FoodEntry[]; volumen: number; kcal: number }>();
+
+    const hole = (datum: string) => {
+      const key = String(datum).slice(0, 10);
+      let eintrag = map.get(key);
+      if (!eintrag) {
+        eintrag = { datum: key, workouts: [], mahlzeiten: [], volumen: 0, kcal: 0 };
+        map.set(key, eintrag);
+      }
+      return eintrag;
+    };
+
+    for (const w of workouts) hole(w.date).workouts.push(w);
+    for (const m of entries) hole(m.date).mahlzeiten.push(m);
+
+    for (const e of map.values()) {
+      e.volumen = e.workouts.reduce((sum, w) => {
+        const uebungen = Array.isArray(w.exercises) ? (w.exercises as Array<{ sets?: unknown }>) : [];
+        return (
+          sum +
+          uebungen.reduce((s, ex) => {
+            const sets = Array.isArray(ex.sets) ? ex.sets : [];
+            return (
+              s +
+              sets.reduce((ss, set) => {
+                const s2 = set as { reps?: number; weight?: number; completed?: boolean };
+                if (s2.completed === false) return ss;
+                return ss + (Number(s2.reps) || 0) * (Number(s2.weight) || 0);
+              }, 0)
+            );
+          }, 0)
+        );
+      }, 0);
+      e.kcal = e.mahlzeiten.reduce((s, m) => s + (Number(m.calories) || 0), 0);
+    }
+
+    return [...map.values()].sort((a, b) => b.datum.localeCompare(a.datum)).slice(0, 90);
+  }, [workouts, entries]);
+
   const streak = workoutStreak(workouts);
   const monat = workoutsThisMonth(workouts);
   const zahlen = gesamtzahlen(workouts);
@@ -414,6 +457,49 @@ export default function ProgressPage() {
         <SectionTitle>Erfassung · 12 Wochen</SectionTitle>
         <Heatmap days={heatmap} weeks={12} />
       </Card>
+
+      {/* Tag für Tag: alles, was an einem Tag passiert ist */}
+      <Card className="p-5">
+        <SectionTitle action={<span className="text-[11px] text-[var(--text-muted)]">antippen für Details</span>}>
+          Tag für Tag
+        </SectionTitle>
+        <div className="max-h-96 overflow-y-auto">
+          <table className="w-full text-[12px]">
+            <thead className="sticky top-0 bg-[var(--card-bg)] text-[10px] uppercase tracking-[0.1em] text-[var(--text-muted)]">
+              <tr>
+                <th className="py-1.5 text-left font-semibold">Datum</th>
+                <th className="py-1.5 text-right font-semibold">Training</th>
+                <th className="py-1.5 text-right font-semibold">Volumen</th>
+                <th className="py-1.5 text-right font-semibold">kcal</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--border-muted)]">
+              {tagListe.map((t) => (
+                <TagesZeileKlick key={t.datum} onClick={() => setTagOffen(t.datum)}>
+                  <td className="py-1.5 text-[var(--text-muted)]">{t.datum}</td>
+                  <td className="py-1.5 text-right">
+                    {t.workouts.length > 0 ? t.workouts.length : '—'}
+                  </td>
+                  <td className="py-1.5 text-right tabular-nums">
+                    {t.volumen > 0 ? `${Math.round(t.volumen).toLocaleString('de-DE')} kg` : '—'}
+                  </td>
+                  <td className="py-1.5 text-right tabular-nums">{t.kcal > 0 ? Math.round(t.kcal) : '—'}</td>
+                </TagesZeileKlick>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {tagOffen && (() => {
+        const t = tagListe.find((x) => x.datum === tagOffen);
+        return t ? (
+          <TrainingTagesdetail
+            tag={{ datum: t.datum, workouts: t.workouts, mahlzeiten: t.mahlzeiten }}
+            onClose={() => setTagOffen(null)}
+          />
+        ) : null;
+      })()}
 
       {fehler && <p className="rounded-xl bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-600">{fehler}</p>}
     </div>

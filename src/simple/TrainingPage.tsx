@@ -26,6 +26,7 @@ import {
 } from './ui';
 import WorkoutSheet from './WorkoutSheet';
 import PlanBereich from '../components/coach/CoachPage';
+import { TrainingTagesdetail } from '../components/training/TrainingTagesdetail';
 import {
   DAY_LABELS,
   dayKeyOf,
@@ -69,6 +70,7 @@ export default function TrainingPage() {
   const [workouts, setWorkouts] = useState<WorkoutEntry[]>([]);
   const [selected, setSelected] = useState<string>(dayKeyOf(today));
   const [running, setRunning] = useState(false);
+  const [tagOffen, setTagOffen] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [laedt, setLaedt] = useState(true);
 
@@ -442,13 +444,17 @@ export default function TrainingPage() {
                 const uebungen = Array.isArray(workout.exercises) ? workout.exercises.length : 0;
                 return (
                   <li key={workout.id} className="flex items-center justify-between gap-3 py-2.5">
-                    <div className="min-w-0 flex-1">
+                    <button
+                      type="button"
+                      onClick={() => setTagOffen(String(workout.date).slice(0, 10))}
+                      className="min-w-0 flex-1 text-left transition hover:opacity-80"
+                    >
                       <p className="truncate text-sm font-medium">{workout.name}</p>
                       <p className="text-[11px] text-[var(--text-muted)]">
                         {formatDay(toYmd(workout.date))} · {workout.duration} min
                         {uebungen ? ` · ${uebungen} Übungen` : ''}
                       </p>
-                    </div>
+                    </button>
                     <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
                       {dayLabelShort(toYmd(workout.date))}
                     </span>
@@ -495,6 +501,17 @@ export default function TrainingPage() {
         </div>
         <PlanBereich />
       </section>
+
+      {tagOffen && (() => {
+        const tagesWorkouts = workouts.filter((w) => String(w.date).slice(0, 10) === tagOffen);
+        return (
+          <TrainingTagesdetail
+            tag={{ datum: tagOffen, workouts: tagesWorkouts, mahlzeiten: [] }}
+            fokus="training"
+            onClose={() => setTagOffen(null)}
+          />
+        );
+      })()}
 
       {running && (
         <WorkoutSheet
