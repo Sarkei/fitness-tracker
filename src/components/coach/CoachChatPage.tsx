@@ -101,7 +101,7 @@ export default function CoachChatPage() {
 
   return (
     // Feste Hoehe (Bildschirm minus Kopfzeile): die Box fuellt den Rest, die Eingabe klebt unten.
-    <div className="mx-auto flex h-[calc(100dvh-var(--app-header-h)-env(safe-area-inset-top,0px)-5.5rem)] w-full max-w-[1360px] flex-col gap-3">
+    <div className="flex h-[calc(100dvh-var(--app-header-h)-env(safe-area-inset-top,0px)-5.5rem)] w-full flex-col gap-3">
       <PageHeader
         eyebrow="Coach"
         title="Dein Coach"
@@ -131,7 +131,7 @@ export default function CoachChatPage() {
           )}
 
           {leer && (
-            <div className="mx-auto max-w-2xl space-y-4 py-2">
+            <div className="w-full space-y-4 py-2">
               <div className="flex items-start gap-3 rounded-2xl bg-[var(--simple-accent-soft)] p-4">
                 <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[var(--simple-accent)]" />
                 <p className="text-sm leading-relaxed text-[var(--simple-accent)]">
@@ -157,8 +157,9 @@ export default function CoachChatPage() {
           {messages.map((m) => {
             const eigen = m.role === 'user';
             return (
-              <div key={m.id} className={`flex ${eigen ? 'justify-end' : 'justify-start'}`}>
-                <div className={`flex max-w-[88%] flex-col gap-0.5 sm:max-w-[72%] ${eigen ? 'items-end' : 'items-start'}`}>
+              <div key={m.id} className={`flex w-full ${eigen ? 'justify-end' : 'justify-start'}`}>
+                {/* 60 % der Boxbreite als Obergrenze — die Zeile selbst ist 100 % breit */}
+                <div className={`flex w-fit max-w-[60%] flex-col gap-0.5 ${eigen ? 'items-end' : 'items-start'}`}>
                   <span className="px-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
                     {eigen ? 'Du' : 'Coach'}
                   </span>
