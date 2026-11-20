@@ -369,7 +369,8 @@
   display: grid;
   gap: 16px;
   margin-top: 32px;
-  align-items: start;
+  /* stretch: alle Kacheln einer Reihe gleich hoch, egal wie lang der Text ist */
+  align-items: stretch;
 }
 
 @media (min-width: 640px) { .app-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -383,7 +384,14 @@
   transition: border-color 140ms ease;
 }
 
-.app-card--link { cursor: pointer; text-decoration: none; color: inherit; display: block; }
+.app-card--link {
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
 .app-card--link:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
 
 .app-card__head {
@@ -418,7 +426,9 @@
 .app-card__text { font-size: 14px; line-height: 1.6; color: var(--muted); }
 
 .app-card__meta {
-  margin-top: 14px;
+  /* schiebt die Meta-Zeile an den unteren Rand, damit sie ueber alle Kacheln buendig steht */
+  margin-top: auto;
+  padding-top: 14px;
   font-size: 13px;
   color: var(--muted);
 }
