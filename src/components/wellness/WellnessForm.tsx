@@ -2,9 +2,11 @@
  * Wellness: Form. Trainingsbelastung: Fitness, Ermüdung, Form (TSB).
  */
 
+import { useState } from 'react';
 import { Activity } from 'lucide-react';
-import { Card, Sparkline, StatTile } from '@/src/simple/ui';
+import { Card, Sparkline } from '@/src/simple/ui';
 import { WellnessToolbar, useWellness } from './WellnessProvider';
+import { KennzahlSheet, KlickKachel } from './KennzahlSheet';
 import { formLabel, letzter } from '@/src/lib/wellness';
 
 /** Farbe je Formzustand - gleiche Skala wie in der Übersicht. */
@@ -18,6 +20,7 @@ function formFarbe(tone: string): string {
 export default function WellnessForm() {
   const { daten } = useWellness();
   const tage = daten.tage;
+  const [detail, setDetail] = useState<'form' | 'fitness' | 'ermuedung' | null>(null);
 
   const ctl = tage.map((t) => t.ctl ?? 0);
   const atl = tage.map((t) => t.atl ?? 0);
@@ -34,19 +37,19 @@ export default function WellnessForm() {
       <WellnessToolbar />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="Fitness (CTL)" value={ctlJetzt != null ? Math.round(ctlJetzt) : '—'} hint="langfristige Belastung" />
-        <StatTile label="Ermüdung (ATL)" value={atlJetzt != null ? Math.round(atlJetzt) : '—'} hint="kurzfristig" />
-        <StatTile
+        <KlickKachel label="Fitness (CTL)" value={ctlJetzt != null ? Math.round(ctlJetzt) : '—'} hint="langfristige Belastung" onClick={() => setDetail('fitness')} />
+        <KlickKachel label="Ermüdung (ATL)" value={atlJetzt != null ? Math.round(atlJetzt) : '—'} hint="kurzfristig" onClick={() => setDetail('ermuedung')} />
+        <KlickKachel
           label="Form (TSB)"
           value={tsbJetzt != null ? Math.round(tsbJetzt) : '—'}
           hint={form.text}
-          tone={form.tone === 'gut' ? 'accent' : 'default'}
+          onClick={() => setDetail('form')}
         />
-        <StatTile
+        <KlickKachel
           label="Rampenrate"
           value={ramp != null ? ramp.toFixed(1) : '—'}
           hint="Veränderung pro Woche"
-          tone={ramp != null && Math.abs(ramp) <= 5 ? 'accent' : 'default'}
+          onClick={() => setDetail('fitness')}
         />
       </div>
 
@@ -74,6 +77,31 @@ export default function WellnessForm() {
           <Sparkline values={atl} height={70} />
         </Card>
       </div>
+
+      {detail === 'form' && (
+        <KennzahlSheet
+          def={{ key: 'form', titel: 'Trainingsform (TSB)', format: (v) => String(Math.round(v)), hoeherBesser: true,
+            hinweis: 'Fitness minus Ermüdung. Über 5 heißt frisch, unter -30 überlastet.' }}
+          punkte={tage.map((t) => ({ datum: t.date, wert: t.tsb ?? null }))}
+          onClose={() => setDetail(null)}
+        />
+      )}
+      {detail === 'fitness' && (
+        <KennzahlSheet
+          def={{ key: 'fitness', titel: 'Fitness (CTL)', format: (v) => String(Math.round(v)), hoeherBesser: true,
+            hinweis: 'Langfristige Trainingsbelastung. Steigt langsam, fällt langsam.' }}
+          punkte={tage.map((t) => ({ datum: t.date, wert: t.ctl ?? null }))}
+          onClose={() => setDetail(null)}
+        />
+      )}
+      {detail === 'ermuedung' && (
+        <KennzahlSheet
+          def={{ key: 'ermuedung', titel: 'Ermüdung (ATL)', format: (v) => String(Math.round(v)), hoeherBesser: false,
+            hinweis: 'Kurzfristige Belastung. Steigt nach harten Einheiten schnell, fällt schnell.' }}
+          punkte={tage.map((t) => ({ datum: t.date, wert: t.atl ?? null }))}
+          onClose={() => setDetail(null)}
+        />
+      )}
 
       <Card className="p-5">
         <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">

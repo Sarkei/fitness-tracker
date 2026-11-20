@@ -2,14 +2,17 @@
  * Wellness: Schlaf. Nur Schlaf: Dauer, Score, Verlauf, Tagesliste.
  */
 
+import { useState } from 'react';
 import { Moon } from 'lucide-react';
-import { Card, Sparkline, StatTile } from '@/src/simple/ui';
+import { Card, Sparkline } from '@/src/simple/ui';
 import { WellnessToolbar, useWellness } from './WellnessProvider';
+import { KennzahlSheet, KlickKachel } from './KennzahlSheet';
 import { mittel, schlafBewertung, schlafStunden } from '@/src/lib/wellness';
 
 export default function WellnessSchlaf() {
   const { daten } = useWellness();
   const tage = daten.tage;
+  const [detail, setDetail] = useState<'dauer' | 'score' | null>(null);
 
   const naechte = tage.map((t) => t.sleepSecs);
   const reihe = naechte.map((s) => schlafStunden(s) ?? 0);
@@ -38,20 +41,21 @@ export default function WellnessSchlaf() {
       <WellnessToolbar />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="Letzte Nacht" value={letzteNacht ?? '—'} unit="h" hint="geschlafen" />
-        <StatTile
+        <KlickKachel label="Letzte Nacht" value={letzteNacht ?? '—'} unit="h" hint="geschlafen" onClick={() => setDetail('dauer')} />
+        <KlickKachel
           label="Nächte im Schnitt"
           value={schnitt != null ? schnitt.toFixed(1) : '—'}
           unit="h"
           hint={`${naechte.filter((s) => s).length} Nächte`}
+          onClick={() => setDetail('dauer')}
         />
-        <StatTile
+        <KlickKachel
           label="Schlafscore"
           value={scoreSchnitt != null ? Math.round(scoreSchnitt) : '—'}
           hint={scoreSchnitt != null ? schlafBewertung(scoreSchnitt) : 'kein Score'}
-          tone={scoreSchnitt != null && scoreSchnitt >= 70 ? 'accent' : 'default'}
+          onClick={() => setDetail('score')}
         />
-        <StatTile label="Nächte ≥ 7 h" value={gut} unit={`von ${reihe.filter((v) => v > 0).length}`} hint="ausreichend" />
+        <KlickKachel label="Nächte ≥ 7 h" value={gut} unit={`von ${reihe.filter((v) => v > 0).length}`} hint="ausreichend" onClick={() => setDetail('dauer')} />
       </div>
 
       <Card className="space-y-2 p-5">
@@ -88,6 +92,23 @@ export default function WellnessSchlaf() {
           })}
         </div>
       </Card>
+
+      {detail === 'dauer' && (
+        <KennzahlSheet
+          def={{ key: 'dauer', titel: 'Schlafdauer', einheit: 'h', format: (v) => v.toFixed(1), hoeherBesser: true,
+            hinweis: 'Nacht für Nacht. Unter 7 Stunden gilt als zu kurz.' }}
+          punkte={tage.map((t) => ({ datum: t.date, wert: schlafStunden(t.sleepSecs) }))}
+          onClose={() => setDetail(null)}
+        />
+      )}
+      {detail === 'score' && (
+        <KennzahlSheet
+          def={{ key: 'score', titel: 'Schlafscore', format: (v) => String(Math.round(v)), hoeherBesser: true,
+            hinweis: 'Qualität der Nacht: 80+ sehr gut, unter 40 schlecht.' }}
+          punkte={tage.map((t) => ({ datum: t.date, wert: t.sleepScore ?? null }))}
+          onClose={() => setDetail(null)}
+        />
+      )}
 
       <Card className="p-5">
         <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">

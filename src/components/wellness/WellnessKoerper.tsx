@@ -3,14 +3,17 @@
  * Trainingsbelastung steht bewusst woanders (eigener Form-Bereich).
  */
 
+import { useState } from 'react';
 import { Heart } from 'lucide-react';
-import { Card, Sparkline, StatTile } from '@/src/simple/ui';
+import { Card, Sparkline } from '@/src/simple/ui';
 import { WellnessToolbar, useWellness } from './WellnessProvider';
+import { KennzahlSheet, KlickKachel } from './KennzahlSheet';
 import { letzter, mittel } from '@/src/lib/wellness';
 
 export default function WellnessKoerper() {
   const { daten } = useWellness();
   const tage = daten.tage;
+  const [detail, setDetail] = useState<'hrv' | 'puls' | 'gewicht' | null>(null);
 
   const hrv = tage.map((t) => t.hrv ?? 0);
   const puls = tage.map((t) => t.restingHr ?? 0);
@@ -36,30 +39,33 @@ export default function WellnessKoerper() {
       <WellnessToolbar />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile
+        <KlickKachel
           label="HRV"
           value={hrvJetzt != null ? Math.round(hrvJetzt) : '—'}
           unit="ms"
           hint={hrvTrend != null ? `${hrvTrend >= 0 ? '+' : ''}${hrvTrend.toFixed(1)} zu Vorwoche` : 'kein Trend'}
-          tone={hrvTrend != null && hrvTrend >= 0 ? 'accent' : 'default'}
+          onClick={() => setDetail('hrv')}
         />
-        <StatTile
+        <KlickKachel
           label="HRV im Schnitt"
           value={hrvSchnitt != null ? Math.round(hrvSchnitt) : '—'}
           unit="ms"
           hint="im Zeitraum"
+          onClick={() => setDetail('hrv')}
         />
-        <StatTile
+        <KlickKachel
           label="Ruhepuls"
           value={pulsJetzt != null ? Math.round(pulsJetzt) : '—'}
           unit="bpm"
           hint={pulsSchnitt != null ? `Ø ${Math.round(pulsSchnitt)}` : 'keine Daten'}
+          onClick={() => setDetail('puls')}
         />
-        <StatTile
+        <KlickKachel
           label="Gewicht"
           value={gewicht.length ? gewicht[gewicht.length - 1].toFixed(1) : '—'}
           unit="kg"
           hint={gewicht.length ? `${gewicht.length} Messungen` : 'keine Daten'}
+          onClick={() => setDetail('gewicht')}
         />
       </div>
 
@@ -86,6 +92,31 @@ export default function WellnessKoerper() {
           schnitt={mittel(gewicht)}
           einheit="kg"
           hinweis="Nur Tage mit Wiegedaten — die Kurve springt deshalb zwischen den Messungen."
+        />
+      )}
+
+      {detail === 'hrv' && (
+        <KennzahlSheet
+          def={{ key: 'hrv', titel: 'HRV', einheit: 'ms', hoeherBesser: true,
+            hinweis: 'Herzfrequenzvariabilität. Sinkt sie über Tage, fehlt Erholung.' }}
+          punkte={tage.map((t) => ({ datum: t.date, wert: t.hrv ?? null }))}
+          onClose={() => setDetail(null)}
+        />
+      )}
+      {detail === 'puls' && (
+        <KennzahlSheet
+          def={{ key: 'puls', titel: 'Ruhepuls', einheit: 'bpm', hoeherBesser: false,
+            hinweis: 'Steigt er bei gleicher Belastung, ist das ein Ermüdungszeichen.' }}
+          punkte={tage.map((t) => ({ datum: t.date, wert: t.restingHr ?? null }))}
+          onClose={() => setDetail(null)}
+        />
+      )}
+      {detail === 'gewicht' && (
+        <KennzahlSheet
+          def={{ key: 'gewicht', titel: 'Gewicht', einheit: 'kg', format: (v) => v.toFixed(1),
+            hinweis: 'Nur an Tagen mit Wiegedaten.' }}
+          punkte={tage.map((t) => ({ datum: t.date, wert: t.weight ?? null }))}
+          onClose={() => setDetail(null)}
         />
       )}
     </div>

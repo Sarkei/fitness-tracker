@@ -2,14 +2,17 @@
  * Wellness: Bewegung. Nur Alltagsbewegung: Schritte und Etagen.
  */
 
+import { useState } from 'react';
 import { Footprints, Mountain } from 'lucide-react';
-import { Card, Sparkline, StatTile } from '@/src/simple/ui';
+import { Card, Sparkline } from '@/src/simple/ui';
 import { WellnessToolbar, useWellness } from './WellnessProvider';
+import { KennzahlSheet, KlickKachel } from './KennzahlSheet';
 import { mittel, summe } from '@/src/lib/wellness';
 
 export default function WellnessBewegung() {
   const { daten } = useWellness();
   const tage = daten.tage;
+  const [detail, setDetail] = useState<'schritte' | 'etagen' | null>(null);
 
   const schritte = tage.map((t) => t.steps ?? 0);
   const etagen = tage.map((t) => t.floors ?? 0);
@@ -40,25 +43,29 @@ export default function WellnessBewegung() {
       <WellnessToolbar />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile
+        <KlickKachel
           label="Letzter Tag"
           value={heuteSchritte != null ? Math.round(heuteSchritte).toLocaleString('de-DE') : '—'}
           hint="Schritte"
+          onClick={() => setDetail('schritte')}
         />
-        <StatTile
+        <KlickKachel
           label="Schnitt pro Tag"
           value={schnittSchritte != null ? Math.round(schnittSchritte).toLocaleString('de-DE') : '—'}
           hint="Schritte"
+          onClick={() => setDetail('schritte')}
         />
-        <StatTile
+        <KlickKachel
           label="Gesamt"
           value={summeSchritte != null ? Math.round(summeSchritte).toLocaleString('de-DE') : '—'}
           hint="im Zeitraum"
+          onClick={() => setDetail('schritte')}
         />
-        <StatTile
+        <KlickKachel
           label="Etagen"
           value={summeEtagen != null ? Math.round(summeEtagen).toLocaleString('de-DE') : '—'}
           hint="im Zeitraum"
+          onClick={() => setDetail('etagen')}
         />
       </div>
 
@@ -83,6 +90,22 @@ export default function WellnessBewegung() {
           </div>
           <Sparkline values={etagen} height={70} />
         </Card>
+      )}
+
+      {detail === 'schritte' && (
+        <KennzahlSheet
+          def={{ key: 'schritte', titel: 'Schritte', format: (v) => Math.round(v).toLocaleString('de-DE'), hoeherBesser: true,
+            hinweis: 'Alltagsbewegung pro Tag.' }}
+          punkte={tage.map((t) => ({ datum: t.date, wert: t.steps ?? null }))}
+          onClose={() => setDetail(null)}
+        />
+      )}
+      {detail === 'etagen' && (
+        <KennzahlSheet
+          def={{ key: 'etagen', titel: 'Etagen', hoeherBesser: true, hinweis: 'Erstiegene Etagen pro Tag.' }}
+          punkte={tage.map((t) => ({ datum: t.date, wert: t.floors ?? null }))}
+          onClose={() => setDetail(null)}
+        />
       )}
 
       <Card className="p-5">
