@@ -215,9 +215,9 @@ export default function ProgressPage() {
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3 lg:items-start">
+      <div className="grid gap-4 lg:grid-cols-3 lg:items-stretch">
         {/* Gewichtsverlauf */}
-        <Card className="p-5 lg:col-span-2">
+        <Card className="flex flex-col p-5 lg:col-span-2">
           <SectionTitle
             action={
               zielGewicht > 0 && hatGewicht ? (
@@ -359,8 +359,8 @@ export default function ProgressPage() {
       </div>
 
       {/* Bestleistungen + Muskelbalance */}
-      <div className="grid gap-4 lg:grid-cols-3 lg:items-start">
-        <Card className="p-5 lg:col-span-2">
+      <div className="grid gap-4 lg:grid-cols-3 lg:items-stretch">
+        <Card className="flex flex-col p-5 lg:col-span-2">
           <SectionTitle action={<span className="text-[11px] text-[var(--text-muted)]">schwerster Satz</span>}>
             Bestleistungen
           </SectionTitle>

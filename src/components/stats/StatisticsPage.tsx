@@ -412,11 +412,11 @@ export default function StatisticsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-10 sm:gap-12 pb-4 lg:pb-16 max-w-6xl mx-auto">
+    <div className="flex flex-col gap-10 sm:gap-12 pb-4 lg:pb-16">
       <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.35em] text-[var(--text-muted)]">{t('stats.subtitle.label')}</p>
-          <h1 className="text-3xl sm:text-4xl font-black italic uppercase tracking-tighter text-[var(--text-primary)] mt-1">
+          <h1 className="mt-0.5 text-[26px] leading-tight text-[var(--text-primary)] sm:text-3xl" style={{ fontFamily: 'var(--font-serif)' }}>
             {t('stats.title')}
           </h1>
           <p className="text-sm text-[var(--text-muted)] mt-2 max-w-xl font-medium leading-relaxed">{t('stats.subtitle.text')}</p>

@@ -16,8 +16,10 @@ import {
   getOllamaBaseUrl,
   getLocalLlmModel,
   coachAreaForPlanType,
+  completeCoachChat,
 } from "./aiProviders";
 import { reloadEnvFromFile, upsertEnvVar } from "./src/lib/envFileManager";
+import { buildCoachChatSystemPrompt, parseCoachChatReply, applyCoachChatActions } from "./src/lib/coachChat";
 import {
   AI_MODEL_AREAS,
   AI_MODEL_AREA_LABELS,
@@ -493,6 +495,21 @@ async function initDb(): Promise<void> {
       source       VARCHAR(16) NOT NULL DEFAULT 'ai',
       updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS coach_chat_messages (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      role VARCHAR(16) NOT NULL,
+      content TEXT NOT NULL,
+      actions JSONB NOT NULL DEFAULT '[]'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS coach_chat_messages_user_idx
+      ON coach_chat_messages (user_id, created_at DESC)
   `);
 
   await pool.query(`
@@ -5187,6 +5204,132 @@ ${JSON.stringify(userCtx, null, 2)}
       res.json(result.rows[0]);
     } catch (err: unknown) {
       res.status(500).json({ error: err instanceof Error ? err.message : "load failed" });
+    }
+  });
+
+  // ── Coach-Chat: Freitext-Beratung + Aktionen ──────────────────────────────
+  app.get("/api/coach/chat", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 60));
+      const result = await pool.query(
+        `SELECT id, role, content, actions, created_at
+           FROM coach_chat_messages
+          WHERE user_id=$1
+          ORDER BY id DESC
+          LIMIT $2`,
+        [req.userId, limit],
+      );
+      res.json(result.rows.reverse());
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "load failed" });
+    }
+  });
+
+  app.delete("/api/coach/chat", requireAuth, async (req: AuthRequest, res) => {
+    await pool.query("DELETE FROM coach_chat_messages WHERE user_id=$1", [req.userId]);
+    res.json({ ok: true });
+  });
+
+  app.post("/api/coach/chat", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      if (!resolveAiCapabilities().enabled) {
+        res.status(503).json({ error: "KI ist nicht konfiguriert (kein gültiger API-Key)." });
+        return;
+      }
+      const message = String(req.body?.message ?? "").trim();
+      if (!message) {
+        res.status(400).json({ error: "Nachricht fehlt." });
+        return;
+      }
+      if (message.length > 4000) {
+        res.status(400).json({ error: "Nachricht ist zu lang (max. 4000 Zeichen)." });
+        return;
+      }
+
+      const [profileRes, plansRes, workoutsRes, nutritionRes, historyRes] = await Promise.all([
+        pool.query(
+          `SELECT name, goals, measurements, coach_preferences, profile_extras,
+                  weight_history, coaching_active, first_name
+             FROM users WHERE id=$1`,
+          [req.userId],
+        ),
+        pool.query(
+          `SELECT id, type, discipline, status, current_week, plan_mode,
+                  event_name, event_date, event_distance, onboarding_data
+             FROM coach_plans
+            WHERE user_id=$1
+            ORDER BY created_at DESC
+            LIMIT 5`,
+          [req.userId],
+        ),
+        pool.query(
+          `SELECT name, type, duration, date
+             FROM workouts
+            WHERE user_id=$1
+            ORDER BY date DESC
+            LIMIT 20`,
+          [req.userId],
+        ),
+        pool.query(
+          `SELECT date, SUM(calories)::int AS kcal, SUM(protein)::int AS protein,
+                  SUM(carbs)::int AS carbs, SUM(fat)::int AS fat
+             FROM nutrition
+            WHERE user_id=$1 AND date >= CURRENT_DATE - INTERVAL '14 days'
+            GROUP BY date
+            ORDER BY date DESC`,
+          [req.userId],
+        ),
+        pool.query(
+          `SELECT role, content FROM coach_chat_messages
+            WHERE user_id=$1
+            ORDER BY id DESC
+            LIMIT 20`,
+          [req.userId],
+        ),
+      ]);
+
+      const profile = profileRes.rows[0] ?? {};
+      const latestPlan = plansRes.rows[0] ?? null;
+
+      const systemPrompt = buildCoachChatSystemPrompt({
+        profile,
+        plans: plansRes.rows,
+        workouts: workoutsRes.rows,
+        nutrition: nutritionRes.rows,
+        latestPlan,
+      });
+
+      const history = historyRes.rows.reverse().map((row) => ({
+        role: row.role === "assistant" ? "assistant" : "user",
+        content: String(row.content),
+      }));
+
+      const raw = await completeCoachChat([
+        { role: "system", content: systemPrompt },
+        ...history,
+        { role: "user", content: message },
+      ]);
+
+      const { text, actions } = parseCoachChatReply(raw);
+
+      await pool.query(
+        "INSERT INTO coach_chat_messages (user_id, role, content, actions) VALUES ($1,'user',$2,'[]'::jsonb)",
+        [req.userId, message],
+      );
+
+      const applied = await applyCoachChatActions(pool, req.userId!, actions);
+
+      const insert = await pool.query(
+        `INSERT INTO coach_chat_messages (user_id, role, content, actions)
+         VALUES ($1,'assistant',$2,$3::jsonb)
+         RETURNING id, role, content, actions, created_at`,
+        [req.userId, text, JSON.stringify(applied)],
+      );
+
+      res.json({ message: insert.rows[0], applied });
+    } catch (err) {
+      console.error("coach/chat POST error:", err);
+      res.status(502).json({ error: err instanceof Error ? err.message : "Chat fehlgeschlagen" });
     }
   });
 

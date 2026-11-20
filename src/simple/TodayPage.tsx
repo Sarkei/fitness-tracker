@@ -194,9 +194,9 @@ export default function TodayPage() {
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-3 lg:items-stretch">
         {/* Ernährung heute */}
-        <Card className="p-5 lg:col-span-2">
+        <Card className="flex flex-col p-5 lg:col-span-2">
           <SectionTitle
             action={
               <GhostButton onClick={() => navigate('/foods')}>

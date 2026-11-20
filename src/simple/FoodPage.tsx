@@ -215,9 +215,9 @@ export default function FoodPage() {
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3 lg:items-start">
+      <div className="grid gap-4 lg:grid-cols-3 lg:items-stretch">
         {/* Tagesring */}
-        <Card className="p-5 lg:col-span-2">
+        <Card className="flex flex-col p-5 lg:col-span-2">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
@@ -272,11 +272,11 @@ export default function FoodPage() {
         </Card>
 
         {/* Woche */}
-        <Card className="p-5">
+        <Card className="flex flex-col p-5">
           <SectionTitle action={<GhostButton onClick={() => setDate(todayYmd())}>Heute</GhostButton>}>
             Woche
           </SectionTitle>
-          <div className="flex items-end gap-1.5">
+          <div className="flex flex-1 items-end gap-1.5">
             {Array.from({ length: 7 }, (_, i) => shiftYmd(date, -6 + i)).map((ymd) => {
               const active = ymd === date;
               const kcal = map.get(ymd) ?? 0;
@@ -311,7 +311,7 @@ export default function FoodPage() {
               );
             })}
           </div>
-          <div className="mt-3 border-t border-[var(--border-muted)] pt-2.5">
+          <div className="mt-auto border-t border-[var(--border-muted)] pt-2.5">
             <ProgressBar
               value={erfasst7}
               max={7}
@@ -405,8 +405,8 @@ export default function FoodPage() {
       </div>
 
       {/* Verlauf */}
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="p-5 lg:col-span-2">
+      <div className="grid gap-4 lg:grid-cols-3 lg:items-stretch">
+        <Card className="flex flex-col p-5 lg:col-span-2">
           <SectionTitle
             action={<span className="text-[11px] text-[var(--text-muted)]">Ziel {Math.round(Number(goals.dailyCalories) || 2400)}</span>}
           >

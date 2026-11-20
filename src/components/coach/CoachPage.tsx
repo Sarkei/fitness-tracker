@@ -2231,7 +2231,7 @@ export default function CoachPage({ planType, deepLink, autoStartOnboarding }: C
 
   if (selectedPlanId) {
     return (
-      <div className={planType ? '' : 'max-w-2xl mx-auto'}>
+      <div>
         <PlanDetail
           planId={selectedPlanId}
           onBack={() => {
@@ -2254,15 +2254,16 @@ export default function CoachPage({ planType, deepLink, autoStartOnboarding }: C
   const embedded = Boolean(planType);
 
   return (
-    <div className={cn(planType ? '' : 'max-w-2xl mx-auto', embedded ? 'space-y-5 pb-6' : 'space-y-8 pb-10')}>
+    <div className={cn(embedded ? 'space-y-5 pb-6' : 'space-y-8 pb-10')}>
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2
             className={cn(
-              'font-black italic uppercase tracking-tighter text-[var(--text-primary)]',
-              embedded ? 'text-xl' : 'text-2xl',
+              'font-normal tracking-[-0.02em] text-[var(--text-primary)]',
+              embedded ? 'text-[22px] leading-tight' : 'text-[26px] leading-tight sm:text-3xl',
             )}
+            style={{ fontFamily: 'var(--font-serif)' }}
           >
             {typeLabel}
           </h2>

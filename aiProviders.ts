@@ -541,6 +541,47 @@ export async function completeCoachNutritionJson(
   return completeCoachJsonForArea(messages, "coach_nutrition");
 }
 
+/**
+ * Coach-Chat (Freitext): gleiche Fallback-Kette wie completeCoachJson, aber ohne JSON-Zwang.
+ * Antwortet in normalem Fliesstext bzw. Markdown; strukturierte Befehle liefert das Modell
+ * zusaetzlich als JSON-Block, den der Server auswertet.
+ */
+export async function completeCoachChat(
+  messages: Array<{ role: string; content: string }>,
+  area: AiModelArea = "coach_workout",
+): Promise<string> {
+  const caps = resolveAiCapabilities();
+  if (!caps.enabled) throw new Error("AI features disabled: no AI provider or API keys configured");
+
+  const providerOrder = buildProviderOrder(caps);
+  const merged = messages.map((m) => `${m.role.toUpperCase()}:\n${m.content}`).join("\n\n---\n\n");
+
+  let lastError: unknown;
+  for (const provider of providerOrder) {
+    try {
+      if (provider === "ollama") {
+        return await ollamaChat(messages as MistralMsg[], false, 0.6, area);
+      }
+      if (provider === "deepseek") {
+        return await deepseekChat(messages as MistralMsg[], false, 0.6, area);
+      }
+      if (provider === "mistral") {
+        return await mistralChat(messages as MistralMsg[], false, 0.6, area);
+      }
+      return await geminiGenerate(merged, undefined, { temperature: 0.6 }, area);
+    } catch (e) {
+      lastError = e;
+      console.warn(
+        `[AI] Coach chat failed (${provider}, area=${area}, model=${getAiModel(provider, area)}):`,
+        e,
+      );
+    }
+  }
+
+  if (lastError instanceof Error) throw lastError;
+  throw new Error(String(lastError ?? "Coach chat failed for all configured providers"));
+}
+
 async function completeCoachJsonForArea(
   messages: Array<{ role: string; content: string }>,
   area: AiModelArea,

@@ -25,6 +25,7 @@ import {
   StatTile,
 } from './ui';
 import WorkoutSheet from './WorkoutSheet';
+import PlanBereich from '../components/coach/CoachPage';
 import {
   DAY_LABELS,
   dayKeyOf,
@@ -256,9 +257,9 @@ export default function TrainingPage() {
         </div>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-3 lg:items-start">
+      <div className="grid gap-4 lg:grid-cols-3 lg:items-stretch">
         {/* Tageskarte */}
-        <Card className="p-5 lg:col-span-2">
+        <Card className="flex flex-col p-5 lg:col-span-2">
           <div className="flex items-start gap-3">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--simple-accent-soft)] text-[var(--simple-accent)]">
               {planDay?.isRest ? <Moon className="h-5 w-5" /> : <Dumbbell className="h-5 w-5" />}
@@ -419,13 +420,13 @@ export default function TrainingPage() {
       </Card>
 
       {/* Aktivität + Verlauf */}
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="p-5">
+      <div className="grid gap-4 lg:grid-cols-3 lg:items-stretch">
+        <Card className="flex flex-col p-5">
           <SectionTitle>Aktivität · 12 Wochen</SectionTitle>
           <Heatmap days={heatmapTage} weeks={12} />
         </Card>
 
-        <Card className="p-5 lg:col-span-2">
+        <Card className="flex flex-col p-5 lg:col-span-2">
           <SectionTitle action={<span className="text-[11px] text-[var(--text-muted)]">{workouts.length} gesamt</span>}>
             Verlauf
           </SectionTitle>
@@ -476,6 +477,24 @@ export default function TrainingPage() {
 
 
       {error && <p className="rounded-xl bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-600">{error}</p>}
+
+      {/* Trainingsplan: anlegen, wechseln, bearbeiten (frueher im Coach) */}
+      <section className="mt-2 border-t border-[var(--border-muted)] pt-6">
+        <div className="mb-4 flex items-end justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+              Trainingsplan
+            </p>
+            <h2
+              className="mt-0.5 text-[22px] leading-tight text-[var(--foreground)]"
+              style={{ fontFamily: 'var(--simple-serif)' }}
+            >
+              Dein Plan
+            </h2>
+          </div>
+        </div>
+        <PlanBereich />
+      </section>
 
       {running && (
         <WorkoutSheet
