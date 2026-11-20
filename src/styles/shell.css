@@ -499,26 +499,28 @@
 .app-btn--ghost:hover { background: var(--surface-2); border-color: var(--line-strong); }
 
 /* ---- Coach-Chat: feste Gruentoene unabhaengig vom Theme ------------------
-   Im dunklen Theme ist --accent ein helles Mintgruen (#4fbf8b) und --accent-soft
-   nur 14 % Deckkraft. Fuer den Chat brauchen wir ein echtes Dunkelgruen und ein
-   echtes Hellgruen, sonst wirkt die Zuordnung vertauscht. */
+   Warum feste Werte: Im dunklen Theme ist --accent ein helles Mintgruen
+   (#4fbf8b), --accent-soft nur 14 % Deckkraft. Damit lagen Coach-Blase und
+   eigene Blase nur 1,15:1 auseinander - praktisch unsichtbar.
+   Jetzt: Coach dunkel + weisse Schrift, eigene Nachricht hell + dunkle Schrift.
+   Trennkontrast 6,6:1, Textkontrast > 9:1. */
 
 .coach-bubble-coach,
 .coach-input {
-  background: #1f6b4a;
+  background: #154c34;
   color: #ffffff;
 }
 
 .coach-bubble-me {
-  background: #cfeade;
-  color: #10352a;
+  background: #8fe3bd;
+  color: #0b2a1e;
 }
 
-/* Im dunklen Theme wird aus dem Hellgruen ein gedecktes Gruen mit heller Schrift. */
-html.dark .coach-bubble-me,
-.dark .coach-bubble-me {
-  background: #2a5f47;
-  color: #eafaf2;
+/* Eingabefeld liegt auf der Seite, nicht auf der Blase: etwas heller als der
+   Coach-Ton, damit es sich vom Hintergrund abhebt, aber klar als Feld lesbar bleibt. */
+.coach-input {
+  background: #17452f;
+  border: 1px solid #2a6a4d;
 }
 
 .coach-input input,
@@ -528,7 +530,19 @@ html.dark .coach-bubble-me,
 
 .coach-input input::placeholder,
 .coach-input textarea::placeholder {
-  color: rgb(255 255 255 / 0.6);
+  color: rgb(255 255 255 / 0.65);
+}
+
+/* Im hellen Theme bleibt das Schema gleich; nur die Toene werden kraeftiger. */
+html:not(.dark) .coach-bubble-coach,
+html:not(.dark) .coach-input {
+  background: #1f6b4a;
+  color: #ffffff;
+}
+
+html:not(.dark) .coach-bubble-me {
+  background: #cfeade;
+  color: #10352a;
 }
 
 @media (prefers-reduced-motion: reduce) {

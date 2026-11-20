@@ -210,7 +210,7 @@ export default function CoachChatPage() {
                     {m.actions && m.actions.length > 0 && (
                       <div
                         className={`space-y-1 border-t pt-2 ${
-                          eigen ? 'border-black/10' : 'border-white/25'
+                          eigen ? 'border-[#0b2a1e]/20' : 'border-white/25'
                         }`}
                       >
                         {m.actions.map((a, i) => (
@@ -225,7 +225,7 @@ export default function CoachChatPage() {
                         ))}
                       </div>
                     )}
-                    <p className={`text-right text-[10px] tabular-nums ${eigen ? 'text-black/45' : 'text-white/60'}`}>
+                    <p className={`text-right text-[10px] tabular-nums ${eigen ? 'text-[#0b2a1e]/60' : 'text-white/65'}`}>
                       {zeitLabel(m.created_at)}
                     </p>
                   </div>
