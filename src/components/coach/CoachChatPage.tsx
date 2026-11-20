@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, ArrowUp, Check, Loader2, RotateCcw, Sparkles } from 'lucide-react';
 import { api } from '@/src/lib/api';
+import { formatChatText } from '@/src/lib/chatFormat';
 import { PageHeader } from '@/src/simple/ui';
 
 type ChatMessage = {
@@ -206,7 +207,7 @@ export default function CoachChatPage() {
                         : 'rounded-bl-md coach-bubble-coach'
                     }`}
                   >
-                    <p className="whitespace-pre-wrap break-words">{m.content}</p>
+                    {formatChatText(m.content)}
                     {m.actions && m.actions.length > 0 && (
                       <div
                         className={`space-y-1 border-t pt-2 ${
