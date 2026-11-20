@@ -58,7 +58,8 @@
     "test:e2e:ui": "playwright test --ui",
     "ci:coach": "npm run test:coach:all && npm run test:e2e:coach",
     "test:analytics": "tsx scripts/analytics-selftest.ts",
-    "test:chat-format": "tsx scripts/chat-format-selftest.ts"
+    "test:chat-format": "tsx scripts/chat-format-selftest.ts",
+    "test:intervals": "tsx scripts/intervals-selftest.ts"
   },
   "dependencies": {
     "@google/genai": "^1.51.0",

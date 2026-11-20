@@ -20,6 +20,7 @@ import {
 } from "./aiProviders";
 import { reloadEnvFromFile, upsertEnvVar } from "./src/lib/envFileManager";
 import { buildCoachChatSystemPrompt, parseCoachChatReply, applyCoachChatActions } from "./src/lib/coachChat";
+import { buildIntervalsContext, fetchAthlete, syncIntervals, type IntervalsSettings } from "./src/lib/intervals";
 import {
   AI_MODEL_AREAS,
   AI_MODEL_AREA_LABELS,
@@ -5207,6 +5208,132 @@ ${JSON.stringify(userCtx, null, 2)}
     }
   });
 
+  // ── Intervals.icu: Garmin-Daten fuer den Coach ────────────────────────────
+  const readIntervalsSettings = async (userId: number): Promise<IntervalsSettings> => {
+    const r = await pool.query("SELECT profile_extras FROM users WHERE id=$1", [userId]);
+    const extras = (r.rows[0]?.profile_extras || {}) as Record<string, unknown>;
+    return (extras.intervals as IntervalsSettings) || {};
+  };
+
+  const writeIntervalsSettings = async (userId: number, next: IntervalsSettings) => {
+    await pool.query(
+      `UPDATE users
+          SET profile_extras = COALESCE(profile_extras,'{}'::jsonb)
+              || jsonb_build_object('intervals', $2::jsonb),
+              updated_at = NOW()
+        WHERE id=$1`,
+      [userId, JSON.stringify(next)],
+    );
+  };
+
+  /** Status ohne den Key selbst - der bleibt im Server. */
+  app.get("/api/integrations/intervals", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const s = await readIntervalsSettings(req.userId!);
+      const cache = s.cache;
+      res.json({
+        connected: Boolean(s.apiKey),
+        athleteId: s.athleteId ?? "0",
+        athleteName: s.athleteName ?? cache?.athlete?.name ?? null,
+        connectedAt: s.connectedAt ?? null,
+        lastError: s.lastError ?? null,
+        lastSync: cache?.fetchedAt ?? null,
+        activityCount: cache?.activities?.length ?? 0,
+        latestActivity: cache?.activities?.[0]
+          ? {
+              date: String(cache.activities[0].start_date_local ?? "").slice(0, 10),
+              type: cache.activities[0].type ?? null,
+              name: cache.activities[0].name ?? null,
+            }
+          : null,
+        fitness: cache?.wellness?.length
+          ? {
+              ctl: cache.wellness[cache.wellness.length - 1].ctl ?? null,
+              atl: cache.wellness[cache.wellness.length - 1].atl ?? null,
+              tsb: cache.wellness[cache.wellness.length - 1].tsb ?? null,
+            }
+          : null,
+      });
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "Status konnte nicht geladen werden." });
+    }
+  });
+
+  /** Verbinden: Key pruefen, Stammdaten holen, sofort einmal synchronisieren. */
+  app.post("/api/integrations/intervals/connect", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const apiKey = String(req.body?.apiKey ?? "").trim();
+      const athleteIdRaw = String(req.body?.athleteId ?? "0").trim();
+      if (!apiKey) {
+        res.status(400).json({ error: "API-Key fehlt." });
+        return;
+      }
+      const athleteId = athleteIdRaw || "0";
+
+      // Erst pruefen, dann speichern - so landet kein ungueltiger Key in der DB.
+      const athlete = await fetchAthlete(apiKey, athleteId);
+      const cache = await syncIntervals(apiKey, athleteId, 30);
+
+      const settings: IntervalsSettings = {
+        apiKey,
+        athleteId,
+        connectedAt: new Date().toISOString(),
+        athleteName: typeof athlete.name === "string" ? athlete.name : undefined,
+        lastError: undefined,
+        cache,
+      };
+      await writeIntervalsSettings(req.userId!, settings);
+
+      res.json({
+        ok: true,
+        athleteName: settings.athleteName ?? null,
+        activityCount: cache.activities.length,
+        lastSync: cache.fetchedAt,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Verbindung fehlgeschlagen.";
+      const prev = await readIntervalsSettings(req.userId!).catch(() => ({} as IntervalsSettings));
+      await writeIntervalsSettings(req.userId!, { ...prev, lastError: msg }).catch(() => {});
+      res.status(400).json({ error: msg });
+    }
+  });
+
+  /** Erneut synchronisieren (Coach sieht frische Daten). */
+  app.post("/api/integrations/intervals/sync", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const s = await readIntervalsSettings(req.userId!);
+      if (!s.apiKey) {
+        res.status(400).json({ error: "Intervals.icu ist nicht verbunden." });
+        return;
+      }
+      const days = Math.min(120, Math.max(7, Number(req.body?.days) || 30));
+      const cache = await syncIntervals(s.apiKey, s.athleteId ?? "0", days);
+      await writeIntervalsSettings(req.userId!, { ...s, cache, lastError: undefined });
+      res.json({
+        ok: true,
+        activityCount: cache.activities.length,
+        lastSync: cache.fetchedAt,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Sync fehlgeschlagen.";
+      const s = await readIntervalsSettings(req.userId!).catch(() => ({} as IntervalsSettings));
+      await writeIntervalsSettings(req.userId!, { ...s, lastError: msg }).catch(() => {});
+      res.status(502).json({ error: msg });
+    }
+  });
+
+  /** Trennen: Key und Cache loeschen. */
+  app.delete("/api/integrations/intervals", requireAuth, async (req: AuthRequest, res) => {
+    await pool.query(
+      `UPDATE users
+          SET profile_extras = profile_extras - 'intervals',
+              updated_at = NOW()
+        WHERE id=$1`,
+      [req.userId],
+    );
+    res.json({ ok: true });
+  });
+
   // ── Coach-Chat: Freitext-Beratung + Aktionen ──────────────────────────────
   app.get("/api/coach/chat", requireAuth, async (req: AuthRequest, res) => {
     try {
@@ -5291,13 +5418,16 @@ ${JSON.stringify(userCtx, null, 2)}
       const profile = profileRes.rows[0] ?? {};
       const latestPlan = plansRes.rows[0] ?? null;
 
-      const systemPrompt = buildCoachChatSystemPrompt({
-        profile,
-        plans: plansRes.rows,
-        workouts: workoutsRes.rows,
-        nutrition: nutritionRes.rows,
-        latestPlan,
-      });
+      const intervalsSettings = await readIntervalsSettings(req.userId!);
+      const intervalsContext = buildIntervalsContext(intervalsSettings);
+      const systemPrompt =
+        buildCoachChatSystemPrompt({
+          profile,
+          plans: plansRes.rows,
+          workouts: workoutsRes.rows,
+          nutrition: nutritionRes.rows,
+          latestPlan,
+        }) + (intervalsContext ? `\n\n${intervalsContext}` : "");
 
       const history = historyRes.rows.reverse().map((row) => ({
         role: row.role === "assistant" ? "assistant" : "user",

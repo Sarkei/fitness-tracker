@@ -16,6 +16,7 @@ import ErrorBanner from '@/src/components/ui/ErrorBanner';
 import type { Post } from '@/src/lib/useSocial';
 import { cn } from '@/src/lib/utils';
 import ReportHistoryView from './ReportHistoryView';
+import IntervalsConnect from './IntervalsConnect';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
 import { de as dfDe, enUS as dfEnUS } from 'date-fns/locale';
@@ -920,6 +921,12 @@ export default function ProfilePage() {
         >
           {pwdBusy ? <Loader2 className="animate-spin" size={18} /> : t('profile.changePassword.submit')}
         </button>
+      </div>
+
+      {/* ── Verbindungen ── */}
+      <div className="space-y-3">
+        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--text-muted)] px-4">Verbindungen</h3>
+        <IntervalsConnect />
       </div>
 
       {/* ── Bericht ── */}
