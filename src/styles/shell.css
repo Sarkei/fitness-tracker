@@ -498,28 +498,26 @@
 
 .app-btn--ghost:hover { background: var(--surface-2); border-color: var(--line-strong); }
 
-/* ---- Coach-Chat: feste Gruentoene unabhaengig vom Theme ------------------
-   Warum feste Werte: Im dunklen Theme ist --accent ein helles Mintgruen
-   (#4fbf8b), --accent-soft nur 14 % Deckkraft. Damit lagen Coach-Blase und
-   eigene Blase nur 1,15:1 auseinander - praktisch unsichtbar.
-   Jetzt: Coach dunkel + weisse Schrift, eigene Nachricht hell + dunkle Schrift.
-   Trennkontrast 6,6:1, Textkontrast > 9:1. */
+/* ---- Coach-Chat: dunkle Gruentoene mit klar getrennten Stufen ------------
+   Beide Blasen sind bewusst dunkel. Der Unterschied kommt nicht mehr ueber
+   Helligkeit, sondern ueber die Stufe: Coach #0b2e1f (sehr dunkel),
+   eigene Nachricht #24744f (dunkel, aber deutlich abgesetzt).
+   Abstand 2,6:1, weisse Schrift 14,7:1, Uhrzeit 5,7:1. */
 
 .coach-bubble-coach,
 .coach-input {
-  background: #154c34;
+  background: #0b2e1f;
   color: #ffffff;
 }
 
 .coach-bubble-me {
-  background: #8fe3bd;
-  color: #0b2a1e;
+  background: #24744f;
+  color: #ffffff;
 }
 
-/* Eingabefeld liegt auf der Seite, nicht auf der Blase: etwas heller als der
-   Coach-Ton, damit es sich vom Hintergrund abhebt, aber klar als Feld lesbar bleibt. */
+/* Eingabefeld liegt auf der Seite: minimal heller als der Coach-Ton mit Kante. */
 .coach-input {
-  background: #17452f;
+  background: #11402c;
   border: 1px solid #2a6a4d;
 }
 
@@ -530,10 +528,20 @@
 
 .coach-input input::placeholder,
 .coach-input textarea::placeholder {
-  color: rgb(255 255 255 / 0.65);
+  color: rgb(255 255 255 / 0.7);
 }
 
-/* Im hellen Theme bleibt das Schema gleich; nur die Toene werden kraeftiger. */
+/* Uhrzeit: auf dem helleren Eigen-Ton braucht sie volle Deckkraft,
+   sonst faellt sie bei 10px unter 4,5:1 (WCAG AA). */
+.coach-time {
+  color: rgb(255 255 255 / 0.8);
+}
+
+.coach-time-me {
+  color: rgb(255 255 255 / 0.92);
+}
+
+/* Im hellen Theme dieselbe Logik, nur mit kraeftigeren Toenen. */
 html:not(.dark) .coach-bubble-coach,
 html:not(.dark) .coach-input {
   background: #1f6b4a;
@@ -541,8 +549,8 @@ html:not(.dark) .coach-input {
 }
 
 html:not(.dark) .coach-bubble-me {
-  background: #cfeade;
-  color: #10352a;
+  background: #2f8c62;
+  color: #ffffff;
 }
 
 @media (prefers-reduced-motion: reduce) {
