@@ -166,8 +166,8 @@ export default function CoachChatPage() {
                   <div
                     className={`space-y-2 rounded-2xl px-4 py-2.5 text-[13.5px] leading-relaxed shadow-[0_1px_2px_rgb(15_23_42/0.06)] ${
                       eigen
-                        ? 'rounded-br-md bg-[var(--simple-accent-soft)] text-[var(--foreground)]'
-                        : 'rounded-bl-md bg-[var(--simple-accent)] text-white'
+                        ? 'rounded-br-md coach-bubble-me'
+                        : 'rounded-bl-md coach-bubble-coach'
                     }`}
                   >
                     <p className="whitespace-pre-wrap break-words">{m.content}</p>
@@ -197,7 +197,7 @@ export default function CoachChatPage() {
 
           {sendet && (
             <div className="flex justify-start">
-              <div className="flex items-center gap-2 rounded-2xl rounded-bl-md bg-[var(--simple-accent)] px-4 py-2.5 text-[13px] text-white/90">
+              <div className="flex items-center gap-2 rounded-2xl rounded-bl-md coach-bubble-coach px-4 py-2.5 text-[13px]">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" /> denkt nach …
               </div>
             </div>
@@ -216,7 +216,7 @@ export default function CoachChatPage() {
             e.preventDefault();
             void senden(eingabe);
           }}
-          className="mt-3 flex shrink-0 items-end gap-2 rounded-2xl bg-[var(--simple-accent)] p-2 shadow-[0_2px_8px_rgb(15_23_42/0.12)]"
+          className="mt-3 flex shrink-0 items-end gap-2 rounded-2xl coach-input p-2 shadow-[0_2px_8px_rgb(15_23_42/0.12)]"
         >
           <textarea
             value={eingabe}

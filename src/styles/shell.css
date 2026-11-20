@@ -498,6 +498,39 @@
 
 .app-btn--ghost:hover { background: var(--surface-2); border-color: var(--line-strong); }
 
+/* ---- Coach-Chat: feste Gruentoene unabhaengig vom Theme ------------------
+   Im dunklen Theme ist --accent ein helles Mintgruen (#4fbf8b) und --accent-soft
+   nur 14 % Deckkraft. Fuer den Chat brauchen wir ein echtes Dunkelgruen und ein
+   echtes Hellgruen, sonst wirkt die Zuordnung vertauscht. */
+
+.coach-bubble-coach,
+.coach-input {
+  background: #1f6b4a;
+  color: #ffffff;
+}
+
+.coach-bubble-me {
+  background: #cfeade;
+  color: #10352a;
+}
+
+/* Im dunklen Theme wird aus dem Hellgruen ein gedecktes Gruen mit heller Schrift. */
+html.dark .coach-bubble-me,
+.dark .coach-bubble-me {
+  background: #2a5f47;
+  color: #eafaf2;
+}
+
+.coach-input input,
+.coach-input textarea {
+  color: #ffffff;
+}
+
+.coach-input input::placeholder,
+.coach-input textarea::placeholder {
+  color: rgb(255 255 255 / 0.6);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .app-card__arrow,
   .app-nav-item,
