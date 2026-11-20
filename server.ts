@@ -20,7 +20,15 @@ import {
 } from "./aiProviders";
 import { reloadEnvFromFile, upsertEnvVar } from "./src/lib/envFileManager";
 import { buildCoachChatSystemPrompt, parseCoachChatReply, applyCoachChatActions } from "./src/lib/coachChat";
-import { buildIntervalsContext, fetchAthlete, syncIntervals, type IntervalsSettings } from "./src/lib/intervals";
+import {
+  buildIntervalsContext,
+  fetchAthlete,
+  normalisiereIntervall,
+  syncFaellig,
+  syncIntervals,
+  SYNC_INTERVAL_OPTIONS,
+  type IntervalsSettings,
+} from "./src/lib/intervals";
 import {
   AI_MODEL_AREAS,
   AI_MODEL_AREA_LABELS,
@@ -5238,6 +5246,8 @@ ${JSON.stringify(userCtx, null, 2)}
         connectedAt: s.connectedAt ?? null,
         lastError: s.lastError ?? null,
         lastSync: cache?.fetchedAt ?? null,
+        syncIntervalHours: normalisiereIntervall(s.syncIntervalHours),
+        syncIntervalOptions: SYNC_INTERVAL_OPTIONS,
         activityCount: cache?.activities?.length ?? 0,
         latestActivity: cache?.activities?.[0]
           ? {
@@ -5319,6 +5329,22 @@ ${JSON.stringify(userCtx, null, 2)}
       const s = await readIntervalsSettings(req.userId!).catch(() => ({} as IntervalsSettings));
       await writeIntervalsSettings(req.userId!, { ...s, lastError: msg }).catch(() => {});
       res.status(502).json({ error: msg });
+    }
+  });
+
+  /** Sync-Intervall einstellen (0 = nur manuell). */
+  app.patch("/api/integrations/intervals/settings", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const s = await readIntervalsSettings(req.userId!);
+      if (!s.apiKey) {
+        res.status(400).json({ error: "Intervals.icu ist nicht verbunden." });
+        return;
+      }
+      const stunden = normalisiereIntervall(req.body?.syncIntervalHours);
+      await writeIntervalsSettings(req.userId!, { ...s, syncIntervalHours: stunden });
+      res.json({ ok: true, syncIntervalHours: stunden });
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "Speichern fehlgeschlagen." });
     }
   });
 
@@ -5418,7 +5444,31 @@ ${JSON.stringify(userCtx, null, 2)}
       const profile = profileRes.rows[0] ?? {};
       const latestPlan = plansRes.rows[0] ?? null;
 
-      const intervalsSettings = await readIntervalsSettings(req.userId!);
+      // Faelliger Auto-Sync: blockiert den Chat nicht, wenn er scheitert.
+      let intervalsSettings = await readIntervalsSettings(req.userId!);
+      if (syncFaellig(intervalsSettings)) {
+        try {
+          const cache = await syncIntervals(
+            intervalsSettings.apiKey!,
+            intervalsSettings.athleteId ?? "0",
+            30,
+          );
+          intervalsSettings = {
+            ...intervalsSettings,
+            cache,
+            lastAutoSyncAt: new Date().toISOString(),
+            lastError: undefined,
+          };
+          await writeIntervalsSettings(req.userId!, intervalsSettings);
+        } catch (e) {
+          intervalsSettings = {
+            ...intervalsSettings,
+            lastAutoSyncAt: new Date().toISOString(),
+            lastError: e instanceof Error ? e.message : "Auto-Sync fehlgeschlagen.",
+          };
+          await writeIntervalsSettings(req.userId!, intervalsSettings).catch(() => {});
+        }
+      }
       const intervalsContext = buildIntervalsContext(intervalsSettings);
       const systemPrompt =
         buildCoachChatSystemPrompt({

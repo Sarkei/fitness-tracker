@@ -20,6 +20,17 @@ type Status = {
   activityCount: number;
   latestActivity: { date: string; type: string | null; name: string | null } | null;
   fitness: { ctl: number | null; atl: number | null; tsb: number | null } | null;
+  syncIntervalHours: number;
+  syncIntervalOptions: number[];
+};
+
+const INTERVALL_LABEL: Record<number, string> = {
+  0: 'Nur manuell',
+  1: 'Jede Stunde',
+  3: 'Alle 3 Stunden',
+  6: 'Alle 6 Stunden',
+  12: 'Alle 12 Stunden',
+  24: 'Einmal täglich',
 };
 
 function fmtDatum(iso: string | null): string {
@@ -101,6 +112,28 @@ export default function IntervalsConnect() {
       await laden();
     } catch (e) {
       setFehler(e instanceof Error ? e.message : 'Sync fehlgeschlagen.');
+    } finally {
+      setArbeitet(false);
+    }
+  };
+
+  const intervallSetzen = async (stunden: number) => {
+    setArbeitet(true);
+    setFehler(null);
+    setErfolg(null);
+    try {
+      await api('/api/integrations/intervals/settings', {
+        method: 'PATCH',
+        body: JSON.stringify({ syncIntervalHours: stunden }),
+      });
+      setErfolg(
+        stunden === 0
+          ? 'Automatischer Sync aus — nur noch manuell.'
+          : `Automatischer Sync: ${INTERVALL_LABEL[stunden]}.`,
+      );
+      await laden();
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : 'Intervall konnte nicht gespeichert werden.');
     } finally {
       setArbeitet(false);
     }
@@ -256,24 +289,42 @@ export default function IntervalsConnect() {
       )}
 
       {status?.connected && (
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 space-y-2">
           <button
             type="button"
             onClick={() => void syncen()}
             disabled={arbeitet}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-muted)] px-3 py-2 text-[12px] font-semibold text-[var(--foreground)] transition hover:border-[var(--simple-accent)] disabled:opacity-50"
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--simple-accent)] px-3 py-2.5 text-[12px] font-semibold text-white transition hover:opacity-90 disabled:opacity-50 sm:w-auto"
           >
             {arbeitet ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
             Jetzt synchronisieren
           </button>
-          <button
-            type="button"
-            onClick={() => void trennen()}
-            disabled={arbeitet}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-muted)] px-3 py-2 text-[12px] font-semibold text-[var(--text-muted)] transition hover:text-red-500 disabled:opacity-50"
-          >
-            <Trash2 className="h-3.5 w-3.5" /> Trennen
-          </button>
+
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="flex-1 text-[11px] font-semibold text-[var(--text-muted)] sm:max-w-[220px]">
+              Automatisch synchronisieren
+              <select
+                value={status.syncIntervalHours ?? 6}
+                onChange={(e) => void intervallSetzen(Number(e.target.value))}
+                disabled={arbeitet}
+                className="mt-1 w-full rounded-xl border border-[var(--border-muted)] bg-[var(--surface-gray)] px-3 py-2 text-[12.5px] font-medium text-[var(--foreground)] outline-none focus:ring-1 focus:ring-[var(--simple-accent)] disabled:opacity-50"
+              >
+                {(status.syncIntervalOptions ?? [0, 1, 3, 6, 12, 24]).map((h) => (
+                  <option key={h} value={h}>
+                    {INTERVALL_LABEL[h] ?? `Alle ${h} Stunden`}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={() => void trennen()}
+              disabled={arbeitet}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-muted)] px-3 py-2 text-[12px] font-semibold text-[var(--text-muted)] transition hover:text-red-500 disabled:opacity-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Trennen
+            </button>
+          </div>
         </div>
       )}
 
