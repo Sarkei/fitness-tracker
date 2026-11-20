@@ -167,6 +167,13 @@ export async function deleteFood(id: string): Promise<void> {
   await api(`/api/nutrition/${id}`, { method: 'DELETE' });
 }
 
+export async function updateFood(
+  id: string,
+  patch: Partial<Pick<FoodEntry, 'meal' | 'category' | 'calories' | 'protein' | 'carbs' | 'fat'>>,
+): Promise<void> {
+  await api(`/api/nutrition/${id}`, { method: 'PATCH', body: JSON.stringify(patch) });
+}
+
 /* ---------- Foto-Erkennung ---------- */
 
 export type V3Component = {

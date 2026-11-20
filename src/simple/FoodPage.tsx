@@ -6,6 +6,7 @@ import {
   Coffee,
   Dumbbell,
   Moon,
+  Pencil,
   Plus,
   Sandwich,
   Sun,
@@ -29,6 +30,7 @@ import {
   StatTile,
 } from './ui';
 import PhotoMealSheet from './PhotoMealSheet';
+import MealEditRow from './EditRows';
 import {
   dayKeyOf,
   deleteFood,
@@ -81,6 +83,7 @@ export default function FoodPage() {
   const [monat, setMonat] = useState<FoodEntry[]>([]);
   const [trainingDay, setTrainingDay] = useState(false);
   const [sheetFor, setSheetFor] = useState<string | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [laedt, setLaedt] = useState(true);
 
@@ -350,7 +353,18 @@ export default function FoodPage() {
                 </div>
               ) : (
                 <ul className="my-2 flex-1 divide-y divide-[var(--border-muted)]">
-                  {meal.entries.map((entry) => (
+                  {meal.entries.map((entry) =>
+                    editId === entry.id ? (
+                      <MealEditRow
+                        key={entry.id}
+                        entry={entry}
+                        onSaved={() => {
+                          setEditId(null);
+                          void load();
+                        }}
+                        onCancel={() => setEditId(null)}
+                      />
+                    ) : (
                     <li key={entry.id} className="flex items-center gap-2 py-2">
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[13px]">{entry.meal}</p>
@@ -363,6 +377,13 @@ export default function FoodPage() {
                         {Math.round(Number(entry.calories) || 0)}
                       </span>
                       <button
+                        className="rounded-md p-1 text-[var(--text-muted)] transition hover:text-[var(--simple-accent)]"
+                        onClick={() => setEditId(entry.id)}
+                        aria-label="Bearbeiten"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button
                         className="rounded-md p-1 text-[var(--text-muted)] transition hover:text-[var(--simple-clay)]"
                         onClick={() => void remove(entry.id)}
                         aria-label="Löschen"
@@ -370,7 +391,8 @@ export default function FoodPage() {
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </li>
-                  ))}
+                    ),
+                  )}
                 </ul>
               )}
 
