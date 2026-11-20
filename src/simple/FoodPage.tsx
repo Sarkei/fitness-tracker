@@ -415,16 +415,24 @@ export default function FoodPage() {
           {hatVerlauf ? (
             <>
               <Sparkline values={verlauf.map((v) => v.kcal)} goal={Number(goals.dailyCalories) || 2400} height={64} />
+              {/* Tag antippen, um ihn zu laden */}
               <div className="mt-1 flex gap-1 text-[9.5px] text-[var(--text-muted)]">
                 {verlauf.map((v, i) => (
-                  <span
+                  <button
                     key={v.ymd}
-                    className={`flex-1 text-center ${v.ymd === date ? 'font-semibold text-[var(--foreground)]' : ''}`}
+                    type="button"
+                    onClick={() => setDate(v.ymd)}
+                    className="flex-1 rounded transition hover:bg-[var(--surface-gray)]"
                   >
-                    {i % 2 === 0 ? dayLabelShort(v.ymd) : ''}
-                  </span>
+                    <span className={v.ymd === date ? 'font-semibold text-[var(--simple-accent)]' : ''}>
+                      {i % 2 === 0 ? dayLabelShort(v.ymd) : ''}
+                    </span>
+                  </button>
                 ))}
               </div>
+              <p className="mt-1 text-[10px] text-[var(--text-muted)]">
+                Tippe einen Tag an, um ihn zu öffnen.
+              </p>
             </>
           ) : (
             <EmptyState
