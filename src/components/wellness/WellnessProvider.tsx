@@ -7,7 +7,7 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, RefreshCw } from 'lucide-react';
 import { api } from '@/src/lib/api';
 import { Card } from '@/src/simple/ui';
 import type { WellnessAktivitaet, WellnessTag } from '@/src/lib/wellness';
@@ -34,6 +34,9 @@ type Kontext = {
   setZeitraum: (n: number) => void;
   neuLaden: () => void;
   laedt: boolean;
+  meldung: string | null;
+  syncJetzt: () => void;
+  synct: boolean;
 };
 
 const WellnessKontext = createContext<Kontext | null>(null);
@@ -49,6 +52,8 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
   const [daten, setDaten] = useState<WellnessDaten | null>(null);
   const [zeitraum, setZeitraum] = useState(30);
   const [laedt, setLaedt] = useState(true);
+  const [synct, setSynct] = useState(false);
+  const [meldung, setMeldung] = useState<string | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
 
   const laden = useCallback(async () => {
@@ -68,12 +73,39 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     void laden();
   }, [laden]);
 
+  /** Holt die Daten frisch bei Intervals.icu und meldet ehrlich, ob Neues kam. */
+  const syncJetzt = useCallback(async () => {
+    setSynct(true);
+    setMeldung(null);
+    setFehler(null);
+    try {
+      const res = await api<{
+        activityCount: number;
+        neuSeitLetztemSync: boolean;
+        neuesteAktivitaet: string | null;
+        hinweis: string | null;
+      }>('/api/integrations/intervals/sync', { method: 'POST', body: JSON.stringify({ days: zeitraum }) });
+      if (res.neuSeitLetztemSync) {
+        setMeldung(`Neue Daten bis ${res.neuesteAktivitaet}.`);
+      } else {
+        setMeldung(
+          `Keine neueren Daten als ${res.neuesteAktivitaet ?? 'bisher'} — deine Uhr hat seitdem nichts Neues übertragen.`,
+        );
+      }
+      await laden();
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : 'Abgleich fehlgeschlagen.');
+    } finally {
+      setSynct(false);
+    }
+  }, [zeitraum, laden]);
+
   const wert = useMemo<Kontext | null>(
     () =>
       daten
-        ? { daten, zeitraum, setZeitraum, neuLaden: () => void laden(), laedt }
+        ? { daten, zeitraum, setZeitraum, neuLaden: () => void laden(), laedt, meldung, syncJetzt: () => void syncJetzt(), synct }
         : null,
-    [daten, zeitraum, laden, laedt],
+    [daten, zeitraum, laden, laedt, meldung, syncJetzt, synct],
   );
 
   if (fehler || (!laedt && !daten)) {
@@ -107,8 +139,9 @@ export function useWellness(): Kontext {
 
 /** Zeitraum-Umschalter + Aktualisieren, auf jeder Unterseite oben. */
 export function WellnessToolbar() {
-  const { zeitraum, setZeitraum, neuLaden, laedt, daten } = useWellness();
+  const { zeitraum, setZeitraum, laedt, daten, meldung, syncJetzt, synct } = useWellness();
   return (
+    <div className="space-y-2">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div className="flex gap-1.5">
         {ZEITRAEUME.map((z) => (
@@ -140,13 +173,18 @@ export function WellnessToolbar() {
         )}
         <button
           type="button"
-          onClick={neuLaden}
-          disabled={laedt}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-muted)] px-2.5 py-1.5 font-semibold transition hover:text-[var(--foreground)] disabled:opacity-50"
+          onClick={() => void syncJetzt()}
+          disabled={laedt || synct}
+          className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-muted)] px-2.5 py-1.5 font-semibold transition hover:border-[var(--simple-accent)] hover:text-[var(--simple-accent)] disabled:opacity-50"
+          title="Daten bei Intervals.icu neu abholen"
         >
-          {laedt ? <Loader2 className="h-3 w-3 animate-spin" /> : null} Aktualisieren
+          {synct ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Abgleich
         </button>
       </div>
+    </div>
+    {meldung && (
+      <p className="rounded-xl bg-[var(--surface-gray)] px-3 py-2 text-[11.5px] text-[var(--text-muted)]">{meldung}</p>
+    )}
     </div>
   );
 }

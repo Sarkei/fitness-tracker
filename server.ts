@@ -23,6 +23,7 @@ import { buildCoachChatSystemPrompt, parseCoachChatReply, applyCoachChatActions 
 import {
   buildIntervalsContext,
   fetchAthlete,
+  neuerStand,
   normalisiereIntervall,
   syncFaellig,
   syncIntervals,
@@ -5317,12 +5318,31 @@ ${JSON.stringify(userCtx, null, 2)}
         return;
       }
       const days = Math.min(120, Math.max(7, Number(req.body?.days) || 30));
+
+      // Vorher/nachher vergleichen: so sieht man, ob wirklich Neues kam.
+      const vorher = s.cache?.activities?.[0]?.start_date_local
+        ? String(s.cache.activities[0].start_date_local).slice(0, 10)
+        : null;
+
       const cache = await syncIntervals(s.apiKey, s.athleteId ?? "0", days);
-      await writeIntervalsSettings(req.userId!, { ...s, cache, lastError: undefined });
+      await writeIntervalsSettings(req.userId!, { ...s, cache, lastError: undefined, lastAutoSyncAt: new Date().toISOString() });
+
+      const nachher = cache.activities?.[0]?.start_date_local
+        ? String(cache.activities[0].start_date_local).slice(0, 10)
+        : null;
+      const neu = Boolean(nachher && nachher !== vorher);
+
       res.json({
         ok: true,
         activityCount: cache.activities.length,
         lastSync: cache.fetchedAt,
+        neuesteAktivitaet: nachher,
+        neuSeitLetztemSync: neu,
+        // Ehrlicher Hinweis: der Abgleich mit der Uhr passiert bei Intervals selbst.
+        hinweis: neu
+          ? null
+          : "Intervals.icu hat keine neueren Aktivitäten. Den Abgleich mit der Uhr stößt Intervals selbst an — " +
+            "prüfe in Garmin Connect, ob die Uhr synchronisiert hat (Intervals hat keinen API-Befehl dafür).",
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Sync fehlgeschlagen.";

@@ -44,6 +44,34 @@ export function normalisiereIntervall(v: unknown): number {
   return (SYNC_INTERVAL_OPTIONS as readonly number[]).includes(n) ? n : 6;
 }
 
+/**
+ * Intervals.icu hat keinen oeffentlichen Endpunkt, der Garmin serverseitig neu
+ * einliest. Was wir tun koennen: die Daten neu abholen und pruefen, ob seit dem
+ * letzten Stand etwas dazugekommen ist. Das Ergebnis wird ehrlich zurueckgemeldet.
+ */
+export async function neuerStand(
+  apiKey: string,
+  athleteId: string,
+): Promise<{ neuesteAktivitaet: string | null; anzahl: number }> {
+  const newest = new Date();
+  const oldest = new Date();
+  oldest.setDate(newest.getDate() - 120);
+  const range = `oldest=${oldest.toISOString().slice(0, 10)}&newest=${newest.toISOString().slice(0, 10)}`;
+  const liste = await call<IntervalsActivity[]>(
+    `/athlete/${encodeURIComponent(athleteId || '0')}/activities?${range}`,
+    apiKey,
+  );
+  const sortiert = (Array.isArray(liste) ? liste : []).sort((a, b) =>
+    String(b.start_date_local ?? '').localeCompare(String(a.start_date_local ?? '')),
+  );
+  return {
+    neuesteAktivitaet: sortiert[0]?.start_date_local
+      ? String(sortiert[0].start_date_local).slice(0, 10)
+      : null,
+    anzahl: sortiert.length,
+  };
+}
+
 /** True, wenn seit dem letzten Sync mehr als das gewaehlte Intervall vergangen ist. */
 export function syncFaellig(settings: IntervalsSettings | undefined, jetzt = Date.now()): boolean {
   if (!settings?.apiKey) return false;

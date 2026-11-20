@@ -104,11 +104,22 @@ export default function IntervalsConnect() {
     setFehler(null);
     setErfolg(null);
     try {
-      const res = await api<{ activityCount: number }>('/api/integrations/intervals/sync', {
+      const res = await api<{
+        activityCount: number;
+        neuSeitLetztemSync: boolean;
+        neuesteAktivitaet: string | null;
+        hinweis: string | null;
+      }>('/api/integrations/intervals/sync', {
         method: 'POST',
         body: JSON.stringify({ days: 30 }),
       });
-      setErfolg(`${res.activityCount} Aktivitäten aktualisiert.`);
+      if (res.neuSeitLetztemSync) {
+        setErfolg(`Neue Daten: ${res.neuesteAktivitaet} · ${res.activityCount} Aktivitäten insgesamt.`);
+      } else if (res.hinweis) {
+        setFehler(res.hinweis);
+      } else {
+        setErfolg(`${res.activityCount} Aktivitäten — keine neuen seit dem letzten Abgleich.`);
+      }
       await laden();
     } catch (e) {
       setFehler(e instanceof Error ? e.message : 'Sync fehlgeschlagen.');
