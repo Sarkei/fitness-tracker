@@ -6,7 +6,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/src/lib/AuthContext';
-import { User, LogOut, Loader2, Plus, Target, Moon, Sun, X, FileText, Camera, Image, ArrowUpRight, ArrowDownRight, Trash2, Download } from 'lucide-react';
+import { User, LogOut, Loader2, Plus, Target, Moon, Sun, X, FileText, Camera, Image, ArrowUpRight, ArrowDownRight, Trash2, Download, Ruler, Shield } from 'lucide-react';
 import { useWorkouts } from '@/src/lib/useWorkouts';
 import { useNutrition } from '@/src/lib/useNutrition';
 import { generatePeriodFitnessReport, allowedReportRangeKeys, type ReportRangeKey } from '@/src/lib/periodReport';
@@ -17,6 +17,7 @@ import type { Post } from '@/src/lib/useSocial';
 import { cn } from '@/src/lib/utils';
 import ReportHistoryView from './ReportHistoryView';
 import IntervalsConnect from './IntervalsConnect';
+import { PageHeader } from '@/src/simple/ui';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
 import { de as dfDe, enUS as dfEnUS } from 'date-fns/locale';
@@ -83,6 +84,7 @@ export default function ProfilePage() {
   const dfLocale = locale === 'de' ? dfDe : dfEnUS;
   const { workouts } = useWorkouts();
   const { nutritionEntries } = useNutrition();
+  const [tab, setTab] = useState<'uebersicht' | 'koerper' | 'ziele' | 'daten' | 'account'>('uebersicht');
   const [isEditingGoals, setIsEditingGoals] = useState(false);
   const [isAddingWeight, setIsAddingWeight] = useState(false);
   const [newWeight, setNewWeight] = useState('');
@@ -388,9 +390,44 @@ export default function ProfilePage() {
 
   const protocol = derivedProtocol;
 
-  return (
-    <div className="w-full space-y-10 pb-8 md:pb-16">
+  const tabs = [
+    { id: 'uebersicht', label: t('profile.tab.overview'), icon: User },
+    { id: 'koerper', label: t('profile.tab.body'), icon: Ruler },
+    { id: 'ziele', label: t('profile.tab.goals'), icon: Target },
+    { id: 'daten', label: t('profile.tab.data'), icon: Download },
+    { id: 'account', label: t('profile.tab.account'), icon: Shield },
+  ] as const;
 
+  return (
+    <div className="w-full space-y-6 pb-8 md:pb-16">
+      <PageHeader
+        eyebrow={t('nav.profile')}
+        title={profile?.displayName || [profile?.firstName, profile?.lastName].filter(Boolean).join(' ') || t('profile.elite')}
+        hint={t('profile.tabHint')}
+      />
+
+      {/* Kategorien statt langer Scrollseite */}
+      <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {tabs.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setTab(id)}
+            className={cn(
+              'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-[12px] font-semibold transition',
+              tab === id
+                ? 'border-[var(--simple-accent)] bg-[var(--simple-accent)] text-white'
+                : 'border-[var(--border-muted)] text-[var(--text-muted)] hover:border-[var(--simple-accent)] hover:text-[var(--simple-accent)]',
+            )}
+          >
+            <Icon className="h-3.5 w-3.5" />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'uebersicht' && (
+        <div className="space-y-6">
       {/* ── Avatar ── */}
       <div className="flex flex-col items-center gap-6 w-full">
         <label className="cursor-pointer group relative">
@@ -688,6 +725,10 @@ export default function ProfilePage() {
         )}
       </div>
 
+        </div>
+      )}
+      {tab === 'koerper' && (
+        <div className="space-y-6">
       {/* ── Biometrics Quick Stats ── */}
       <div className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -729,6 +770,10 @@ export default function ProfilePage() {
         </div>
       </div>
 
+        </div>
+      )}
+      {tab === 'ziele' && (
+        <div className="space-y-6">
       {/* ── Operational Goals ── */}
       <div className="space-y-6">
         <div className="flex justify-between items-end px-4">
@@ -922,7 +967,11 @@ export default function ProfilePage() {
           {pwdBusy ? <Loader2 className="animate-spin" size={18} /> : t('profile.changePassword.submit')}
         </button>
       </div>
+        </div>
+      )}
 
+      {tab === 'daten' && (
+        <div className="space-y-6">
       {/* ── Verbindungen ── */}
       <div className="space-y-3">
         <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--text-muted)] px-4">Verbindungen</h3>
@@ -1034,7 +1083,11 @@ export default function ProfilePage() {
         <p className="text-sm text-[var(--text-muted)] font-medium leading-relaxed">{t('profile.privacy.body')}</p>
         <p className="text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-widest">{t('profile.privacy.exportHint')}</p>
       </div>
+        </div>
+      )}
 
+      {tab === 'account' && (
+        <div className="space-y-6">
       {/* ── Konto ── */}
       <div className="space-y-6">
         <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--text-muted)] px-4">{t('profile.account')}</h3>
@@ -1064,6 +1117,8 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+        </div>
+      )}
 
       {/* ── Add Weight Modal ── */}
       {isAddingWeight ? overlayPortal(

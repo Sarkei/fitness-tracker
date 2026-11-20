@@ -26,7 +26,33 @@ export type IntervalsSettings = {
   lastError?: string;
   /** Cache der zuletzt geholten Daten. */
   cache?: IntervalsCache;
+  /**
+   * Sync-Intervall in Stunden. 0 = nur manuell.
+   * Der Server zieht beim naechsten Coach-Zugriff nach, wenn das Intervall abgelaufen ist.
+   */
+  syncIntervalHours?: number;
+  /** Zeitpunkt des letzten automatischen Versuchs (auch bei Fehler gesetzt). */
+  lastAutoSyncAt?: string;
 };
+
+export const SYNC_INTERVAL_OPTIONS = [0, 1, 3, 6, 12, 24] as const;
+
+/** Nur erlaubte Intervalle zulassen, sonst Standard 6 Stunden. */
+export function normalisiereIntervall(v: unknown): number {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 6;
+  return (SYNC_INTERVAL_OPTIONS as readonly number[]).includes(n) ? n : 6;
+}
+
+/** True, wenn seit dem letzten Sync mehr als das gewaehlte Intervall vergangen ist. */
+export function syncFaellig(settings: IntervalsSettings | undefined, jetzt = Date.now()): boolean {
+  if (!settings?.apiKey) return false;
+  const stunden = normalisiereIntervall(settings.syncIntervalHours);
+  if (stunden <= 0) return false;
+  const letzter = Date.parse(settings.lastAutoSyncAt ?? settings.cache?.fetchedAt ?? '');
+  if (!Number.isFinite(letzter)) return true;
+  return jetzt - letzter >= stunden * 3600_000;
+}
 
 export type IntervalsActivity = {
   id: string;
