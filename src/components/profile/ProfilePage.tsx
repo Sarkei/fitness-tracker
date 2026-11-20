@@ -732,32 +732,28 @@ export default function ProfilePage() {
       {/* ── Biometrics Quick Stats ── */}
       <div className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="bg-[var(--card-bg)] p-6 rounded-[2rem] border border-[var(--border-muted)] text-center">
-            <div className="flex items-center justify-center gap-2 flex-wrap">
-              <p className="text-3xl font-black italic tracking-tighter uppercase">{profile?.measurements?.weight ?? '—'}</p>
-              {weightTrendVsLastLog === 'up' && (
-                <ArrowUpRight
-                  size={28}
-                  className="text-green-500 shrink-0"
-                  aria-label={t('profile.weightTrendUp')}
-                  strokeWidth={2.5}
-                />
-              )}
-              {weightTrendVsLastLog === 'down' && (
-                <ArrowDownRight
-                  size={28}
-                  className="text-red-500 shrink-0"
-                  aria-label={t('profile.weightTrendDown')}
-                  strokeWidth={2.5}
-                />
-              )}
-            </div>
-            <p className="text-[10px] text-[var(--text-muted)] font-black uppercase tracking-widest mt-2">{t('profile.kgCurrent')}</p>
-          </div>
-          <div className="bg-[var(--card-bg)] p-6 rounded-[2rem] border border-[var(--border-muted)] flex flex-col justify-between text-center sm:text-left">
+          <div className="bg-[var(--card-bg)] p-6 rounded-[2rem] border border-[var(--border-muted)] flex flex-col justify-between text-center">
             <div>
-              <p className="text-3xl font-black italic tracking-tighter uppercase text-center sm:text-left">{profile?.measurements?.height ?? '—'}</p>
-              <p className="text-[10px] text-[var(--text-muted)] font-black uppercase tracking-widest mt-2">{t('profile.cmHeight')}</p>
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                <p className="text-3xl font-black italic tracking-tighter uppercase">{profile?.measurements?.weight ?? '—'}</p>
+                {weightTrendVsLastLog === 'up' && (
+                  <ArrowUpRight
+                    size={28}
+                    className="text-green-500 shrink-0"
+                    aria-label={t('profile.weightTrendUp')}
+                    strokeWidth={2.5}
+                  />
+                )}
+                {weightTrendVsLastLog === 'down' && (
+                  <ArrowDownRight
+                    size={28}
+                    className="text-red-500 shrink-0"
+                    aria-label={t('profile.weightTrendDown')}
+                    strokeWidth={2.5}
+                  />
+                )}
+              </div>
+              <p className="text-[10px] text-[var(--text-muted)] font-black uppercase tracking-widest mt-2">{t('profile.kgCurrent')}</p>
             </div>
             <button
               type="button"
@@ -766,6 +762,10 @@ export default function ProfilePage() {
             >
               {t('profile.updateWeight.open')}
             </button>
+          </div>
+          <div className="bg-[var(--card-bg)] p-6 rounded-[2rem] border border-[var(--border-muted)] flex flex-col items-center justify-center text-center">
+            <p className="text-3xl font-black italic tracking-tighter uppercase">{profile?.measurements?.height ?? '—'}</p>
+            <p className="text-[10px] text-[var(--text-muted)] font-black uppercase tracking-widest mt-2">{t('profile.cmHeight')}</p>
           </div>
         </div>
       </div>
