@@ -26,21 +26,21 @@ const ALL: NavItem[] = [
 export function splitNavItems(focus: NavigationFocus): { primary: NavItem[]; overflow: NavItem[] } {
   if (focus === 'hybrid') {
     // Coach in Primary für Discoverability; Stats/Social/Profil im Overflow
-    const primaryPaths = new Set(['/', '/workouts', '/nutrition', '/coach']);
+    const primaryPaths = new Set(['/', '/workouts', '/nutrition', '/coach', '/wellness']);
     return {
       primary: ALL.filter(i => primaryPaths.has(i.path)),
       overflow: ALL.filter(i => !primaryPaths.has(i.path)),
     };
   }
   if (focus === 'workout') {
-    const primaryPaths = new Set(['/', '/workouts', '/coach', '/stats']);
+    const primaryPaths = new Set(['/', '/workouts', '/coach', '/stats', '/wellness']);
     return {
       primary: ALL.filter(i => primaryPaths.has(i.path)),
       overflow: ALL.filter(i => !primaryPaths.has(i.path)),
     };
   }
   // nutrition-first
-  const primaryPaths = new Set(['/', '/nutrition', '/coach', '/stats']);
+  const primaryPaths = new Set(['/', '/nutrition', '/coach', '/stats', '/wellness']);
   return {
     primary: ALL.filter(i => primaryPaths.has(i.path)),
     overflow: ALL.filter(i => !primaryPaths.has(i.path)),
