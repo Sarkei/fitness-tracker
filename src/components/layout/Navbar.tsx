@@ -5,7 +5,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Home, Dumbbell, Utensils, BarChart2, Users, User, Moon, Sun, ChevronRight, Menu, Brain } from 'lucide-react';
+import { Home, Dumbbell, Utensils, BarChart2, Users, User, Moon, Sun, ChevronRight, Menu, Brain, Watch } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/src/lib/utils';
 import { useAuth } from '@/src/lib/AuthContext';
@@ -21,6 +21,7 @@ const ICONS: Record<string, typeof Home> = {
   '/nutrition': Utensils,
   '/coach': Brain,
   '/stats': BarChart2,
+  '/wellness': Watch,
   '/social': Users,
   '/profile': User,
 };
@@ -31,6 +32,7 @@ const SHORT_LABEL_KEYS: Record<string, string> = {
   '/nutrition': 'nav.nutrition.short',
   '/coach': 'nav.coach.short',
   '/stats': 'nav.stats.short',
+  '/wellness': 'nav.wellness.short',
   '/social': 'nav.social.short',
   '/profile': 'nav.profile.short',
 };

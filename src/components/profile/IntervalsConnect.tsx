@@ -164,7 +164,7 @@ export default function IntervalsConnect() {
             <Activity className="h-4 w-4" />
           </span>
           <div>
-            <p className="text-sm font-semibold text-[var(--foreground)]">Intervals.icu · Garmin</p>
+            <p className="text-sm font-semibold text-[var(--foreground)]">Intervals.icu · deine Quelle</p>
             <p className="mt-0.5 text-[11.5px] leading-relaxed text-[var(--text-muted)]">
               Der Coach sieht dann deine Läufe, Einheiten und deine Form (CTL/ATL/TSB).
             </p>
@@ -239,7 +239,7 @@ export default function IntervalsConnect() {
                   öffnen, ganz unten „Developer Settings“
                 </li>
                 <li>API-Key erzeugen und hier einfügen</li>
-                <li>Garmin muss in Intervals.icu als Quelle verbunden sein</li>
+                <li>Deine Uhr bzw. App (Garmin, Polar, Suunto, Whoop …) muss in Intervals.icu verbunden sein</li>
               </ol>
               <label className="block text-[11px] font-semibold text-[var(--text-muted)]">
                 API-Key

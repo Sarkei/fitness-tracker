@@ -1,6 +1,6 @@
 
 /** Prueft die Garmin-Auswertung (Schlaf, Form, Aggregate). */
-import { schlafStunden, formLabel, schlafBewertung, mittel, summe, letzter } from '../src/lib/garmin';
+import { schlafStunden, formLabel, schlafBewertung, mittel, summe, letzter } from '../src/lib/wellness';
 
 let fehler = 0;
 function check(name: string, ok: boolean, detail = '') {

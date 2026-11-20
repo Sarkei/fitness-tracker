@@ -18,6 +18,7 @@ const ALL: NavItem[] = [
   { path: '/nutrition', messageKey: 'nav.nutrition' },
   { path: '/coach', messageKey: 'nav.coach' },
   { path: '/stats', messageKey: 'nav.stats' },
+  { path: '/wellness', messageKey: 'nav.wellness' },
   { path: '/social', messageKey: 'nav.social' },
   { path: '/profile', messageKey: 'nav.profile' },
 ];

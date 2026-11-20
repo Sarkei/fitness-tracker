@@ -1,11 +1,11 @@
 /**
- * Garmin-/Intervals-Daten als eigene Ansicht.
+ * Daten aus Intervals.icu (Garmin, Polar, Suunto, Whoop ...) als eigene Ansicht.
  *
- * Was Intervals.icu aus Garmin durchreicht (am echten Konto geprueft):
+ * Was Intervals.icu aus den Quellen durchreicht (am echten Konto geprueft):
  *   Schlaf (sleepSecs, sleepScore, sleepQuality), Schritte, Etagen, HRV,
  *   Ruhepuls, Fitness/Form (CTL/ATL/TSB), Rampenrate, VO2max (sporadisch).
  *
- * Was NICHT kommt: Stress, Body Battery, SpO2, Readiness, Atemfrequenz -
+ * Was NICHT kommt (Garmin gibt es nicht frei): Stress, Body Battery, SpO2, Readiness, Atemfrequenz -
  * diese Felder sind in Intervals.icu dauerhaft leer. Das wird hier offen
  * benannt, statt eine leere Kachel zu zeigen.
  */
@@ -27,25 +27,45 @@ export type WellnessTag = {
   weight?: number | null;
 };
 
-export type GarminAktivitaet = {
+export type WellnessAktivitaet = {
   id: string;
   name?: string | null;
   type?: string | null;
   start_date_local?: string | null;
   distance?: number | null;
   moving_time?: number | null;
+  elapsed_time?: number | null;
   avg_hr?: number | null;
   max_hr?: number | null;
   calories?: number | null;
   icu_training_load?: number | null;
+  icu_intensity?: number | null;
   average_speed?: number | null;
   total_elevation_gain?: number | null;
+  icu_average_watts?: number | null;
+  /* Zusatzfelder aus Garmin/Polar/Suunto ueber Intervals */
+  average_cadence?: number | null;
+  average_stride?: number | null;
+  average_stance_time_percent?: number | null;
+  gap?: number | null;
+  trimp?: number | null;
+  polarization_index?: number | null;
+  icu_hr_zone_times?: number[] | null;
+  icu_hr_zones?: number[] | null;
+  icu_rpe?: number | null;
+  feel?: number | null;
+  average_temp?: number | null;
+  icu_warmup_time?: number | null;
+  icu_cooldown_time?: number | null;
+  icu_efficiency_factor?: number | null;
+  hr_load_type?: string | null;
+  description?: string | null;
 };
 
 export type GarminDaten = {
   fetchedAt: string;
   tage: WellnessTag[];
-  aktivitaeten: GarminAktivitaet[];
+  aktivitaeten: WellnessAktivitaet[];
   verfuegbar: {
     schlaf: boolean;
     schritte: boolean;

@@ -19,6 +19,7 @@ const NutritionPage = lazy(() => import('./components/nutrition/NutritionPage'))
 const CoachHubPage = lazy(() => import('./components/coach/CoachHubPage'));
 const ProfilePage = lazy(() => import('./components/profile/ProfilePage'));
 const StatisticsPage = lazy(() => import('./components/stats/StatisticsPage'));
+const WellnessPage = lazy(() => import('./components/wellness/WellnessPage'));
 const SocialPage = lazy(() => import('./components/social/SocialPage'));
 const AdminPage = lazy(() => import('./pages/AdminPage'));
 
@@ -130,6 +131,14 @@ const AppContent = () => {
           element={
             <RouteErrorBoundary title="Community konnte nicht geladen werden">
               <SocialPage />
+            </RouteErrorBoundary>
+          }
+        />
+        <Route
+          path="/wellness/*"
+          element={
+            <RouteErrorBoundary title="Garmin-Daten konnten nicht geladen werden">
+              <WellnessPage />
             </RouteErrorBoundary>
           }
         />

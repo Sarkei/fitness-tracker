@@ -70,6 +70,23 @@ export type IntervalsActivity = {
   calories?: number;
   average_speed?: number;
   icu_average_watts?: number;
+  /* Zusatzfelder fuer die Detailansicht (kommen von Garmin ueber Intervals) */
+  average_cadence?: number;
+  average_stride?: number;
+  average_stance_time_percent?: number;
+  gap?: number;
+  trimp?: number;
+  polarization_index?: number;
+  icu_hr_zone_times?: number[];
+  icu_hr_zones?: number[];
+  icu_rpe?: number;
+  feel?: number;
+  average_temp?: number;
+  icu_warmup_time?: number;
+  icu_cooldown_time?: number;
+  icu_efficiency_factor?: number;
+  hr_load_type?: string;
+  description?: string;
 };
 
 export type IntervalsWellnessDay = {
@@ -180,6 +197,22 @@ export async function syncIntervals(
       calories: a.calories,
       average_speed: a.average_speed,
       icu_average_watts: a.icu_average_watts,
+      average_cadence: numOrUndef(a.average_cadence),
+      average_stride: numOrUndef(a.average_stride),
+      average_stance_time_percent: numOrUndef(a.average_stance_time_percent),
+      gap: numOrUndef(a.gap),
+      trimp: numOrUndef(a.trimp),
+      polarization_index: numOrUndef(a.polarization_index),
+      icu_hr_zone_times: Array.isArray(a.icu_hr_zone_times) ? (a.icu_hr_zone_times as number[]) : undefined,
+      icu_hr_zones: Array.isArray(a.icu_hr_zones) ? (a.icu_hr_zones as number[]) : undefined,
+      icu_rpe: numOrUndef(a.icu_rpe),
+      feel: numOrUndef(a.feel),
+      average_temp: numOrUndef(a.average_temp),
+      icu_warmup_time: numOrUndef(a.icu_warmup_time),
+      icu_cooldown_time: numOrUndef(a.icu_cooldown_time),
+      icu_efficiency_factor: numOrUndef(a.icu_efficiency_factor),
+      hr_load_type: typeof a.hr_load_type === "string" ? a.hr_load_type : undefined,
+      description: typeof a.description === "string" ? a.description : undefined,
     }))
     .sort((a, b) => String(b.start_date_local ?? '').localeCompare(String(a.start_date_local ?? '')));
 
