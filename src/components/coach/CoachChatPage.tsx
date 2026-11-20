@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, ArrowUp, Check, Loader2, RotateCcw, Sparkles } from 'lucide-react';
 import { api } from '@/src/lib/api';
-import { Card, PageHeader } from '@/src/simple/ui';
+import { PageHeader } from '@/src/simple/ui';
 
 type ChatMessage = {
   id: number | string;
@@ -119,11 +119,11 @@ export default function CoachChatPage() {
         }
       />
 
-      <Card className="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
-        <div
-          ref={scrollRef}
-          className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5"
-        >
+      {/* Nachrichten liegen direkt auf dem Seitenhintergrund - keine aeussere Box */}
+      <div
+        ref={scrollRef}
+        className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain py-1"
+      >
           {laedt && (
             <p className="flex items-center justify-center gap-2 py-6 text-sm text-[var(--text-muted)]">
               <Loader2 className="h-4 w-4 animate-spin" /> Chat wird geladen …
@@ -164,17 +164,17 @@ export default function CoachChatPage() {
                     {eigen ? 'Du' : 'Coach'}
                   </span>
                   <div
-                    className={`space-y-2 rounded-2xl px-4 py-2.5 text-[13.5px] leading-relaxed ${
+                    className={`space-y-2 rounded-2xl px-4 py-2.5 text-[13.5px] leading-relaxed shadow-[0_1px_2px_rgb(15_23_42/0.06)] ${
                       eigen
-                        ? 'rounded-br-md bg-[var(--simple-accent)] text-white'
-                        : 'rounded-bl-md bg-[var(--surface-gray)] text-[var(--foreground)]'
+                        ? 'rounded-br-md bg-[var(--simple-accent-soft)] text-[var(--foreground)]'
+                        : 'rounded-bl-md bg-[var(--simple-accent)] text-white'
                     }`}
                   >
                     <p className="whitespace-pre-wrap break-words">{m.content}</p>
                     {m.actions && m.actions.length > 0 && (
                       <div
                         className={`space-y-1 border-t pt-2 ${
-                          eigen ? 'border-white/25' : 'border-[var(--border-muted)]'
+                          eigen ? 'border-black/10' : 'border-white/25'
                         }`}
                       >
                         {m.actions.map((a, i) => (
@@ -197,7 +197,7 @@ export default function CoachChatPage() {
 
           {sendet && (
             <div className="flex justify-start">
-              <div className="flex items-center gap-2 rounded-2xl rounded-bl-md bg-[var(--surface-gray)] px-4 py-2.5 text-[13px] text-[var(--text-muted)]">
+              <div className="flex items-center gap-2 rounded-2xl rounded-bl-md bg-[var(--simple-accent)] px-4 py-2.5 text-[13px] text-white/90">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" /> denkt nach …
               </div>
             </div>
@@ -210,13 +210,13 @@ export default function CoachChatPage() {
           </p>
         )}
 
-        {/* Eingabezeile: fest am unteren Rand der Chatbox */}
+        {/* Eingabezeile: eigenstaendige dunkelgruene Box am unteren Rand */}
         <form
           onSubmit={(e) => {
             e.preventDefault();
             void senden(eingabe);
           }}
-          className="flex shrink-0 items-end gap-2 border-t border-[var(--border-muted)] bg-[var(--card-bg)] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+          className="mt-3 flex shrink-0 items-end gap-2 rounded-2xl bg-[var(--simple-accent)] p-2 shadow-[0_2px_8px_rgb(15_23_42/0.12)]"
         >
           <textarea
             value={eingabe}
@@ -229,18 +229,17 @@ export default function CoachChatPage() {
             }}
             rows={1}
             placeholder="Frag deinen Coach …"
-            className="max-h-32 min-h-[44px] flex-1 resize-none rounded-2xl bg-[var(--surface-gray)] px-4 py-3 text-[13.5px] outline-none focus:ring-1 focus:ring-[var(--simple-accent)]"
+            className="max-h-32 min-h-[44px] flex-1 resize-none bg-transparent px-3 py-3 text-[13.5px] text-white placeholder:text-white/60 outline-none"
           />
           <button
             type="submit"
             disabled={sendet || !eingabe.trim()}
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--simple-accent)] text-white transition disabled:opacity-40"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25 disabled:opacity-40"
             aria-label="Senden"
           >
             {sendet ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
           </button>
         </form>
-      </Card>
     </div>
   );
 }
