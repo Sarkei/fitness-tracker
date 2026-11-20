@@ -1,14 +1,11 @@
 /**
- * KI-Coach-Chat (`/coach`).
- *
- * Freitext-Chat ueber das komplette Fitnessprofil. Aenderungen (Ziele, Masse,
- * Praeferenzen) und das Anlegen neuer Plaene laufen ueber den actions-Block, den der
- * Server auswertet und der Nutzer hier als Quittung sieht.
+ * KI-Coach-Chat (`/coach`) im Messenger-Layout:
+ * oben eine Chatbox mit eigenem Scrollbereich, Eingabezeile fest am unteren Rand der Box,
+ * Coach-Nachrichten links, eigene rechts.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowUp, Dumbbell, Loader2, RotateCcw, Sparkles, Check, AlertCircle } from 'lucide-react';
+import { AlertCircle, ArrowUp, Check, Loader2, RotateCcw, Sparkles } from 'lucide-react';
 import { api } from '@/src/lib/api';
 import { Card, PageHeader } from '@/src/simple/ui';
 
@@ -18,7 +15,6 @@ type ChatMessage = {
   content: string;
   actions?: Array<{ type: string; ok: boolean; note?: string }>;
   created_at?: string;
-  pending?: boolean;
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -34,7 +30,6 @@ const VORSCHLAEGE = [
   'Wie war meine Woche? Wo hakt es?',
   'Stell meine Kalorien auf Abnehmen um, moderat.',
   'Ich habe nur 3 Tage pro Woche Zeit — pass die Tage an.',
-  'Mein Knie zwickt beim Beugen, was soll ich machen?',
   'Bau mir einen neuen Trainingsplan für Muskelaufbau.',
 ];
 
@@ -44,7 +39,7 @@ export default function CoachChatPage() {
   const [laedt, setLaedt] = useState(true);
   const [sendet, setSendet] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
-  const endeRef = useRef<HTMLDivElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const laden = useCallback(async () => {
     setLaedt(true);
@@ -63,9 +58,11 @@ export default function CoachChatPage() {
     void laden();
   }, [laden]);
 
+  // Nach unten scrollen, aber nur innerhalb der Chatbox — die Seite selbst bleibt stehen.
   useEffect(() => {
-    endeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages.length, sendet]);
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages.length, sendet, laedt]);
 
   const senden = useCallback(
     async (text: string) => {
@@ -74,8 +71,7 @@ export default function CoachChatPage() {
       setFehler(null);
       setEingabe('');
       setSendet(true);
-      const tempId = `temp-${Date.now()}`;
-      setMessages((prev) => [...prev, { id: tempId, role: 'user', content: inhalt }]);
+      setMessages((prev) => [...prev, { id: `temp-${Date.now()}`, role: 'user', content: inhalt }]);
       try {
         const res = await api<{ message: ChatMessage }>('/api/coach/chat', {
           method: 'POST',
@@ -104,7 +100,8 @@ export default function CoachChatPage() {
   const leer = useMemo(() => !laedt && messages.length === 0, [laedt, messages.length]);
 
   return (
-    <div className="flex flex-col gap-5 pb-10">
+    // Feste Hoehe (Bildschirm minus Kopfzeile): die Box fuellt den Rest, die Eingabe klebt unten.
+    <div className="mx-auto flex h-[calc(100dvh-var(--app-header-h)-env(safe-area-inset-top,0px)-5.5rem)] w-full max-w-[1360px] flex-col gap-3">
       <PageHeader
         eyebrow="Coach"
         title="Dein Coach"
@@ -122,16 +119,19 @@ export default function CoachChatPage() {
         }
       />
 
-      <Card className="flex min-h-[60vh] flex-col p-0">
-        <div className="flex-1 space-y-4 overflow-y-auto p-5">
+      <Card className="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
+        <div
+          ref={scrollRef}
+          className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5"
+        >
           {laedt && (
-            <p className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
+            <p className="flex items-center justify-center gap-2 py-6 text-sm text-[var(--text-muted)]">
               <Loader2 className="h-4 w-4 animate-spin" /> Chat wird geladen …
             </p>
           )}
 
           {leer && (
-            <div className="space-y-4">
+            <div className="mx-auto max-w-2xl space-y-4 py-2">
               <div className="flex items-start gap-3 rounded-2xl bg-[var(--simple-accent-soft)] p-4">
                 <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[var(--simple-accent)]" />
                 <p className="text-sm leading-relaxed text-[var(--simple-accent)]">
@@ -154,56 +154,68 @@ export default function CoachChatPage() {
             </div>
           )}
 
-          {messages.map((m) => (
-            <div key={m.id} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
-              <div
-                className={`max-w-[85%] space-y-2 rounded-2xl px-4 py-2.5 text-[13.5px] leading-relaxed ${
-                  m.role === 'user'
-                    ? 'bg-[var(--simple-accent)] text-white'
-                    : 'bg-[var(--surface-gray)] text-[var(--foreground)]'
-                }`}
-              >
-                <p className="whitespace-pre-wrap">{m.content}</p>
-                {m.actions && m.actions.length > 0 && (
-                  <div className="space-y-1 border-t border-black/10 pt-2">
-                    {m.actions.map((a, i) => (
-                      <p
-                        key={`${m.id}-${i}`}
-                        className="flex items-center gap-1.5 text-[11px] font-semibold opacity-90"
+          {messages.map((m) => {
+            const eigen = m.role === 'user';
+            return (
+              <div key={m.id} className={`flex ${eigen ? 'justify-end' : 'justify-start'}`}>
+                <div className={`flex max-w-[88%] flex-col gap-0.5 sm:max-w-[72%] ${eigen ? 'items-end' : 'items-start'}`}>
+                  <span className="px-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                    {eigen ? 'Du' : 'Coach'}
+                  </span>
+                  <div
+                    className={`space-y-2 rounded-2xl px-4 py-2.5 text-[13.5px] leading-relaxed ${
+                      eigen
+                        ? 'rounded-br-md bg-[var(--simple-accent)] text-white'
+                        : 'rounded-bl-md bg-[var(--surface-gray)] text-[var(--foreground)]'
+                    }`}
+                  >
+                    <p className="whitespace-pre-wrap break-words">{m.content}</p>
+                    {m.actions && m.actions.length > 0 && (
+                      <div
+                        className={`space-y-1 border-t pt-2 ${
+                          eigen ? 'border-white/25' : 'border-[var(--border-muted)]'
+                        }`}
                       >
-                        {a.ok ? <Check className="h-3 w-3" /> : <AlertCircle className="h-3 w-3" />}
-                        {ACTION_LABELS[a.type] ?? a.type}
-                        {a.note ? <span className="font-normal opacity-70">· {a.note}</span> : null}
-                      </p>
-                    ))}
+                        {m.actions.map((a, i) => (
+                          <p
+                            key={`${m.id}-${i}`}
+                            className="flex items-center gap-1.5 text-[11px] font-semibold opacity-90"
+                          >
+                            {a.ok ? <Check className="h-3 w-3" /> : <AlertCircle className="h-3 w-3" />}
+                            {ACTION_LABELS[a.type] ?? a.type}
+                            {a.note ? <span className="font-normal opacity-70">· {a.note}</span> : null}
+                          </p>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           {sendet && (
             <div className="flex justify-start">
-              <div className="flex items-center gap-2 rounded-2xl bg-[var(--surface-gray)] px-4 py-2.5 text-[13px] text-[var(--text-muted)]">
+              <div className="flex items-center gap-2 rounded-2xl rounded-bl-md bg-[var(--surface-gray)] px-4 py-2.5 text-[13px] text-[var(--text-muted)]">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" /> denkt nach …
               </div>
             </div>
           )}
-          <div ref={endeRef} />
         </div>
 
         {fehler && (
-          <p className="mx-5 mb-2 rounded-xl bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-600">
+          <p className="mx-4 mb-2 shrink-0 rounded-xl bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-600">
             {fehler}
           </p>
         )}
 
+        {/* Eingabezeile: fest am unteren Rand der Chatbox */}
         <form
           onSubmit={(e) => {
             e.preventDefault();
             void senden(eingabe);
           }}
-          className="flex items-end gap-2 border-t border-[var(--border-muted)] p-3"
+          className="flex shrink-0 items-end gap-2 border-t border-[var(--border-muted)] bg-[var(--card-bg)] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
         >
           <textarea
             value={eingabe}
@@ -221,20 +233,13 @@ export default function CoachChatPage() {
           <button
             type="submit"
             disabled={sendet || !eingabe.trim()}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[var(--simple-accent)] text-white transition disabled:opacity-40"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--simple-accent)] text-white transition disabled:opacity-40"
             aria-label="Senden"
           >
             {sendet ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
           </button>
         </form>
       </Card>
-
-      <Link
-        to="/training"
-        className="inline-flex items-center gap-2 self-start rounded-xl border border-[var(--border-muted)] px-3 py-2 text-[12px] font-semibold text-[var(--text-muted)] transition hover:border-[var(--simple-accent)] hover:text-[var(--simple-accent)]"
-      >
-        <Dumbbell className="h-3.5 w-3.5" /> Trainingsplan im Trainingsbereich verwalten
-      </Link>
     </div>
   );
 }
