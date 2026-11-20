@@ -8,12 +8,14 @@ import { Heart } from 'lucide-react';
 import { Card, Sparkline } from '@/src/simple/ui';
 import { WellnessToolbar, useWellness } from './WellnessProvider';
 import { KennzahlSheet, KlickKachel } from './KennzahlSheet';
+import { Tagesdetail, TagesZeile } from './Tagesdetail';
 import { letzter, mittel } from '@/src/lib/wellness';
 
 export default function WellnessKoerper() {
   const { daten } = useWellness();
   const tage = daten.tage;
   const [detail, setDetail] = useState<'hrv' | 'puls' | 'gewicht' | null>(null);
+  const [tagOffen, setTagOffen] = useState<string | null>(null);
 
   const hrv = tage.map((t) => t.hrv ?? 0);
   const puls = tage.map((t) => t.restingHr ?? 0);
@@ -94,6 +96,45 @@ export default function WellnessKoerper() {
           hinweis="Nur Tage mit Wiegedaten — die Kurve springt deshalb zwischen den Messungen."
         />
       )}
+
+      <Card className="p-5">
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+          Tag für Tag
+        </p>
+        <div className="max-h-80 overflow-y-auto">
+          <table className="w-full text-[12px]">
+            <thead className="sticky top-0 bg-[var(--card-bg)] text-[10px] uppercase tracking-[0.1em] text-[var(--text-muted)]">
+              <tr>
+                <th className="py-1.5 text-left font-semibold">Datum</th>
+                <th className="py-1.5 text-right font-semibold">HRV</th>
+                <th className="py-1.5 text-right font-semibold">Puls</th>
+                <th className="py-1.5 text-right font-semibold">Gewicht</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--border-muted)]">
+              {[...tage].reverse().map((t) => (
+                <TagesZeile key={t.date} onClick={() => setTagOffen(t.date)}>
+                  <td className="py-1.5 text-[var(--text-muted)]">{t.date}</td>
+                  <td className="py-1.5 text-right tabular-nums">{t.hrv != null ? Math.round(t.hrv) : '—'}</td>
+                  <td className="py-1.5 text-right tabular-nums">
+                    {t.restingHr != null ? Math.round(t.restingHr) : '—'}
+                  </td>
+                  <td className="py-1.5 text-right tabular-nums">
+                    {t.weight != null && t.weight > 0 ? t.weight.toFixed(1) : '—'}
+                  </td>
+                </TagesZeile>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {tagOffen && (() => {
+        const t = tage.find((x) => x.date === tagOffen);
+        return t ? (
+          <Tagesdetail tag={t} aktivitaeten={daten.aktivitaeten} fokus="koerper" onClose={() => setTagOffen(null)} />
+        ) : null;
+      })()}
 
       {detail === 'hrv' && (
         <KennzahlSheet

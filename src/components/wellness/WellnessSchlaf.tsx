@@ -7,12 +7,14 @@ import { Moon } from 'lucide-react';
 import { Card, Sparkline } from '@/src/simple/ui';
 import { WellnessToolbar, useWellness } from './WellnessProvider';
 import { KennzahlSheet, KlickKachel } from './KennzahlSheet';
+import { Tagesdetail, TagesZeile } from './Tagesdetail';
 import { mittel, schlafBewertung, schlafStunden } from '@/src/lib/wellness';
 
 export default function WellnessSchlaf() {
   const { daten } = useWellness();
   const tage = daten.tage;
   const [detail, setDetail] = useState<'dauer' | 'score' | null>(null);
+  const [tagOffen, setTagOffen] = useState<string | null>(null);
 
   const naechte = tage.map((t) => t.sleepSecs);
   const reihe = naechte.map((s) => schlafStunden(s) ?? 0);
@@ -93,6 +95,18 @@ export default function WellnessSchlaf() {
         </div>
       </Card>
 
+      {tagOffen && (() => {
+        const t = tage.find((x) => x.date === tagOffen);
+        return t ? (
+          <Tagesdetail
+            tag={t}
+            aktivitaeten={daten.aktivitaeten}
+            fokus="schlaf"
+            onClose={() => setTagOffen(null)}
+          />
+        ) : null;
+      })()}
+
       {detail === 'dauer' && (
         <KennzahlSheet
           def={{ key: 'dauer', titel: 'Schlafdauer', einheit: 'h', format: (v) => v.toFixed(1), hoeherBesser: true,
@@ -129,7 +143,7 @@ export default function WellnessSchlaf() {
                 const h = schlafStunden(t.sleepSecs);
                 if (h == null) return null;
                 return (
-                  <tr key={t.date}>
+                  <TagesZeile key={t.date} onClick={() => setTagOffen(t.date)}>
                     <td className="py-1.5 text-[var(--text-muted)]">{t.date}</td>
                     <td className="py-1.5 text-right tabular-nums">{h.toFixed(1)} h</td>
                     <td className="py-1.5 text-right tabular-nums">
@@ -138,7 +152,7 @@ export default function WellnessSchlaf() {
                     <td className="py-1.5 text-right text-[11px] text-[var(--text-muted)]">
                       {schlafBewertung(t.sleepScore)}
                     </td>
-                  </tr>
+                  </TagesZeile>
                 );
               })}
             </tbody>

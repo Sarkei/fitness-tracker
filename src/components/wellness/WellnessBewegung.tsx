@@ -7,12 +7,14 @@ import { Footprints, Mountain } from 'lucide-react';
 import { Card, Sparkline } from '@/src/simple/ui';
 import { WellnessToolbar, useWellness } from './WellnessProvider';
 import { KennzahlSheet, KlickKachel } from './KennzahlSheet';
+import { Tagesdetail, TagesZeile } from './Tagesdetail';
 import { mittel, summe } from '@/src/lib/wellness';
 
 export default function WellnessBewegung() {
   const { daten } = useWellness();
   const tage = daten.tage;
   const [detail, setDetail] = useState<'schritte' | 'etagen' | null>(null);
+  const [tagOffen, setTagOffen] = useState<string | null>(null);
 
   const schritte = tage.map((t) => t.steps ?? 0);
   const etagen = tage.map((t) => t.floors ?? 0);
@@ -92,6 +94,13 @@ export default function WellnessBewegung() {
         </Card>
       )}
 
+      {tagOffen && (() => {
+        const t = tage.find((x) => x.date === tagOffen);
+        return t ? (
+          <Tagesdetail tag={t} aktivitaeten={daten.aktivitaeten} fokus="bewegung" onClose={() => setTagOffen(null)} />
+        ) : null;
+      })()}
+
       {detail === 'schritte' && (
         <KennzahlSheet
           def={{ key: 'schritte', titel: 'Schritte', format: (v) => Math.round(v).toLocaleString('de-DE'), hoeherBesser: true,
@@ -123,7 +132,7 @@ export default function WellnessBewegung() {
             </thead>
             <tbody className="divide-y divide-[var(--border-muted)]">
               {[...tage].reverse().map((t) => (
-                <tr key={t.date}>
+                <TagesZeile key={t.date} onClick={() => setTagOffen(t.date)}>
                   <td className="py-1.5 text-[var(--text-muted)]">{t.date}</td>
                   <td className="py-1.5 text-right tabular-nums">
                     {t.steps != null ? Math.round(t.steps).toLocaleString('de-DE') : '—'}
@@ -131,7 +140,7 @@ export default function WellnessBewegung() {
                   <td className="py-1.5 text-right tabular-nums">
                     {t.floors != null ? Math.round(t.floors) : '—'}
                   </td>
-                </tr>
+                </TagesZeile>
               ))}
             </tbody>
           </table>

@@ -38,10 +38,13 @@ export function KennzahlSheet({
   def,
   punkte,
   onClose,
+  onTag,
 }: {
   def: KennzahlDef;
   punkte: KennzahlPunkt[];
   onClose: () => void;
+  /** Wenn gesetzt, ist jeder Tag anklickbar und oeffnet die Tagesansicht. */
+  onTag?: (datum: string) => void;
 }) {
   const { werte, mitWert } = useMemo(() => {
     const w = punkte.map((p) => p.wert).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
@@ -169,7 +172,11 @@ export function KennzahlSheet({
                   </thead>
                   <tbody className="divide-y divide-[var(--border-muted)]">
                     {[...punkte].reverse().map((p) => (
-                      <tr key={p.datum}>
+                      <tr
+                        key={p.datum}
+                        onClick={onTag ? () => onTag(p.datum) : undefined}
+                        className={onTag ? 'cursor-pointer transition hover:bg-[var(--surface-gray)]' : undefined}
+                      >
                         <td className="px-3 py-1.5 text-[var(--text-muted)]">{datumLang(p.datum)}</td>
                         <td className="px-3 py-1.5 text-right tabular-nums font-semibold">
                           {p.wert == null ? '—' : `${fmt(p.wert)}${def.einheit ? ` ${def.einheit}` : ''}`}

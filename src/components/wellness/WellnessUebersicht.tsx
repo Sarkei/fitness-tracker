@@ -9,6 +9,7 @@ import { Link } from 'react-router-dom';
 import { Card } from '@/src/simple/ui';
 import { useWellness, WellnessToolbar } from './WellnessProvider';
 import { KennzahlSheet, KlickKachel, type KennzahlDef, type KennzahlPunkt } from './KennzahlSheet';
+import { Tagesdetail } from './Tagesdetail';
 import { formLabel, letzter, mittel, schlafBewertung, schlafStunden } from '@/src/lib/wellness';
 
 type Kennzahl = { def: KennzahlDef; punkte: KennzahlPunkt[] };
@@ -17,6 +18,7 @@ export default function WellnessUebersicht() {
   const { daten } = useWellness();
   const tage = daten.tage;
   const [offen, setOffen] = useState<string | null>(null);
+  const [tagOffen, setTagOffen] = useState<string | null>(null);
 
   const schlafLetzte = schlafStunden(letzter(tage, 'sleepSecs'));
   const schlafScore = letzter(tage, 'sleepScore');
@@ -173,8 +175,16 @@ export default function WellnessUebersicht() {
           def={kennzahlen[offen].def}
           punkte={kennzahlen[offen].punkte}
           onClose={() => setOffen(null)}
+          onTag={(datum) => setTagOffen(datum)}
         />
       )}
+
+      {tagOffen && (() => {
+        const t = tage.find((x) => x.date === tagOffen);
+        return t ? (
+          <Tagesdetail tag={t} aktivitaeten={daten.aktivitaeten} onClose={() => setTagOffen(null)} />
+        ) : null;
+      })()}
 
       {daten.nichtVerfuegbar.length > 0 && (
         <div className="flex items-start gap-2 rounded-xl bg-[var(--surface-gray)] px-3 py-2.5">

@@ -7,6 +7,7 @@ import { Activity } from 'lucide-react';
 import { Card, Sparkline } from '@/src/simple/ui';
 import { WellnessToolbar, useWellness } from './WellnessProvider';
 import { KennzahlSheet, KlickKachel } from './KennzahlSheet';
+import { Tagesdetail, TagesZeile } from './Tagesdetail';
 import { formLabel, letzter } from '@/src/lib/wellness';
 
 /** Farbe je Formzustand - gleiche Skala wie in der Übersicht. */
@@ -21,6 +22,7 @@ export default function WellnessForm() {
   const { daten } = useWellness();
   const tage = daten.tage;
   const [detail, setDetail] = useState<'form' | 'fitness' | 'ermuedung' | null>(null);
+  const [tagOffen, setTagOffen] = useState<string | null>(null);
 
   const ctl = tage.map((t) => t.ctl ?? 0);
   const atl = tage.map((t) => t.atl ?? 0);
@@ -78,6 +80,13 @@ export default function WellnessForm() {
         </Card>
       </div>
 
+      {tagOffen && (() => {
+        const t = tage.find((x) => x.date === tagOffen);
+        return t ? (
+          <Tagesdetail tag={t} aktivitaeten={daten.aktivitaeten} fokus="form" onClose={() => setTagOffen(null)} />
+        ) : null;
+      })()}
+
       {detail === 'form' && (
         <KennzahlSheet
           def={{ key: 'form', titel: 'Trainingsform (TSB)', format: (v) => String(Math.round(v)), hoeherBesser: true,
@@ -119,12 +128,12 @@ export default function WellnessForm() {
             </thead>
             <tbody className="divide-y divide-[var(--border-muted)]">
               {[...tage].reverse().map((t) => (
-                <tr key={t.date}>
+                <TagesZeile key={t.date} onClick={() => setTagOffen(t.date)}>
                   <td className="py-1.5 text-[var(--text-muted)]">{t.date}</td>
                   <td className="py-1.5 text-right tabular-nums">{t.ctl != null ? Math.round(t.ctl) : '—'}</td>
                   <td className="py-1.5 text-right tabular-nums">{t.atl != null ? Math.round(t.atl) : '—'}</td>
                   <td className="py-1.5 text-right tabular-nums">{t.tsb != null ? Math.round(t.tsb) : '—'}</td>
-                </tr>
+                </TagesZeile>
               ))}
             </tbody>
           </table>
