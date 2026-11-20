@@ -26,6 +26,29 @@ const ACTION_LABELS: Record<string, string> = {
   set_coaching_active: 'Coaching-Status geändert',
 };
 
+/** Tagesschluessel in lokaler Zeit (YYYY-MM-DD) fuer die Datums-Trenner. */
+function tagKey(iso?: string): string {
+  const d = iso ? new Date(iso) : new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Ueberschrift fuer einen Tag: Heute, Gestern oder ausgeschriebenes Datum. */
+function tagLabel(iso?: string): string {
+  const d = iso ? new Date(iso) : new Date();
+  const heute = new Date();
+  const gestern = new Date();
+  gestern.setDate(heute.getDate() - 1);
+  if (tagKey(iso) === tagKey(heute.toISOString())) return 'Heute';
+  if (tagKey(iso) === tagKey(gestern.toISOString())) return 'Gestern';
+  return d.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+}
+
+/** Uhrzeit HH:MM in lokaler Zeit. */
+function zeitLabel(iso?: string): string {
+  if (!iso) return '';
+  return new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+}
+
 const VORSCHLAEGE = [
   'Wie war meine Woche? Wo hakt es?',
   'Stell meine Kalorien auf Abnehmen um, moderat.',
@@ -154,10 +177,23 @@ export default function CoachChatPage() {
             </div>
           )}
 
-          {messages.map((m) => {
+          {messages.map((m, index) => {
             const eigen = m.role === 'user';
+            const vorherige = index > 0 ? messages[index - 1] : null;
+            // Datums-Trenner, sobald ein neuer Kalendertag beginnt (wie bei WhatsApp)
+            const neuerTag = !vorherige || tagKey(vorherige.created_at) !== tagKey(m.created_at);
             return (
-              <div key={m.id} className={`flex w-full ${eigen ? 'justify-end' : 'justify-start'}`}>
+              <div key={m.id} className="w-full">
+                {neuerTag && (
+                  <div className="my-4 flex items-center gap-3" aria-label={tagLabel(m.created_at)}>
+                    <span className="h-px flex-1 bg-[var(--border-muted)]" />
+                    <span className="shrink-0 rounded-full bg-[var(--surface-gray)] px-3 py-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                      {tagLabel(m.created_at)}
+                    </span>
+                    <span className="h-px flex-1 bg-[var(--border-muted)]" />
+                  </div>
+                )}
+              <div className={`flex w-full ${eigen ? 'justify-end' : 'justify-start'}`}>
                 {/* 60 % der Boxbreite als Obergrenze — die Zeile selbst ist 100 % breit */}
                 <div className={`flex w-fit max-w-[60%] flex-col gap-0.5 ${eigen ? 'items-end' : 'items-start'}`}>
                   <span className="px-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
@@ -189,8 +225,12 @@ export default function CoachChatPage() {
                         ))}
                       </div>
                     )}
+                    <p className={`text-right text-[10px] tabular-nums ${eigen ? 'text-black/45' : 'text-white/60'}`}>
+                      {zeitLabel(m.created_at)}
+                    </p>
                   </div>
                 </div>
+              </div>
               </div>
             );
           })}
