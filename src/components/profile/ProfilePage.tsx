@@ -6,7 +6,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/src/lib/AuthContext';
-import { User, LogOut, Loader2, Plus, Target, Moon, Sun, X, FileText, Camera, Image, ArrowUpRight, ArrowDownRight, Trash2, Download, Ruler, Shield } from 'lucide-react';
+import { User, LogOut, Loader2, Plus, Target, Moon, Sun, X, FileText, Camera, Image, ArrowUpRight, ArrowDownRight, Trash2, Download, Ruler, Shield, Activity } from 'lucide-react';
 import { useWorkouts } from '@/src/lib/useWorkouts';
 import { useNutrition } from '@/src/lib/useNutrition';
 import { generatePeriodFitnessReport, allowedReportRangeKeys, type ReportRangeKey } from '@/src/lib/periodReport';
@@ -17,6 +17,7 @@ import type { Post } from '@/src/lib/useSocial';
 import { cn } from '@/src/lib/utils';
 import ReportHistoryView from './ReportHistoryView';
 import IntervalsConnect from './IntervalsConnect';
+import GarminView from './GarminView';
 import { PageHeader } from '@/src/simple/ui';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
@@ -84,7 +85,7 @@ export default function ProfilePage() {
   const dfLocale = locale === 'de' ? dfDe : dfEnUS;
   const { workouts } = useWorkouts();
   const { nutritionEntries } = useNutrition();
-  const [tab, setTab] = useState<'uebersicht' | 'koerper' | 'ziele' | 'daten' | 'account'>('uebersicht');
+  const [tab, setTab] = useState<'uebersicht' | 'koerper' | 'garmin' | 'ziele' | 'daten' | 'account'>('uebersicht');
   const [isEditingGoals, setIsEditingGoals] = useState(false);
   const [isAddingWeight, setIsAddingWeight] = useState(false);
   const [newWeight, setNewWeight] = useState('');
@@ -393,6 +394,7 @@ export default function ProfilePage() {
   const tabs = [
     { id: 'uebersicht', label: t('profile.tab.overview'), icon: User },
     { id: 'koerper', label: t('profile.tab.body'), icon: Ruler },
+    { id: 'garmin', label: t('profile.tab.garmin'), icon: Activity },
     { id: 'ziele', label: t('profile.tab.goals'), icon: Target },
     { id: 'daten', label: t('profile.tab.data'), icon: Download },
     { id: 'account', label: t('profile.tab.account'), icon: Shield },
@@ -772,6 +774,12 @@ export default function ProfilePage() {
 
         </div>
       )}
+      {tab === 'garmin' && (
+        <div className="space-y-6">
+          <GarminView />
+        </div>
+      )}
+
       {tab === 'ziele' && (
         <div className="space-y-6">
       {/* ── Operational Goals ── */}

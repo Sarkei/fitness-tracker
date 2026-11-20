@@ -604,6 +604,7 @@ export const MESSAGES: Record<string, { de: string; en: string }> = {
   'profile.theme.dark': { de: 'Dunkel', en: 'Dark' },
   'profile.tab.overview': { de: 'Übersicht', en: 'Overview' },
   'profile.tab.body': { de: 'Körper', en: 'Body' },
+  'profile.tab.garmin': { de: 'Garmin', en: 'Garmin' },
   'profile.tab.goals': { de: 'Ziele', en: 'Goals' },
   'profile.tab.data': { de: 'Daten & Sync', en: 'Data & sync' },
   'profile.tab.account': { de: 'Konto', en: 'Account' },

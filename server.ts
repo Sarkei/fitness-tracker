@@ -5332,6 +5332,57 @@ ${JSON.stringify(userCtx, null, 2)}
     }
   });
 
+  /** Wellness-/Garmin-Daten fuer die eigene Ansicht (Schlaf, Schritte, HRV, Form). */
+  app.get("/api/integrations/intervals/wellness", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const tage = Math.min(180, Math.max(7, Number(req.query.days) || 60));
+      let s = await readIntervalsSettings(req.userId!);
+      if (!s.apiKey) {
+        res.status(400).json({ error: "Intervals.icu ist nicht verbunden." });
+        return;
+      }
+
+      // Veraltete Daten nachziehen, damit die Ansicht aktuell ist.
+      if (syncFaellig(s)) {
+        try {
+          const cache = await syncIntervals(s.apiKey, s.athleteId ?? "0", tage);
+          s = { ...s, cache, lastAutoSyncAt: new Date().toISOString(), lastError: undefined };
+          await writeIntervalsSettings(req.userId!, s);
+        } catch (e) {
+          s = { ...s, lastAutoSyncAt: new Date().toISOString(), lastError: e instanceof Error ? e.message : "Sync fehlgeschlagen." };
+          await writeIntervalsSettings(req.userId!, s).catch(() => {});
+        }
+      }
+
+      const cache = s.cache;
+      const alle = (cache?.wellness ?? []).slice(-tage);
+      const hat = (feld: keyof typeof alle[number]) => alle.some((w) => typeof w[feld] === "number");
+
+      // Stress/Body Battery/SpO2 liefert Intervals aus Garmin nicht - offen benennen.
+      const nichtVerfuegbar: string[] = [];
+      if (!alle.some((w) => (w as Record<string, unknown>).stress != null)) nichtVerfuegbar.push("Stress");
+      nichtVerfuegbar.push("Body Battery", "SpO2", "Atemfrequenz");
+
+      res.json({
+        fetchedAt: cache?.fetchedAt ?? null,
+        tage: alle,
+        aktivitaeten: (cache?.activities ?? []).slice(0, 50),
+        verfuegbar: {
+          schlaf: hat("sleepSecs"),
+          schritte: hat("steps"),
+          etagen: hat("floors"),
+          hrv: hat("hrv"),
+          ruhepuls: hat("restingHr"),
+          fitness: hat("ctl"),
+        },
+        nichtVerfuegbar,
+        lastError: s.lastError ?? null,
+      });
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "Wellness-Daten konnten nicht geladen werden." });
+    }
+  });
+
   /** Sync-Intervall einstellen (0 = nur manuell). */
   app.patch("/api/integrations/intervals/settings", requireAuth, async (req: AuthRequest, res) => {
     try {

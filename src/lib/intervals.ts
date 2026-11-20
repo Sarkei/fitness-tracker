@@ -81,6 +81,11 @@ export type IntervalsWellnessDay = {
   hrv?: number;
   weight?: number;
   sleepSecs?: number;
+  sleepScore?: number;
+  sleepQuality?: number;
+  steps?: number;
+  floors?: number;
+  vo2max?: number;
   rampRate?: number;
 };
 
@@ -190,6 +195,11 @@ export async function syncIntervals(
       hrv: numOrUndef(w.hrv),
       weight: numOrUndef(w.weight),
       sleepSecs: numOrUndef(w.sleepSecs),
+      sleepScore: numOrUndef(w.sleepScore),
+      sleepQuality: numOrUndef(w.sleepQuality),
+      steps: numOrUndef(w.steps),
+      floors: numOrUndef(w.floorsClimbed),
+      vo2max: numOrUndef(w.vo2max),
       rampRate: numOrUndef(w.rampRate),
     }))
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -248,6 +258,10 @@ export function buildIntervalsContext(settings: IntervalsSettings | undefined): 
       `- ${w.date}: CTL ${w.ctl ?? '-'}, ATL ${w.atl ?? '-'}, TSB ${w.tsb ?? '-'}` +
       (w.restingHr ? `, Ruhepuls ${Math.round(w.restingHr)}` : '') +
       (w.hrv ? `, HRV ${Math.round(w.hrv)}` : '') +
+      (w.sleepSecs ? `, Schlaf ${(w.sleepSecs / 3600).toFixed(1)} h` : '') +
+      (w.sleepScore ? `, Schlafscore ${Math.round(w.sleepScore)}` : '') +
+      (w.steps ? `, ${Math.round(w.steps)} Schritte` : '') +
+      (w.vo2max ? `, VO2max ${w.vo2max}` : '') +
       (w.weight ? `, Gewicht ${w.weight}` : ''),
   );
 
