@@ -5338,11 +5338,9 @@ ${JSON.stringify(userCtx, null, 2)}
         lastSync: cache.fetchedAt,
         neuesteAktivitaet: nachher,
         neuSeitLetztemSync: neu,
-        // Ehrlicher Hinweis: der Abgleich mit der Uhr passiert bei Intervals selbst.
-        hinweis: neu
-          ? null
-          : "Intervals.icu hat keine neueren Aktivitäten. Den Abgleich mit der Uhr stößt Intervals selbst an — " +
-            "prüfe in Garmin Connect, ob die Uhr synchronisiert hat (Intervals hat keinen API-Befehl dafür).",
+        // Der Abgleich mit der Uhr laeuft bei Intervals automatisch. Keine neuen
+        // Aktivitaeten heisst in der Regel: es wurde nicht trainiert, kein Fehler.
+        hinweis: neu ? null : "Seit dem letzten Training ist keine neue Aktivität dazugekommen.",
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Sync fehlgeschlagen.";

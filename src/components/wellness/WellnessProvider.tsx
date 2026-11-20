@@ -86,10 +86,10 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
         hinweis: string | null;
       }>('/api/integrations/intervals/sync', { method: 'POST', body: JSON.stringify({ days: zeitraum }) });
       if (res.neuSeitLetztemSync) {
-        setMeldung(`Neue Daten bis ${res.neuesteAktivitaet}.`);
+        setMeldung(`Neue Aktivität bis ${res.neuesteAktivitaet}.`);
       } else {
         setMeldung(
-          `Keine neueren Daten als ${res.neuesteAktivitaet ?? 'bisher'} — deine Uhr hat seitdem nichts Neues übertragen.`,
+          `Aktuell — letzte Aktivität ${res.neuesteAktivitaet ?? '—'}, seither kein neues Training.`,
         );
       }
       await laden();
@@ -176,9 +176,9 @@ export function WellnessToolbar() {
           onClick={() => void syncJetzt()}
           disabled={laedt || synct}
           className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-muted)] px-2.5 py-1.5 font-semibold transition hover:border-[var(--simple-accent)] hover:text-[var(--simple-accent)] disabled:opacity-50"
-          title="Daten bei Intervals.icu neu abholen"
+          title="Daten jetzt neu abholen (kommen sonst automatisch)"
         >
-          {synct ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Abgleich
+          {synct ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Aktualisieren
         </button>
       </div>
     </div>
