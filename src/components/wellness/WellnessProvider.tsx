@@ -34,7 +34,6 @@ type Kontext = {
   setZeitraum: (n: number) => void;
   neuLaden: () => void;
   laedt: boolean;
-  meldung: string | null;
   syncJetzt: () => void;
   synct: boolean;
 };
@@ -53,7 +52,6 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
   const [zeitraum, setZeitraum] = useState(30);
   const [laedt, setLaedt] = useState(true);
   const [synct, setSynct] = useState(false);
-  const [meldung, setMeldung] = useState<string | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
 
   const laden = useCallback(async () => {
@@ -73,45 +71,20 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     void laden();
   }, [laden]);
 
-  /** Holt die Daten frisch bei Intervals.icu und meldet ehrlich, ob Neues kam. */
+  /**
+   * Holt die Daten frisch bei Intervals.icu. Aktualisiert nur still - die Werte in
+   * der App aendern sich dadurch, eine Meldung braucht es dafuer nicht.
+   */
   const syncJetzt = useCallback(async () => {
     setSynct(true);
-    setMeldung(null);
     setFehler(null);
     try {
-      const res = await api<{
-        activityCount: number;
-        neuSeitLetztemSync: boolean;
-        neuesteAktivitaet: string | null;
-        hinweis: string | null;
-        wellnessAktualisiert: string | null;
-        todayWellness: {
-          date: string;
-          schritte: number | null;
-          ruhepuls: number | null;
-          hrv: number | null;
-          schlafStunden: number | null;
-        } | null;
-      }>('/api/integrations/intervals/sync', { method: 'POST', body: JSON.stringify({ days: zeitraum }) });
+      await api<{ ok: boolean }>('/api/integrations/intervals/sync', {
+        method: 'POST',
+        body: JSON.stringify({ days: zeitraum }),
+      });
 
-      // Zusammenfassen, was sich wirklich geaendert hat.
-      const teile: string[] = [];
-      const w = res.todayWellness;
-      if (w) {
-        if (w.schritte != null) teile.push(`${w.schritte.toLocaleString('de-DE')} Schritte`);
-        if (w.ruhepuls != null) teile.push(`Ruhepuls ${w.ruhepuls}`);
-        if (w.hrv != null) teile.push(`HRV ${w.hrv}`);
-        if (w.schlafStunden != null) teile.push(`Schlaf ${w.schlafStunden} h`);
-      }
-      if (res.wellnessAktualisiert) {
-        setMeldung(`Aktualisiert: ${teile.length > 0 ? teile.join(' · ') : 'neue Tageswerte'}.`);
-      } else if (res.neuSeitLetztemSync) {
-        setMeldung(`Neue Aktivität bis ${res.neuesteAktivitaet}.`);
-      } else {
-        setMeldung(
-          `Aktuell — ${teile.length > 0 ? teile.join(' · ') : 'keine neuen Werte'} (letzte Aktivität ${res.neuesteAktivitaet ?? '—'}).`,
-        );
-      }
+      // Still nachladen: die Ansicht zeigt danach die frischen Werte.
       await laden();
     } catch (e) {
       setFehler(e instanceof Error ? e.message : 'Abgleich fehlgeschlagen.');
@@ -123,9 +96,9 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
   const wert = useMemo<Kontext | null>(
     () =>
       daten
-        ? { daten, zeitraum, setZeitraum, neuLaden: () => void laden(), laedt, meldung, syncJetzt: () => void syncJetzt(), synct }
+        ? { daten, zeitraum, setZeitraum, neuLaden: () => void laden(), laedt, syncJetzt: () => void syncJetzt(), synct }
         : null,
-    [daten, zeitraum, laden, laedt, meldung, syncJetzt, synct],
+    [daten, zeitraum, laden, laedt, syncJetzt, synct],
   );
 
   if (fehler || (!laedt && !daten)) {
@@ -159,7 +132,7 @@ export function useWellness(): Kontext {
 
 /** Zeitraum-Umschalter + Aktualisieren, auf jeder Unterseite oben. */
 export function WellnessToolbar() {
-  const { zeitraum, setZeitraum, laedt, daten, meldung, syncJetzt, synct } = useWellness();
+  const { zeitraum, setZeitraum, laedt, daten, syncJetzt, synct } = useWellness();
   return (
     <div className="space-y-2">
     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -202,9 +175,6 @@ export function WellnessToolbar() {
         </button>
       </div>
     </div>
-    {meldung && (
-      <p className="rounded-xl bg-[var(--surface-gray)] px-3 py-2 text-[11.5px] text-[var(--text-muted)]">{meldung}</p>
-    )}
     </div>
   );
 }
