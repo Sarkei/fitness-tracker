@@ -6,6 +6,7 @@
  * gezeigt, was dort hingehört (Schlaf-Seite → Schlafdetails usw.).
  */
 
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { formLabel, schlafBewertung, schlafStunden, type WellnessAktivitaet, type WellnessTag } from '@/src/lib/wellness';
@@ -56,7 +57,7 @@ export function Tagesdetail({
   aktivitaeten: WellnessAktivitaet[];
   fokus?: TagesdetailFokus;
   onClose: () => void;
-}) {
+}): React.ReactElement {
   const schlaf = schlafStunden(tag.sleepSecs);
   const form = formLabel(tag.tsb);
   const tagAktivitaeten = aktivitaeten.filter((a) => String(a.start_date_local ?? '').slice(0, 10) === tag.date);
@@ -66,7 +67,7 @@ export function Tagesdetail({
   const zeigeKoerper = fokus === 'alle' || fokus === 'koerper';
   const zeigeForm = fokus === 'alle' || fokus === 'form';
 
-  return (
+  const inhalt = (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-6"
       role="dialog"
@@ -74,7 +75,7 @@ export function Tagesdetail({
       onClick={onClose}
     >
       <div
-        className="max-h-[92dvh] w-full max-w-lg overflow-hidden rounded-t-[1.75rem] bg-[var(--card-bg)] shadow-2xl sm:rounded-[1.75rem]"
+        className="max-h-[var(--vv-height,92dvh)] w-full max-w-lg overflow-hidden rounded-t-[1.75rem] bg-[var(--card-bg)] shadow-2xl sm:rounded-[1.75rem]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 border-b border-[var(--border-muted)] p-4">
@@ -158,6 +159,10 @@ export function Tagesdetail({
       </div>
     </div>
   );
+
+  // Portal statt Inline: der Sheet haengt an <body> und kann die Seite nicht mehr
+  // verschieben, wenn nach dem Eintragen neue Werte dazukommen.
+  return typeof document === "undefined" ? inhalt : createPortal(inhalt, document.body);
 }
 
 /** Zeile in einer Tagestabelle: klickbar, mit Hover. */

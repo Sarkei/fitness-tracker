@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Camera, Check, Loader2, X } from 'lucide-react';
 import { PrimaryButton } from './ui';
 import { analyzeFood, fileToDataUrl, saveAnalyzedMeal, type V3Result } from './simpleApi';
@@ -69,10 +70,10 @@ export default function PhotoMealSheet({
     return sum + c.kcal * factor;
   }, 0);
 
-  return (
+  const inhalt = (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-6" onClick={onClose}>
       <div
-        className="flex max-h-[92dvh] w-full max-w-lg flex-col rounded-t-3xl border border-[var(--border-muted)] bg-[var(--card-bg)] sm:rounded-3xl"
+        className="flex max-h-[var(--vv-height,92dvh)] w-full max-w-lg flex-col rounded-t-3xl border border-[var(--border-muted)] bg-[var(--card-bg)] sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-[var(--border-muted)] px-4 py-3">
@@ -189,4 +190,8 @@ export default function PhotoMealSheet({
       </div>
     </div>
   );
+
+  // Portal statt Inline: der Sheet haengt an <body> und kann die Seite nicht mehr
+  // verschieben, wenn nach dem Eintragen neue Werte dazukommen.
+  return typeof document === "undefined" ? inhalt : createPortal(inhalt, document.body);
 }

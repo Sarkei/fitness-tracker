@@ -321,7 +321,7 @@ function EditModal({
   return overlayPortal(
     <div className={mobileSheetOverlayClass()}>
       <div
-        className="max-h-[min(92dvh,calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)))] w-full max-w-md overflow-y-auto overscroll-contain rounded-t-2xl border border-line bg-surface text-ink shadow-2xl lg:max-h-[90vh] lg:rounded-2xl [-webkit-overflow-scrolling:touch]"
+        className="max-h-[var(--vv-height,92dvh)] w-full max-w-md overflow-y-auto overscroll-contain rounded-t-2xl border border-line bg-surface text-ink shadow-2xl lg:max-h-[var(--vv-height,90vh)] lg:rounded-2xl [-webkit-overflow-scrolling:touch]"
         style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
       >
         {/* Header */}

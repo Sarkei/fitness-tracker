@@ -552,7 +552,7 @@ export default function RationComposerModal({
         <motion.div
           initial={{ y: 30, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          className="relative z-10 flex max-h-[min(92dvh,calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)))] w-full max-w-lg flex-col overflow-hidden rounded-t-[2rem] border border-[var(--border-muted)] bg-[var(--card-bg)] shadow-2xl lg:max-h-[92dvh] lg:rounded-[2rem]"
+          className="relative z-10 flex max-h-[var(--vv-height,92dvh)] w-full max-w-lg flex-col overflow-hidden rounded-t-[2rem] border border-[var(--border-muted)] bg-[var(--card-bg)] shadow-2xl lg:max-h-[var(--vv-height,92dvh)] lg:rounded-[2rem]"
         >
           <div className="flex shrink-0 items-center justify-between border-b border-[var(--border-muted)] p-5 pt-[max(1rem,env(safe-area-inset-top))] md:pt-5">
             <h3 className="text-lg font-black italic uppercase tracking-tighter text-[var(--text-primary)]">

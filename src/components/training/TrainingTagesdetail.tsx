@@ -6,6 +6,7 @@
  * Heute genutzt.
  */
 
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import type { FoodEntry, WorkoutEntry } from '@/src/simple/simpleApi';
 
@@ -43,7 +44,7 @@ export function TrainingTagesdetail({
   tag: TrainingTag;
   fokus?: 'alle' | 'training' | 'ernaehrung';
   onClose: () => void;
-}) {
+}): React.ReactElement {
   const zeigeTraining = fokus === 'alle' || fokus === 'training';
   const zeigeErnaehrung = fokus === 'alle' || fokus === 'ernaehrung';
 
@@ -68,7 +69,7 @@ export function TrainingTagesdetail({
     );
   }, 0);
 
-  return (
+  const inhalt = (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-6"
       role="dialog"
@@ -76,7 +77,7 @@ export function TrainingTagesdetail({
       onClick={onClose}
     >
       <div
-        className="max-h-[92dvh] w-full max-w-lg overflow-hidden rounded-t-[1.75rem] bg-[var(--card-bg)] shadow-2xl sm:rounded-[1.75rem]"
+        className="max-h-[var(--vv-height,92dvh)] w-full max-w-lg overflow-hidden rounded-t-[1.75rem] bg-[var(--card-bg)] shadow-2xl sm:rounded-[1.75rem]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 border-b border-[var(--border-muted)] p-4">
@@ -188,6 +189,10 @@ export function TrainingTagesdetail({
       </div>
     </div>
   );
+
+  // Portal statt Inline: der Sheet haengt an <body> und verschiebt die Seite nicht,
+  // wenn nach dem Eintragen neue Werte dazukommen.
+  return typeof document === 'undefined' ? inhalt : createPortal(inhalt, document.body);
 }
 
 /** Klickbare Zeile in einer Tages-Tabelle. */

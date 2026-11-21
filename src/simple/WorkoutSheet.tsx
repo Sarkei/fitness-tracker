@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, ChevronDown, ChevronUp, Minus, Plus, Timer, X } from 'lucide-react';
 import { PrimaryButton } from './ui';
 import { saveWorkout, type PlanDay, type PlanExercise } from './simpleApi';
@@ -119,7 +120,7 @@ export default function WorkoutSheet({
   const clock = (seconds: number) =>
     `${Math.floor(seconds / 60)}:${String(Math.max(0, seconds % 60)).padStart(2, '0')}`;
 
-  return (
+  const inhalt = (
     <div className="fixed inset-0 z-50 flex flex-col bg-[var(--background)]">
       <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 py-3">
         <button className="rounded-full border border-[var(--border-muted)] p-2 text-[var(--text-muted)]" onClick={onClose} aria-label="Schließen">
@@ -336,4 +337,8 @@ export default function WorkoutSheet({
       )}
     </div>
   );
+
+  // Portal statt Inline: der Sheet haengt an <body> und kann die Seitenhoehe
+  // nach dem Speichern nicht mehr verschieben.
+  return typeof document === 'undefined' ? inhalt : createPortal(inhalt, document.body);
 }

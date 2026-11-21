@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Camera, Loader2, ScanBarcode, X } from 'lucide-react';
 import { api } from '../lib/api';
 
@@ -145,7 +146,7 @@ export function BarcodeSheet({
     }
   }
 
-  return (
+  const inhalt = (
     <div className="fixed inset-0 z-50 flex flex-col bg-black/80 p-4 text-white">
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col">
         <div className="mb-3 flex items-center justify-between">
@@ -240,4 +241,8 @@ export function BarcodeSheet({
       </div>
     </div>
   );
+
+  // Portal statt Inline: der Sheet haengt an <body> und kann die Seite nicht mehr
+  // verschieben, wenn nach dem Eintragen neue Werte dazukommen.
+  return typeof document === "undefined" ? inhalt : createPortal(inhalt, document.body);
 }

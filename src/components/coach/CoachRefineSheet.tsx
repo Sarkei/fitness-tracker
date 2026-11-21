@@ -61,7 +61,7 @@ export default function CoachRefineSheet({ open, planType, busy, onClose, onSubm
     <div className={mobileSheetOverlayClass('bg-black/50')}>
       <div
         data-testid="coach-refine-sheet"
-        className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-t-[2rem] bg-[var(--card-bg)] shadow-2xl sm:rounded-[2rem]"
+        className="flex max-h-[var(--vv-height,90vh)] w-full max-w-lg flex-col overflow-hidden rounded-t-[2rem] bg-[var(--card-bg)] shadow-2xl sm:rounded-[2rem]"
       >
         <div className="flex items-center justify-between border-b border-[var(--border-muted)] px-6 py-4">
           <div className="flex items-center gap-2">

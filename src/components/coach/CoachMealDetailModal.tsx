@@ -106,7 +106,7 @@ export default function CoachMealDetailModal({
         initial={{ y: 28, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 20, opacity: 0 }}
-        className="relative z-10 flex max-h-[min(92dvh,calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)))] w-full max-w-lg flex-col overflow-hidden rounded-t-[2rem] border border-[var(--border-muted)] bg-[var(--card-bg)] shadow-2xl lg:max-h-[90dvh] lg:rounded-[2rem]"
+        className="relative z-10 flex max-h-[var(--vv-height,92dvh)] w-full max-w-lg flex-col overflow-hidden rounded-t-[2rem] border border-[var(--border-muted)] bg-[var(--card-bg)] shadow-2xl lg:max-h-[var(--vv-height,90dvh)] lg:rounded-[2rem]"
         style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
         onClick={e => e.stopPropagation()}
       >

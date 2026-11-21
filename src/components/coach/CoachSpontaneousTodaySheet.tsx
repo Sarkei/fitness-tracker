@@ -51,7 +51,7 @@ export default function CoachSpontaneousTodaySheet({
   return overlayPortal(
     <div className={mobileSheetOverlayClass('bg-black/50')}>
       <div
-        className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-[2rem] bg-[var(--card-bg)] shadow-2xl sm:rounded-[2rem]"
+        className="flex max-h-[var(--vv-height,92vh)] w-full max-w-lg flex-col overflow-hidden rounded-t-[2rem] bg-[var(--card-bg)] shadow-2xl sm:rounded-[2rem]"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-[var(--border-muted)] px-6 py-4">

@@ -699,7 +699,7 @@ export default function Dashboard() {
             <motion.div
               initial={{ y: 40, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              className="relative z-10 w-full max-w-3xl max-h-[92dvh] flex flex-col overflow-hidden rounded-t-[1.75rem] sm:rounded-t-2xl bg-[var(--background)] border border-[var(--border-muted)] shadow-2xl"
+              className="relative z-10 w-full max-w-3xl max-h-[var(--vv-height,92dvh)] flex flex-col overflow-hidden rounded-t-[1.75rem] sm:rounded-t-2xl bg-[var(--background)] border border-[var(--border-muted)] shadow-2xl"
             >
               <div className="flex shrink-0 justify-between items-center gap-3 px-4 sm:px-6 pt-4 sm:pt-6 pb-3 border-b border-[var(--border-muted)] bg-[var(--background)]">
                 <div className="min-w-0">
@@ -776,7 +776,7 @@ export default function Dashboard() {
             className={mobileSheetOverlayClass()}>
             <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={closeCoachReport} />
             <motion.div initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
-              className="relative w-full max-w-lg max-h-[min(92dvh,calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)))] bg-[var(--card-bg)] rounded-t-[2rem] lg:rounded-[2rem] shadow-2xl z-10 flex flex-col overflow-hidden border border-[var(--border-muted)]">
+              className="relative w-full max-w-lg max-h-[var(--vv-height,92dvh)] bg-[var(--card-bg)] rounded-t-[2rem] lg:rounded-[2rem] shadow-2xl z-10 flex flex-col overflow-hidden border border-[var(--border-muted)]">
               <div className="p-5 pb-4 md:p-7 md:pb-4 border-b border-[var(--border-muted)] flex-shrink-0 pt-[max(1.25rem,env(safe-area-inset-top))]">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">

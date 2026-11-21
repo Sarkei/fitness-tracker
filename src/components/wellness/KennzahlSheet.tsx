@@ -7,6 +7,7 @@
  */
 
 import { useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { X, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { Sparkline } from '@/src/simple/ui';
 
@@ -45,7 +46,7 @@ export function KennzahlSheet({
   onClose: () => void;
   /** Wenn gesetzt, ist jeder Tag anklickbar und oeffnet die Tagesansicht. */
   onTag?: (datum: string) => void;
-}) {
+}): React.ReactElement {
   const { werte, mitWert } = useMemo(() => {
     const w = punkte.map((p) => p.wert).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
     return { werte: w, mitWert: punkte.filter((p) => typeof p.wert === 'number') };
@@ -88,7 +89,7 @@ export function KennzahlSheet({
 
   const reihe = punkte.map((p) => p.wert ?? 0);
 
-  return (
+  const inhalt = (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-6"
       role="dialog"
@@ -96,7 +97,7 @@ export function KennzahlSheet({
       onClick={onClose}
     >
       <div
-        className="max-h-[92dvh] w-full max-w-2xl overflow-hidden rounded-t-[1.75rem] bg-[var(--card-bg)] shadow-2xl sm:rounded-[1.75rem]"
+        className="max-h-[var(--vv-height,92dvh)] w-full max-w-2xl overflow-hidden rounded-t-[1.75rem] bg-[var(--card-bg)] shadow-2xl sm:rounded-[1.75rem]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 border-b border-[var(--border-muted)] p-4">
@@ -192,6 +193,10 @@ export function KennzahlSheet({
       </div>
     </div>
   );
+
+  // Portal statt Inline: der Sheet haengt an <body> und kann die Seite nicht mehr
+  // verschieben, wenn nach dem Eintragen neue Werte dazukommen.
+  return typeof document === "undefined" ? inhalt : createPortal(inhalt, document.body);
 }
 
 /** Klickbare Kachel: gleiche Optik wie StatTile, aber als Button. */
