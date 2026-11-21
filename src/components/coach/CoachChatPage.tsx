@@ -5,10 +5,11 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, ArrowUp, Check, Loader2, RotateCcw, Sparkles } from 'lucide-react';
+import { AlarmClock, AlertCircle, ArrowUp, Check, Loader2, RotateCcw, Sparkles } from 'lucide-react';
 import { api } from '@/src/lib/api';
 import { formatChatText } from '@/src/lib/chatFormat';
 import { PageHeader } from '@/src/simple/ui';
+import CoachZeitplaene from './CoachZeitplaene';
 
 type ChatMessage = {
   id: number | string;
@@ -68,6 +69,7 @@ export default function CoachChatPage() {
   // (< 28 px) und den Fall "Tastatur gerade offen" aus - im Chat muss sie aber
   // immer exakt stimmen, sonst verschwindet die Eingabezeile.
   const [sichtbareHoehe, setSichtbareHoehe] = useState<number | null>(null);
+  const [zeitplaeneOffen, setZeitplaeneOffen] = useState(false);
 
   useEffect(() => {
     const vv = window.visualViewport;
@@ -155,17 +157,32 @@ export default function CoachChatPage() {
         title="Dein Coach"
         hint="Frag zu Training, Ernährung oder deinem Plan — er kennt dein ganzes Profil."
         action={
-          messages.length > 0 ? (
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => void verlaufLoeschen()}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-muted)] px-3 py-2 text-[11px] font-semibold text-[var(--text-muted)] transition hover:text-[var(--foreground)]"
+              onClick={() => setZeitplaeneOffen((v) => !v)}
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-semibold transition ${
+                zeitplaeneOffen
+                  ? 'border-[var(--simple-accent)] text-[var(--simple-accent)]'
+                  : 'border-[var(--border-muted)] text-[var(--text-muted)] hover:text-[var(--foreground)]'
+              }`}
             >
-              <RotateCcw className="h-3.5 w-3.5" /> Verlauf löschen
+              <AlarmClock className="h-3.5 w-3.5" /> Zeitpläne
             </button>
-          ) : null
+            {messages.length > 0 && (
+              <button
+                type="button"
+                onClick={() => void verlaufLoeschen()}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-muted)] px-3 py-2 text-[11px] font-semibold text-[var(--text-muted)] transition hover:text-[var(--foreground)]"
+              >
+                <RotateCcw className="h-3.5 w-3.5" /> Verlauf löschen
+              </button>
+            )}
+          </div>
         }
       />
+
+      <CoachZeitplaene offen={zeitplaeneOffen} onSchliessen={() => setZeitplaeneOffen(false)} />
 
       {/* Nachrichten liegen direkt auf dem Seitenhintergrund - keine aeussere Box */}
       <div
