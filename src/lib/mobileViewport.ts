@@ -34,9 +34,10 @@ function hasMobileOverlayOpen(): boolean {
 function pinStandaloneBottomChrome(): void {
   if (!isStandalonePwa() || typeof window === 'undefined') return;
   if (hasMobileOverlayOpen() || isEditableFocused()) return;
-  if (window.scrollY > 0 || (window.visualViewport?.offsetTop ?? 0) > 0) {
-    resetScrollAncestors();
-  }
+  // Fruehere Fassung setzte die Seite auf 0 zurueck, sobald scrollY > 0 war. Das
+  // feuerte nach jedem Touch-Ende und riss den Nutzer beim Scrollen wieder nach oben.
+  // Die Tab-Bar haengt ohnehin an `position: fixed`; ein Scroll-Reset ist dafuer
+  // nicht noetig. Nur die Insets werden nachgezogen.
   forceMobileViewportInsetsReset();
 }
 
