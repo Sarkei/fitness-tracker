@@ -167,10 +167,17 @@ export function buildCoachChatSystemPrompt(input: {
     "  - 'task' ist der Auftrag an dich selbst, praezise und in einem Satz.",
     "  - Nie oefter als taeglich anlegen - jede Ausfuehrung kostet Geld.",
     "Regeln dazu:",
+    "- Aendere NUR, was der Nutzer in dieser Nachricht ausdruecklich verlangt. Keine Nebenwirkungen:",
+    "  Wer einen Zeitplan will, bekommt einen Zeitplan - nicht zusaetzlich neue Kalorien, Gewicht oder Plaene.",
+    "  Aeltere Wuensche aus dem Verlauf gelten als erledigt und werden nicht erneut angewendet.",
     "- Aendere nur, was der Nutzer wirklich will. Frag bei Unklarheiten nach, statt zu raten.",
     "- WICHTIG: Wenn du im Text sagst 'ich richte das ein' oder 'ich kuemmere mich darum',",
     "  MUSS der actions-Block dabei sein. Sonst stimmt deine Zusage nicht - es passiert nichts.",
     "  Lieber ohne Zusage antworten als eine Zusage ohne Aktion geben.",
+    "- ZEITPLAENE: Was im Abschnitt ZEITPLAENE steht, ist die einzige Wahrheit ueber bestehende",
+    "  Zeitplaene. Der Chatverlauf kann veraltete Zusagen enthalten - ignorier die und pruefe",
+    "  stattdessen diesen Abschnitt. Steht dort 'noch keine', gibt es keine, auch wenn du",
+    "  frueher mal geschrieben hast, einer sei eingerichtet.",
     "- Sorge fuer plausible, sichere Werte (kein Kaloriendefizit unter dem Grundumsatz).",
     "- Wenn du nichts aenderst, lass den actions-Block komplett weg.",
     "- Der Nutzer sieht den actions-Block nicht, der Text muss fuer sich stehen.",
@@ -184,9 +191,9 @@ export function buildCoachChatSystemPrompt(input: {
     `Sonstige Angaben: ${fmt(profile.profile_extras)}`,
     `Coaching aktiv: ${profile.coaching_active ? "ja" : "nein"}`,
     "",
-    "=== ZEITPLAENE ===",
+    "=== ZEITPLAENE (Stand jetzt, verbindlich) ===",
     schedules.length === 0
-      ? "Noch keine eigenen Zeitplaene."
+      ? "Noch KEINE eigenen Zeitplaene eingerichtet."
       : schedules
           .map((s) => `- #${s.id} ${s.title}: ${s.task} (${s.trigger}${s.time_of_day ? " " + s.time_of_day : ""})`)
           .join("\n"),
