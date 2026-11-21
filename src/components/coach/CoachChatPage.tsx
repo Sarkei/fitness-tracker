@@ -64,6 +64,23 @@ export default function CoachChatPage() {
   const [sendet, setSendet] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  // Sichtbare Hoehe selbst verfolgen: die globale Logik bremst kleine Aenderungen
+  // (< 28 px) und den Fall "Tastatur gerade offen" aus - im Chat muss sie aber
+  // immer exakt stimmen, sonst verschwindet die Eingabezeile.
+  const [sichtbareHoehe, setSichtbareHoehe] = useState<number | null>(null);
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const aktualisieren = () => setSichtbareHoehe(Math.round(vv.height));
+    aktualisieren();
+    vv.addEventListener('resize', aktualisieren);
+    vv.addEventListener('scroll', aktualisieren);
+    return () => {
+      vv.removeEventListener('resize', aktualisieren);
+      vv.removeEventListener('scroll', aktualisieren);
+    };
+  }, []);
 
   const laden = useCallback(async () => {
     setLaedt(true);
@@ -124,8 +141,15 @@ export default function CoachChatPage() {
   const leer = useMemo(() => !laedt && messages.length === 0, [laedt, messages.length]);
 
   return (
-    // Feste Hoehe (Bildschirm minus Kopfzeile): die Box fuellt den Rest, die Eingabe klebt unten.
-    <div className="flex h-[calc(100dvh-var(--app-header-h)-env(safe-area-inset-top,0px)-5.5rem)] w-full flex-col gap-3">
+    // Hoehe folgt dem sichtbaren Bereich (visualViewport). Auf dem Handy schrumpft
+    // --vv-height, sobald die Tastatur aufgeht - dadurch bleibt die Eingabezeile sichtbar.
+    // Ohne JavaScript-Wert greift dvh als Rueckfall.
+    <div
+      className="flex w-full flex-col gap-3"
+      style={{
+        height: `calc(${sichtbareHoehe ? `${sichtbareHoehe}px` : 'var(--vv-height, 100dvh)'} - var(--app-header-h) - env(safe-area-inset-top, 0px) - 5.5rem)`,
+      }}
+    >
       <PageHeader
         eyebrow="Coach"
         title="Dein Coach"
@@ -196,7 +220,7 @@ export default function CoachChatPage() {
                 )}
               <div className={`flex w-full ${eigen ? 'justify-end' : 'justify-start'}`}>
                 {/* 60 % der Boxbreite als Obergrenze — die Zeile selbst ist 100 % breit */}
-                <div className={`flex w-fit max-w-[60%] flex-col gap-0.5 ${eigen ? 'items-end' : 'items-start'}`}>
+                <div className={`flex w-fit max-w-[90%] flex-col gap-0.5 sm:max-w-[60%] ${eigen ? 'items-end' : 'items-start'}`}>
                   <span className="px-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
                     {eigen ? 'Du' : 'Coach'}
                   </span>
@@ -262,6 +286,16 @@ export default function CoachChatPage() {
           <textarea
             value={eingabe}
             onChange={(e) => setEingabe(e.target.value)}
+            onFocus={() => {
+              // Tastatur oeffnet erst kurz danach - dann ans Ende scrollen,
+              // damit die letzte Nachricht ueber der Eingabe sichtbar bleibt.
+              [120, 320, 600].forEach((ms) =>
+                window.setTimeout(() => {
+                  const el = scrollRef.current;
+                  if (el) el.scrollTop = el.scrollHeight;
+                }, ms),
+              );
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -269,6 +303,8 @@ export default function CoachChatPage() {
               }
             }}
             rows={1}
+            enterKeyHint="send"
+            autoComplete="off"
             placeholder="Frag deinen Coach …"
             className="max-h-32 min-h-[44px] flex-1 resize-none bg-transparent px-3 py-3 text-[13.5px] text-white placeholder:text-white/60 outline-none"
           />
