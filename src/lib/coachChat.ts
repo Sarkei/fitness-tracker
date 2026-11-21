@@ -20,7 +20,37 @@ export type CoachChatAction =
   | { type: "update_coach_preferences"; preferences: Record<string, unknown> }
   | { type: "update_extras"; extras: Record<string, unknown> }
   | { type: "create_plan"; planType: "workout" | "nutrition"; discipline?: string }
-  | { type: "set_coaching_active"; active: boolean };
+  | { type: "set_coaching_active"; active: boolean }
+  | {
+      type: "create_schedule";
+      /** Was ausgeloest werden soll. */
+      trigger: "nach_training" | "taeglich" | "waechentlich" | "monatlich";
+      /** Wochentag 1-7 (Mo-So) bei waechentlich. */
+      weekday?: number;
+      /** Tag im Monat 1-28 bei monatlich. */
+      dayOfMonth?: number;
+      /** Uhrzeit HH:MM fuer taeglich/waechentlich/monatlich. */
+      time?: string;
+      /** Aufgabe in einem Satz - das ist der Auftrag an den Coach. */
+      task: string;
+      /** Titel fuer die Anzeige. */
+      title?: string;
+    };
+
+/** Erlaubte Ausloeser, damit das Modell nichts anderes erfinden kann. */
+const ERLAUBTE_TRIGGER = ["nach_training", "taeglich", "waechentlich", "monatlich"] as const;
+
+/**
+ * Untergrenzen gegen versehentlich teure Zeitplaene.
+ * Jede Ausfuehrung kostet einen KI-Aufruf - ein "jede Stunde"-Auftrag waere teuer
+ * und liefert kaum Mehrwert, deshalb wird er abgelehnt statt still angelegt.
+ */
+const MIN_ABSTAND_STUNDEN: Record<string, number> = {
+  nach_training: 0,
+  taeglich: 20,
+  waechentlich: 0,
+  monatlich: 0,
+};
 
 export type AppliedAction = { type: string; ok: boolean; note?: string };
 
@@ -91,8 +121,11 @@ export function buildCoachChatSystemPrompt(input: {
   workouts: Array<Record<string, unknown>>;
   nutrition: Array<Record<string, unknown>>;
   latestPlan: Record<string, unknown> | null;
+  /** Bereits eingerichtete eigene Zeitplaene, damit keine Dubletten entstehen. */
+  schedules?: Array<Record<string, unknown>>;
 }): string {
   const { profile, plans, workouts, nutrition, latestPlan } = input;
+  const schedules = input.schedules ?? [];
   const weightHistory = Array.isArray(profile.weight_history) ? profile.weight_history.slice(-10) : [];
   const lastWeight = weightHistory.length > 0 ? weightHistory[weightHistory.length - 1] : null;
 
@@ -124,8 +157,20 @@ export function buildCoachChatSystemPrompt(input: {
     '- {"type":"update_coach_preferences","preferences":{...}}',
     '- {"type":"create_plan","planType":"workout"|"nutrition"} - legt einen neuen Plan an',
     '- {"type":"set_coaching_active","active":true|false}',
+    '- {"type":"create_schedule","trigger":"nach_training"|"taeglich"|"waechentlich"|"monatlich",' +
+      '"time":"HH:MM","weekday":1-7,"dayOfMonth":1-28,"title":"...","task":"..."} - legt einen eigenen Zeitplan an',
+    "  Zeitplaene: der Nutzer sagt z.B. 'mach nach jedem Training eine Analyse'. Dann:",
+    '  {"type":"create_schedule","trigger":"nach_training","title":"Analyse nach dem Training",',
+    '   "task":"Analysiere die letzte Einheit: Belastung, Form, Auffaelligkeiten, Empfehlung fuer morgen."}',
+    "  - trigger 'nach_training' laeuft automatisch, sobald ein neues Training importiert wurde (Empfehlung dafuer).",
+    "  - 'taeglich'/'waechentlich'/'monatlich' brauchen eine Uhrzeit; waechentlich zusaetzlich weekday (1=Montag), monatlich dayOfMonth.",
+    "  - 'task' ist der Auftrag an dich selbst, praezise und in einem Satz.",
+    "  - Nie oefter als taeglich anlegen - jede Ausfuehrung kostet Geld.",
     "Regeln dazu:",
     "- Aendere nur, was der Nutzer wirklich will. Frag bei Unklarheiten nach, statt zu raten.",
+    "- WICHTIG: Wenn du im Text sagst 'ich richte das ein' oder 'ich kuemmere mich darum',",
+    "  MUSS der actions-Block dabei sein. Sonst stimmt deine Zusage nicht - es passiert nichts.",
+    "  Lieber ohne Zusage antworten als eine Zusage ohne Aktion geben.",
     "- Sorge fuer plausible, sichere Werte (kein Kaloriendefizit unter dem Grundumsatz).",
     "- Wenn du nichts aenderst, lass den actions-Block komplett weg.",
     "- Der Nutzer sieht den actions-Block nicht, der Text muss fuer sich stehen.",
@@ -138,6 +183,13 @@ export function buildCoachChatSystemPrompt(input: {
     `Trainingspraeferenzen: ${fmt(profile.coach_preferences)}`,
     `Sonstige Angaben: ${fmt(profile.profile_extras)}`,
     `Coaching aktiv: ${profile.coaching_active ? "ja" : "nein"}`,
+    "",
+    "=== ZEITPLAENE ===",
+    schedules.length === 0
+      ? "Noch keine eigenen Zeitplaene."
+      : schedules
+          .map((s) => `- #${s.id} ${s.title}: ${s.task} (${s.trigger}${s.time_of_day ? " " + s.time_of_day : ""})`)
+          .join("\n"),
     "",
     "=== PLAENE ===",
     plans.length === 0
@@ -232,6 +284,33 @@ function validateActions(candidate: string): CoachChatAction[] {
           out.push({ type, active: Boolean((item as Record<string, unknown>).active) });
           break;
         }
+        case "create_schedule": {
+          const raw = item as Record<string, unknown>;
+          const trigger = String(raw.trigger ?? "");
+          const task = String(raw.task ?? "").trim();
+          if (!(ERLAUBTE_TRIGGER as readonly string[]).includes(trigger)) break;
+          if (task.length < 10) break;
+
+          const zeit = typeof raw.time === "string" && /^\d{2}:\d{2}$/.test(raw.time) ? raw.time : undefined;
+          const weekday = Number(raw.weekday);
+          const dayOfMonth = Number(raw.dayOfMonth);
+
+          // Pflichtfelder je Ausloeser pruefen - sonst lieber verwerfen.
+          if (trigger === "waechentlich" && !(weekday >= 1 && weekday <= 7)) break;
+          if (trigger === "monatlich" && !(dayOfMonth >= 1 && dayOfMonth <= 28)) break;
+          if (trigger !== "nach_training" && !zeit) break;
+
+          out.push({
+            type,
+            trigger: trigger as CoachChatAction extends { type: "create_schedule"; trigger: infer T } ? T : never,
+            weekday: trigger === "waechentlich" ? weekday : undefined,
+            dayOfMonth: trigger === "monatlich" ? dayOfMonth : undefined,
+            time: zeit,
+            title: String(raw.title ?? "").slice(0, 80) || "Eigener Zeitplan",
+            task: task.slice(0, 600),
+          });
+          break;
+        }
         default:
           break;
       }
@@ -239,6 +318,29 @@ function validateActions(candidate: string): CoachChatAction[] {
     return out;
   } catch {
     return [];
+  }
+}
+
+/** Kurze, lesbare Beschreibung eines Zeitplans fuer die Rueckmeldung im Chat. */
+export function beschreibeZeitplan(s: {
+  trigger: string;
+  weekday?: number;
+  dayOfMonth?: number;
+  time?: string;
+}): string {
+  switch (s.trigger) {
+    case "nach_training":
+      return "jedes Mal, wenn ein neues Training importiert wird";
+    case "taeglich":
+      return `taeglich um ${s.time}`;
+    case "waechentlich": {
+      const tage = ["", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
+      return `jeden ${tage[s.weekday ?? 1] ?? "Montag"} um ${s.time}`;
+    }
+    case "monatlich":
+      return `am ${s.dayOfMonth}. jeden Monats um ${s.time}`;
+    default:
+      return s.trigger;
   }
 }
 
@@ -290,6 +392,48 @@ export async function applyCoachChatActions(
             [userId, JSON.stringify(action.preferences)],
           );
           applied.push({ type: action.type, ok: true });
+          break;
+        }
+        case "create_schedule": {
+          const mindest = MIN_ABSTAND_STUNDEN[action.trigger] ?? 0;
+          if (mindest > 0) {
+            const zuViel = await pool.query(
+              `SELECT 1 FROM coach_schedules
+                WHERE user_id=$1 AND trigger=$2 AND active=true
+                  AND created_at > NOW() - ($3 || ' hours')::interval
+                LIMIT 1`,
+              [userId, action.trigger, String(mindest)],
+            );
+            if (zuViel.rowCount) {
+              applied.push({
+                type: action.type,
+                ok: false,
+                note: "So einen Zeitplan gibt es schon - bitte den bestehenden aendern statt einen zweiten anzulegen.",
+              });
+              break;
+            }
+          }
+
+          const neu = await pool.query<{ id: number }>(
+            `INSERT INTO coach_schedules
+               (user_id, trigger, weekday, day_of_month, time_of_day, title, task)
+             VALUES ($1,$2,$3,$4,$5,$6,$7)
+             RETURNING id`,
+            [
+              userId,
+              action.trigger,
+              action.weekday ?? null,
+              action.dayOfMonth ?? null,
+              action.time ?? null,
+              action.title ?? "Eigener Zeitplan",
+              action.task,
+            ],
+          );
+          applied.push({
+            type: action.type,
+            ok: true,
+            note: `${action.title ?? "Zeitplan"} (#${neu.rows[0]?.id}) - ${beschreibeZeitplan(action)}`,
+          });
           break;
         }
         case "set_coaching_active": {

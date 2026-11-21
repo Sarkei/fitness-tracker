@@ -521,6 +521,29 @@ async function initDb(): Promise<void> {
     CREATE INDEX IF NOT EXISTS coach_chat_messages_user_idx
       ON coach_chat_messages (user_id, created_at DESC)
   `);
+  // Eigene Zeitplaene des Coaches ("nach jedem Training eine Analyse").
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS coach_schedules (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      trigger VARCHAR(20) NOT NULL,           -- nach_training | taeglich | waechentlich | monatlich
+      weekday SMALLINT,                        -- 1-7 (Mo-So), nur waechentlich
+      day_of_month SMALLINT,                   -- 1-28, nur monatlich
+      time_of_day VARCHAR(5),                  -- HH:MM, nur bei Zeit-Ausloesern
+      title VARCHAR(120) NOT NULL,
+      task TEXT NOT NULL,
+      active BOOLEAN NOT NULL DEFAULT TRUE,
+      last_run_at TIMESTAMPTZ,
+      last_seen_activity TEXT,                 -- bei nach_training: zuletzt gesehene Aktivitaet
+      last_result TEXT,
+      run_count INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS coach_schedules_user_idx
+      ON coach_schedules (user_id, active)
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS coach_ai_runs (
@@ -5495,6 +5518,184 @@ ${JSON.stringify(userCtx, null, 2)}
   // Einmal kurz nach dem Start, damit nach einem Neustart nichts alt bleibt.
   setTimeout(() => void hintergrundTick(), 20_000).unref?.();
 
+  /**
+   * Fuehrt die eigenen Zeitplaene des Coaches aus.
+   *
+   * Ein Zeitplan ist ein Auftrag in einem Satz ("Analysiere die letzte Einheit"),
+   * den der Coach selbst angelegt hat. Der Nutzer sieht das Ergebnis im Chat.
+   *
+   * Ausloeser:
+   *  - nach_training: sobald eine neue Aktivitaet importiert wurde. Erkannt an der
+   *    neuesten Aktivitaets-ID - so feuert es genau einmal pro Training, nicht bei
+   *    jedem Sync erneut.
+   *  - taeglich/waechentlich/monatlich: Uhrzeit; laeuft nur, wenn seit dem letzten
+   *    Lauf mindestens ein Tag vergangen ist (Schutz gegen Doppel-Ausfuehrung).
+   */
+  let zeitplanLaeuft = false;
+  const coachZeitplanTick = async () => {
+    if (zeitplanLaeuft) return;
+    zeitplanLaeuft = true;
+    try {
+      const faellige = await pool.query(
+        `SELECT s.*, u.profile_extras->'intervals' AS iv
+           FROM coach_schedules s
+           JOIN users u ON u.id = s.user_id
+          WHERE s.active = TRUE`,
+      );
+
+      for (const row of faellige.rows) {
+        const plan = row as Record<string, unknown> & {
+          id: number;
+          user_id: number;
+          trigger: string;
+          time_of_day: string | null;
+          last_run_at: string | null;
+          last_seen_activity: string | null;
+          task: string;
+          title: string;
+          iv?: IntervalsSettings | null;
+        };
+
+        let ausloesen = false;
+        let marke: string | null = null;
+
+        if (plan.trigger === 'nach_training') {
+          const neueste = plan.iv?.cache?.activities?.[0];
+          const neuesteId = neueste ? String(neueste.id) : null;
+          if (neuesteId && neuesteId !== plan.last_seen_activity) {
+            ausloesen = true;
+            marke = neuesteId;
+          }
+        } else {
+          ausloesen = zeitpunktFaellig(plan);
+        }
+
+        if (!ausloesen) continue;
+
+        try {
+          const profil = await pool.query('SELECT * FROM users WHERE id=$1', [plan.user_id]);
+          const user = profil.rows[0];
+          if (!user) continue;
+
+          const pl = await pool.query(
+            'SELECT * FROM coach_plans WHERE user_id=$1 ORDER BY created_at DESC LIMIT 1',
+            [plan.user_id],
+          );
+          const letzte = await pool.query(
+            'SELECT * FROM coach_chat_messages WHERE user_id=$1 ORDER BY created_at DESC LIMIT 10',
+            [plan.user_id],
+          );
+
+          const systemPrompt =
+            buildCoachChatSystemPrompt({
+              profile: user,
+              plans: pl.rows,
+              workouts: [],
+              nutrition: [],
+              latestPlan: pl.rows[0],
+            }) +
+            (plan.iv ? `\n\n${buildIntervalsContext(plan.iv)}` : '') +
+            `\n\n=== EIGENER AUFTRAG ===\nDieser Auftrag wurde von dir selbst frueher eingerichtet.\n` +
+            `Fuehre ihn jetzt aus und antworte in normalem Text. Kein actions-Block noetig.`;
+
+          const raw = await completeCoachChat([
+            { role: 'system', content: systemPrompt },
+            {
+              role: 'user',
+              content: `Zeitplan "${plan.title}": ${plan.task}`,
+            },
+          ]);
+
+          const { text: antwort } = parseCoachChatReply(raw);
+
+          await pool.query(
+            `INSERT INTO coach_chat_messages (user_id, role, content, actions)
+             VALUES ($1,'assistant',$2,'[{"type":"zeitplan","ok":true}]'::jsonb)`,
+            [plan.user_id, `**${plan.title}**\n\n${antwort}`],
+          );
+
+          await pool.query(
+            `UPDATE coach_schedules
+                SET last_run_at = NOW(),
+                    last_seen_activity = COALESCE($2, last_seen_activity),
+                    last_result = $3,
+                    run_count = run_count + 1
+              WHERE id = $1`,
+            [plan.id, marke, antwort.slice(0, 2000)],
+          );
+        } catch (e) {
+          await pool.query('UPDATE coach_schedules SET last_run_at = NOW() WHERE id=$1', [plan.id]).catch(
+            () => {},
+          );
+          console.warn(`[coach] Zeitplan ${plan.id}:`, e);
+        }
+      }
+    } catch (e) {
+      console.warn('[coach] Zeitplaene:', e);
+    } finally {
+      zeitplanLaeuft = false;
+    }
+  };
+
+  // Jede Minute pruefen - die Ausfuehrung selbst ist durch last_run_at gesperrt.
+  const zeiplanTimer = setInterval(() => void coachZeitplanTick(), 60_000);
+  zeiplanTimer.unref?.();
+
+  /** Prueft, ob ein Zeit-Ausloeser jetzt faellig ist. */
+  function zeitpunktFaellig(plan: {
+    trigger: string;
+    time_of_day: string | null;
+    last_run_at: string | null;
+  }): boolean {
+    const jetzt = new Date();
+    const [hh, mm] = String(plan.time_of_day ?? '08:00')
+      .split(':')
+      .map((n) => Number(n) || 0);
+
+    // Erst ab der eingestellten Uhrzeit (lokale Zeit des Servers).
+    if (jetzt.getHours() < hh || (jetzt.getHours() === hh && jetzt.getMinutes() < mm)) return false;
+
+    if (!plan.last_run_at) return true;
+    const letzter = new Date(plan.last_run_at);
+    const stunden = (jetzt.getTime() - letzter.getTime()) / 3_600_000;
+
+    if (plan.trigger === 'taeglich') return stunden >= 20;
+    if (plan.trigger === 'waechentlich') return stunden >= 24 * 6;
+    return stunden >= 24 * 27;
+  }
+
+  /** Zeitplaene des Nutzers auflisten. */
+  app.get('/api/coach/schedules', requireAuth, async (req: AuthRequest, res) => {
+    const rows = await pool.query(
+      'SELECT * FROM coach_schedules WHERE user_id=$1 ORDER BY created_at DESC',
+      [req.userId],
+    );
+    res.json(rows.rows);
+  });
+
+  /** Zeitplan pausieren/fortsetzen oder loeschen. */
+  app.patch('/api/coach/schedules/:id', requireAuth, async (req: AuthRequest, res) => {
+    const aktiv = req.body?.active;
+    if (typeof aktiv !== 'boolean') {
+      res.status(400).json({ error: 'Feld "active" (true/false) fehlt.' });
+      return;
+    }
+    await pool.query('UPDATE coach_schedules SET active=$2 WHERE id=$1 AND user_id=$3', [
+      Number(req.params.id),
+      aktiv,
+      req.userId,
+    ]);
+    res.json({ ok: true });
+  });
+
+  app.delete('/api/coach/schedules/:id', requireAuth, async (req: AuthRequest, res) => {
+    await pool.query('DELETE FROM coach_schedules WHERE id=$1 AND user_id=$2', [
+      Number(req.params.id),
+      req.userId,
+    ]);
+    res.json({ ok: true });
+  });
+
   /** Trennen: Key und Cache loeschen. */
   app.delete("/api/integrations/intervals", requireAuth, async (req: AuthRequest, res) => {
     await pool.query(
@@ -5617,6 +5818,10 @@ ${JSON.stringify(userCtx, null, 2)}
         }
       }
       const intervalsContext = buildIntervalsContext(intervalsSettings);
+      const schedulesRes = await pool.query(
+        "SELECT id, title, task, trigger, time_of_day FROM coach_schedules WHERE user_id=$1 AND active=true ORDER BY created_at DESC",
+        [req.userId],
+      );
       const systemPrompt =
         buildCoachChatSystemPrompt({
           profile,
@@ -5624,6 +5829,7 @@ ${JSON.stringify(userCtx, null, 2)}
           workouts: workoutsRes.rows,
           nutrition: nutritionRes.rows,
           latestPlan,
+          schedules: schedulesRes.rows,
         }) + (intervalsContext ? `\n\n${intervalsContext}` : "");
 
       const history = historyRes.rows.reverse().map((row) => ({
