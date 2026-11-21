@@ -5324,8 +5324,23 @@ ${JSON.stringify(userCtx, null, 2)}
         ? String(s.cache.activities[0].start_date_local).slice(0, 10)
         : null;
 
+      const altHeute = s.cache?.wellness?.[s.cache.wellness.length - 1];
+
       const cache = await syncIntervals(s.apiKey, s.athleteId ?? "0", days);
       await writeIntervalsSettings(req.userId!, { ...s, cache, lastError: undefined, lastAutoSyncAt: new Date().toISOString() });
+
+      // Wellness-Fortschritt des laufenden Tages mitmelden (Schritte, Puls, Schlaf).
+      const neuHeute = cache.wellness?.[cache.wellness.length - 1];
+      const wellnessNeu = (() => {
+        if (!neuHeute) return null;
+        if (!altHeute || altHeute.date !== neuHeute.date) return neuHeute.date;
+        const gleich =
+          altHeute.steps === neuHeute.steps &&
+          altHeute.restingHr === neuHeute.restingHr &&
+          altHeute.hrv === neuHeute.hrv &&
+          altHeute.sleepSecs === neuHeute.sleepSecs;
+        return gleich ? null : neuHeute.date;
+      })();
 
       const nachher = cache.activities?.[0]?.start_date_local
         ? String(cache.activities[0].start_date_local).slice(0, 10)
@@ -5338,6 +5353,16 @@ ${JSON.stringify(userCtx, null, 2)}
         lastSync: cache.fetchedAt,
         neuesteAktivitaet: nachher,
         neuSeitLetztemSync: neu,
+        wellnessAktualisiert: wellnessNeu,
+        todayWellness: neuHeute
+          ? {
+              date: neuHeute.date,
+              schritte: neuHeute.steps ?? null,
+              ruhepuls: neuHeute.restingHr ?? null,
+              hrv: neuHeute.hrv ?? null,
+              schlafStunden: neuHeute.sleepSecs ? Math.round((neuHeute.sleepSecs / 3600) * 10) / 10 : null,
+            }
+          : null,
         // Der Abgleich mit der Uhr laeuft bei Intervals automatisch. Keine neuen
         // Aktivitaeten heisst in der Regel: es wurde nicht trainiert, kein Fehler.
         hinweis: neu ? null : "Seit dem letzten Training ist keine neue Aktivität dazugekommen.",
@@ -5416,6 +5441,59 @@ ${JSON.stringify(userCtx, null, 2)}
       res.status(500).json({ error: err instanceof Error ? err.message : "Speichern fehlgeschlagen." });
     }
   });
+
+  /**
+   * Hintergrund-Abgleich: haelt die Wellness-Daten aktuell, auch wenn die App
+   * geschlossen ist. Laeuft im Server-Takt, nicht pro Nutzer-Anfrage.
+   *
+   * Warum hier und nicht per Cron: Der Server laeuft ohnehin, kennt bereits alle
+   * Nutzer-Schluessel und muss nichts von aussen angestossen werden. Intervall
+   * kommt aus den Nutzer-Einstellungen (5 Minuten bis 24 Stunden).
+   */
+  let hintergrundLaeuft = false;
+  const hintergrundTick = async () => {
+    if (hintergrundLaeuft) return;
+    hintergrundLaeuft = true;
+    try {
+      const rows = await pool.query(
+        `SELECT id, profile_extras->'intervals' AS iv
+           FROM users
+          WHERE profile_extras ? 'intervals'
+            AND profile_extras->'intervals'->>'apiKey' IS NOT NULL`,
+      );
+      for (const row of rows.rows) {
+        const s = (row.iv || {}) as IntervalsSettings;
+        if (!s.apiKey) continue;
+        if (!syncFaellig(s)) continue;
+        try {
+          const cache = await syncIntervals(s.apiKey, s.athleteId ?? "0", 30);
+          await writeIntervalsSettings(row.id, {
+            ...s,
+            cache,
+            lastAutoSyncAt: new Date().toISOString(),
+            lastError: undefined,
+          });
+        } catch (e) {
+          await writeIntervalsSettings(row.id, {
+            ...s,
+            lastAutoSyncAt: new Date().toISOString(),
+            lastError: e instanceof Error ? e.message : "Hintergrund-Abgleich fehlgeschlagen.",
+          }).catch(() => {});
+        }
+      }
+    } catch (e) {
+      console.warn("[intervals] Hintergrund-Abgleich:", e);
+    } finally {
+      hintergrundLaeuft = false;
+    }
+  };
+
+  // Takt: jede Minute pruefen, ob ein Nutzer faellig ist. Die teuren API-Aufrufe
+  // passieren nur, wenn das eingestellte Intervall wirklich abgelaufen ist.
+  const hintergrundTimer = setInterval(() => void hintergrundTick(), 60_000);
+  hintergrundTimer.unref?.();
+  // Einmal kurz nach dem Start, damit nach einem Neustart nichts alt bleibt.
+  setTimeout(() => void hintergrundTick(), 20_000).unref?.();
 
   /** Trennen: Key und Cache loeschen. */
   app.delete("/api/integrations/intervals", requireAuth, async (req: AuthRequest, res) => {

@@ -35,7 +35,7 @@ export type IntervalsSettings = {
   lastAutoSyncAt?: string;
 };
 
-export const SYNC_INTERVAL_OPTIONS = [0, 1, 3, 6, 12, 24] as const;
+export const SYNC_INTERVAL_OPTIONS = [0, 0.083, 0.25, 0.5, 1, 3, 6, 12, 24] as const;
 
 /** Nur erlaubte Intervalle zulassen, sonst Standard 6 Stunden. */
 export function normalisiereIntervall(v: unknown): number {
@@ -114,6 +114,8 @@ export type IntervalsActivity = {
   icu_cooldown_time?: number;
   icu_efficiency_factor?: number;
   hr_load_type?: string;
+  /** Gesetzt, wenn die Aktivitaet einer geplanten Einheit zugeordnet ist. */
+  paired_event_id?: number | null;
   description?: string;
 };
 
@@ -288,6 +290,9 @@ export async function syncIntervals(
 }
 
 function numOrUndef(v: unknown): number | undefined {
+  // Wichtig: Number(null) und Number('') sind 0 - daraus wuerde faelschlich ein
+  // Messwert "Schlaf 0 h" statt "noch keine Daten". Deshalb vorher abfangen.
+  if (v === null || v === undefined || v === '') return undefined;
   const n = Number(v);
   return Number.isFinite(n) ? n : undefined;
 }

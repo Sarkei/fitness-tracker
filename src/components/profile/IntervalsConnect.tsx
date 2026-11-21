@@ -26,6 +26,9 @@ type Status = {
 
 const INTERVALL_LABEL: Record<number, string> = {
   0: 'Nur manuell',
+  0.083: 'Alle 5 Minuten',
+  0.25: 'Alle 15 Minuten',
+  0.5: 'Alle 30 Minuten',
   1: 'Jede Stunde',
   3: 'Alle 3 Stunden',
   6: 'Alle 6 Stunden',

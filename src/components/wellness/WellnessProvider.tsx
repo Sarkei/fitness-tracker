@@ -84,12 +84,32 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
         neuSeitLetztemSync: boolean;
         neuesteAktivitaet: string | null;
         hinweis: string | null;
+        wellnessAktualisiert: string | null;
+        todayWellness: {
+          date: string;
+          schritte: number | null;
+          ruhepuls: number | null;
+          hrv: number | null;
+          schlafStunden: number | null;
+        } | null;
       }>('/api/integrations/intervals/sync', { method: 'POST', body: JSON.stringify({ days: zeitraum }) });
-      if (res.neuSeitLetztemSync) {
+
+      // Zusammenfassen, was sich wirklich geaendert hat.
+      const teile: string[] = [];
+      const w = res.todayWellness;
+      if (w) {
+        if (w.schritte != null) teile.push(`${w.schritte.toLocaleString('de-DE')} Schritte`);
+        if (w.ruhepuls != null) teile.push(`Ruhepuls ${w.ruhepuls}`);
+        if (w.hrv != null) teile.push(`HRV ${w.hrv}`);
+        if (w.schlafStunden != null) teile.push(`Schlaf ${w.schlafStunden} h`);
+      }
+      if (res.wellnessAktualisiert) {
+        setMeldung(`Aktualisiert: ${teile.length > 0 ? teile.join(' · ') : 'neue Tageswerte'}.`);
+      } else if (res.neuSeitLetztemSync) {
         setMeldung(`Neue Aktivität bis ${res.neuesteAktivitaet}.`);
       } else {
         setMeldung(
-          `Aktuell — letzte Aktivität ${res.neuesteAktivitaet ?? '—'}, seither kein neues Training.`,
+          `Aktuell — ${teile.length > 0 ? teile.join(' · ') : 'keine neuen Werte'} (letzte Aktivität ${res.neuesteAktivitaet ?? '—'}).`,
         );
       }
       await laden();
