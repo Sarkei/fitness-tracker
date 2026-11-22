@@ -39,8 +39,10 @@ pruefe('20:00 fasten', [s20.phase, Math.round(s20.remainingMinutes)], ['fasting'
 pruefe('Fortschritt essen 16:00', Math.round(fastingStatus(plan16, new Date(2026, 10, 23, 16, 0, 0)).progress * 100), 50);
 
 // Anzeige
-pruefe('Restzeit 493 min', formatRemaining(493), '8:13');
-pruefe('Restzeit 0 min', formatRemaining(0), '0:00');
+pruefe('Restzeit 493 min mit Sekunden', formatRemaining(493), '8:13:00');
+pruefe('Restzeit 493.42 min', formatRemaining(493.42), '8:13:25');
+pruefe('Restzeit ohne Sekunden', formatRemaining(493.42, false), '8:13');
+pruefe('Restzeit 0 min', formatRemaining(0), '0:00:00');
 pruefe('Label 16:8', planLabel(plan16), '16:8');
 
 // Validierung

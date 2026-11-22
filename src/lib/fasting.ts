@@ -120,12 +120,17 @@ export function fastingStatus(plan: FastingPlan, now: Date = new Date()): Fastin
   };
 }
 
-/** 493 -> "8:13" (Stunden:Minuten) wie eine Restzeit-Uhr. */
-export function formatRemaining(minutes: number): string {
-  const total = Math.max(0, Math.round(minutes));
-  const h = Math.floor(total / 60);
-  const m = total % 60;
-  return `${h}:${String(m).padStart(2, '0')}`;
+/**
+ * Restzeit als Uhr. Standard mit Sekunden: 493.42 min -> "8:13:25".
+ * `withSeconds=false` liefert nur Stunden und Minuten.
+ */
+export function formatRemaining(minutes: number, withSeconds = true): string {
+  const totalSeconds = Math.max(0, Math.round(minutes * 60));
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  const base = `${h}:${String(m).padStart(2, '0')}`;
+  return withSeconds ? `${base}:${String(s).padStart(2, '0')}` : base;
 }
 
 export function formatClock(date: Date): string {

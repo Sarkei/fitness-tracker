@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
-import { Moon, Sun, Timer, ChevronDown } from 'lucide-react';
+import { Moon, Sun, Timer, ChevronDown, Check } from 'lucide-react';
 import { useAuth } from '@/src/lib/AuthContext';
 import { useI18n } from '@/src/lib/i18n';
 import {
@@ -9,6 +9,7 @@ import {
   formatRemaining,
   isValidPlan,
   nextEatingStart,
+  parseClock,
   planLabel,
   type FastingPlan,
 } from '@/src/lib/fasting';
@@ -16,9 +17,12 @@ import {
 /**
  * Intervallfasten-Box für die Startseite (oberste Karte).
  *
- * Zeigt dauerhaft laufend, ob gerade Fastenzeit oder Essensfenster ist und wie lange
- * die Phase noch dauert. Der Plan (16:8, 18:6 … und die Startzeit) wird am Profil
- * gespeichert (`goals.fasting`), damit die Box auf jedem Gerät denselben Plan zeigt.
+ * Zeigt dauerhaft laufend — mit Sekunden — ob gerade Fastenzeit oder Essensfenster ist
+ * und wie lange die Phase noch dauert. Der Plan (16:8, 18:6 … und die Startzeit) wird am
+ * Profil gespeichert (`goals.fasting`), damit die Box auf jedem Gerät denselben Plan zeigt.
+ *
+ * Im Panel ist die Auswahl zunächst ein Entwurf: sie wird hervorgehoben, aber erst mit
+ * „Speichern" übernommen. Die laufende Uhr ändert sich also nicht beim Antippen.
  */
 export function FastingCard(): ReactElement {
   const { profile, updateProfile } = useAuth();
@@ -33,13 +37,40 @@ export function FastingCard(): ReactElement {
   const [saving, setSaving] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
 
+  // Entwurf im Panel (noch nicht gespeichert)
+  const [draftFast, setDraftFast] = useState<number | null>(null);
+  const [draftEat, setDraftEat] = useState<number | null>(null);
+  const [draftStart, setDraftStart] = useState('20:00');
+
   // Uhr läuft dauerhaft — jede Sekunde neu rechnen, kostet praktisch nichts.
   useEffect(() => {
     const id = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(id);
   }, []);
 
+  // Beim Öffnen den gespeicherten Plan als Entwurf laden
+  useEffect(() => {
+    if (!open) return;
+    setDraftFast(plan?.fastHours ?? null);
+    setDraftEat(plan?.eatHours ?? null);
+    setDraftStart(plan?.startTime ?? '20:00');
+    setFehler(null);
+  }, [open, plan?.fastHours, plan?.eatHours, plan?.startTime]);
+
   const status = useMemo(() => (plan ? fastingStatus(plan, now) : null), [plan, now]);
+
+  const draftValid =
+    draftFast != null &&
+    draftEat != null &&
+    draftFast > 0 &&
+    draftFast < 24 &&
+    draftEat > 0 &&
+    draftEat < 24 &&
+    draftFast + draftEat === 24 &&
+    parseClock(draftStart) !== null;
+
+  const draftSameAsSaved =
+    !!plan && plan.fastHours === draftFast && plan.eatHours === draftEat && plan.startTime === draftStart;
 
   const speichere = async (next: FastingPlan | null) => {
     setSaving(true);
@@ -53,6 +84,17 @@ export function FastingCard(): ReactElement {
     } finally {
       setSaving(false);
     }
+  };
+
+  const uebernehmeDraft = () => {
+    if (!draftValid || draftFast == null || draftEat == null) return;
+    const matching = FASTING_PRESETS.find((p) => p.fastHours === draftFast && p.eatHours === draftEat);
+    void speichere({
+      fastHours: draftFast,
+      eatHours: draftEat,
+      startTime: draftStart,
+      label: matching ? planLabel(matching) : `${draftFast}:${draftEat}`,
+    });
   };
 
   const titel = de ? 'Intervallfasten' : 'Intermittent fasting';
@@ -80,8 +122,8 @@ export function FastingCard(): ReactElement {
         <div className="fast-card__empty">
           <p>
             {de
-              ? 'Noch kein Fastenplan gewählt. Wähle ein Verhältnis — die Uhr läuft dann dauerhaft mit.'
-              : 'No plan yet. Pick a ratio — the clock runs continuously once set.'}
+              ? 'Noch kein Fastenplan gewählt. Verhältnis und Startzeit einstellen, dann auf „Speichern" tippen — die Uhr läuft danach dauerhaft mit.'
+              : 'No plan yet. Pick a ratio, set the start time and press “Save” — the clock then runs continuously.'}
           </p>
           <button type="button" className="app-btn" onClick={() => setOpen(true)}>
             <Timer size={16} /> {de ? 'Plan wählen' : 'Choose plan'}
@@ -102,9 +144,9 @@ export function FastingCard(): ReactElement {
             </span>
           </div>
 
-          <p className="fast-card__clock" aria-live="off">
+          <p className="fast-card__clock" aria-live="off" title={de ? 'Restzeit dieser Phase' : 'Time left in this phase'}>
             {formatRemaining(status?.remainingMinutes ?? 0)}
-            <span className="fast-card__unit">{de ? 'h übrig' : 'h left'}</span>
+            <span className="fast-card__unit">{de ? 'übrig' : 'left'}</span>
           </p>
 
           <div className="fast-card__track" role="presentation">
@@ -131,6 +173,12 @@ export function FastingCard(): ReactElement {
                   : `${de ? 'ab' : 'from'} ${formatClock(nextEatingStart(plan, now))}`}
               </dd>
             </div>
+            <div>
+              <dt>{de ? 'Phase' : 'Phase'}</dt>
+              <dd>
+                {Math.round((status?.progress ?? 0) * 100)} %
+              </dd>
+            </div>
           </dl>
         </div>
       )}
@@ -139,20 +187,27 @@ export function FastingCard(): ReactElement {
         <div className="fast-card__panel">
           <p className="fast-card__hint">
             {de
-              ? 'Startzeit ist der Beginn der Fastenzeit (Ende des Essens).'
-              : 'Start time is when fasting begins (end of eating).'}
+              ? 'Verhältnis wählen und die Startzeit der Fastenzeit einstellen — übernommen wird erst mit „Speichern".'
+              : 'Pick a ratio and the fasting start time — nothing changes until you press “Save”.'}
           </p>
-          <div className="fast-card__presets">
+
+          <div className="fast-card__presets" role="radiogroup" aria-label={de ? 'Fastenverhältnis' : 'Fasting ratio'}>
             {FASTING_PRESETS.map((preset) => {
-              const aktiv = plan?.fastHours === preset.fastHours && plan?.startTime === preset.startTime;
+              const ausgewaehlt = draftFast === preset.fastHours && draftEat === preset.eatHours;
               return (
                 <button
                   key={planLabel(preset)}
                   type="button"
-                  className={`fast-card__preset ${aktiv ? 'is-active' : ''}`}
+                  role="radio"
+                  aria-checked={ausgewaehlt}
+                  className={`fast-card__preset ${ausgewaehlt ? 'is-selected' : ''}`}
                   disabled={saving}
-                  onClick={() => void speichere(preset)}
+                  onClick={() => {
+                    setDraftFast(preset.fastHours);
+                    setDraftEat(preset.eatHours);
+                  }}
                 >
+                  {ausgewaehlt && <Check size={13} className="fast-card__check" aria-hidden />}
                   <strong>{planLabel(preset)}</strong>
                   <span>
                     {preset.fastHours} h {de ? 'fasten' : 'fasting'} · {preset.eatHours} h {de ? 'essen' : 'eating'}
@@ -161,30 +216,48 @@ export function FastingCard(): ReactElement {
               );
             })}
           </div>
+
           <div className="fast-card__custom">
             <label>
-              <span>{de ? 'Startzeit' : 'Start time'}</span>
+              <span>{de ? 'Startzeit Fasten' : 'Fasting start'}</span>
               <input
                 type="time"
-                defaultValue={plan?.startTime ?? '20:00'}
+                value={draftStart}
                 disabled={saving}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (!plan || !value) return;
-                  void speichere({ ...plan, startTime: value });
-                }}
+                onChange={(e) => setDraftStart(e.target.value || '20:00')}
               />
             </label>
+            <span className="fast-card__preview">
+              {draftValid
+                ? `${de ? 'Essen ab' : 'Eating from'} ${formatClock(
+                    nextEatingStart({ fastHours: draftFast!, eatHours: draftEat!, startTime: draftStart }, now),
+                  )}`
+                : de
+                  ? 'Bitte ein Verhältnis wählen.'
+                  : 'Please pick a ratio.'}
+            </span>
+          </div>
+
+          <div className="fast-card__actions">
             {plan && (
               <button type="button" className="fast-card__reset" disabled={saving} onClick={() => void speichere(null)}>
                 {de ? 'Plan entfernen' : 'Remove plan'}
               </button>
             )}
+            <button
+              type="button"
+              className="fast-card__save"
+              disabled={saving || !draftValid || draftSameAsSaved}
+              onClick={uebernehmeDraft}
+            >
+              {saving ? '…' : <Check size={15} />}
+              {de ? 'Speichern' : 'Save'}
+            </button>
           </div>
+
           {fehler && <p className="fast-card__error">{fehler}</p>}
         </div>
       )}
     </section>
   );
 }
-
