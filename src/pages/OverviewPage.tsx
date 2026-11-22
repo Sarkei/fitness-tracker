@@ -16,6 +16,7 @@ import { useI18n } from '@/src/lib/i18n';
 import { useNutrition, useWorkouts } from '@/src/lib/AppDataContext';
 import { effectiveNutritionTotals } from '@/src/lib/nutritionTotals';
 import { strengthVolumeForWorkout } from '@/src/lib/workoutAnalytics';
+import { FastingCard } from '@/src/components/dashboard/FastingCard';
 
 /**
  * Startseite als Übersicht (knowledge/design-system/layout.md, Abschnitt 9):
@@ -150,8 +151,17 @@ export default function OverviewPage() {
     return rows.sort((a, b) => b.sortKey.localeCompare(a.sortKey)).slice(0, 5);
   }, [workouts, nutritionEntries, numberFormat, t]);
 
+  const fastingEnabled =
+    (profile as unknown as { goals?: { fastingEnabled?: boolean } } | null)?.goals?.fastingEnabled !== false;
+
   return (
     <>
+      {fastingEnabled && (
+        <div className="app-container" style={{ paddingTop: '16px' }}>
+          <FastingCard />
+        </div>
+      )}
+
       <header className="app-container app-hero">
         <p className="app-badge">{t('home.badge')}</p>
         <h1 className="app-title">{t('home.title')}</h1>

@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import AppRoot from './AppRoot.tsx';
 import './index.css';
 import './styles/shell.css';
+import './styles/fasting.css';
 import { applyTheme, getStoredTheme } from './lib/themePreference.ts';
 import { AiCapabilitiesProvider } from './lib/AiCapabilitiesContext.tsx';
 import { isDemoMode, markDemoMode } from './lib/demoMode.ts';

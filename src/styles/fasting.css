@@ -1,0 +1,295 @@
+/* ============================================================
+   Intervallfasten-Box (Startseite, oberste Karte)
+   Nutzt ausschließlich die Design-Tokens der App (Grau + Grün);
+   Fasten = Akzentfarbe, Essensfenster = gedämpfter Grauton.
+   ============================================================ */
+
+.fast-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--ds-radius-lg);
+  padding: 18px 20px 16px;
+  margin-bottom: 18px;
+}
+
+.fast-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.fast-card__title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.fast-card__title h2 {
+  font-family: var(--font-serif, Georgia, serif);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.fast-card__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--text-muted);
+}
+.fast-card__dot.is-fasting {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.fast-card__dot.is-eating {
+  background: var(--text-muted);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--text-muted) 18%, transparent);
+}
+
+.fast-card__plan {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-ink, var(--accent));
+}
+
+.fast-card__change {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong, var(--line));
+  background: var(--bg);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 140ms ease, color 140ms ease;
+}
+.fast-card__change:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.fast-card__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 0 4px;
+}
+.fast-card__empty p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  max-width: 46ch;
+}
+
+.fast-card__body {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    'phase clock'
+    'track track'
+    'meta meta';
+  gap: 8px 18px;
+  align-items: center;
+  padding-top: 12px;
+}
+
+.fast-card__phase {
+  grid-area: phase;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.fast-card__clock {
+  grid-area: clock;
+  margin: 0;
+  justify-self: end;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.fast-card__unit {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-left: 6px;
+}
+
+.fast-card__track {
+  grid-area: track;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-2, var(--bg));
+  overflow: hidden;
+}
+.fast-card__fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 900ms linear, background-color 300ms ease;
+  background: var(--text-muted);
+}
+.fast-card__fill.is-fasting {
+  background: var(--accent);
+}
+
+.fast-card__meta {
+  grid-area: meta;
+  display: flex;
+  gap: 22px;
+  margin: 4px 0 0;
+  padding: 0;
+  flex-wrap: wrap;
+}
+.fast-card__meta div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.fast-card__meta dt {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.fast-card__meta dd {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Plan-Auswahl */
+.fast-card__panel {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.fast-card__hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.fast-card__presets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 8px;
+}
+.fast-card__preset {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  min-height: 54px;
+  border-radius: 12px;
+  border: 1px solid var(--line-strong, var(--line));
+  background: var(--bg);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+.fast-card__preset:hover {
+  border-color: var(--accent);
+}
+.fast-card__preset.is-active {
+  border-color: var(--accent);
+  border-width: 2px;
+  background: var(--accent-soft);
+}
+.fast-card__preset strong {
+  font-size: 14px;
+  font-weight: 800;
+}
+.fast-card__preset span {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.fast-card__custom {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.fast-card__custom label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.fast-card__custom input[type='time'] {
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line-strong, var(--line));
+  background: var(--bg);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 700;
+}
+.fast-card__reset {
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: underline;
+  cursor: pointer;
+  min-height: 34px;
+}
+.fast-card__reset:hover {
+  color: var(--danger, #b4453a);
+}
+.fast-card__error {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--danger, #b4453a);
+}
+
+@media (max-width: 640px) {
+  .fast-card { padding: 16px; }
+  .fast-card__body { grid-template-columns: 1fr; grid-template-areas: 'phase' 'clock' 'track' 'meta'; }
+  .fast-card__clock { justify-self: start; }
+}
