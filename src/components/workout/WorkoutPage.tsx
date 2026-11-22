@@ -19,6 +19,13 @@ import { cn } from '@/src/lib/utils';
 import { format, addDays, startOfWeek, isSameDay, startOfDay, isAfter, type Locale as DateFnsLocale } from 'date-fns';
 import { dateInCoachWeek, toLocalYmd, weekMondayForWorkoutView } from '@/src/lib/coachWeekWindow';
 import {
+  clampWeekOffset,
+  mondayOfWeek,
+  shiftWeek,
+  weekRangeLabel,
+  weekRelationLabel,
+} from '@/src/lib/trainingWeekNav';
+import {
   applyManualPlanWeekOverrides,
   manualPlanWeekStartYmd,
   pruneManualPlanWeekOverrides,
@@ -541,6 +548,9 @@ export default function WorkoutPage() {
   const { loading: bootstrapLoading, error: bootstrapError, retry: retryBootstrap } = useAppBootstrap();
 
   const [view, setView] = useState<'thisweek' | 'history' | 'templates' | 'coach'>('thisweek');
+  /** Angesehene Woche im Trainingsstreifen: 0 = diese Woche, 1 = nächste … */
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [swipeStart, setSwipeStart] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     if (coachTabDisabled && view === 'coach') setView('thisweek');
@@ -853,7 +863,11 @@ export default function WorkoutPage() {
 
   const thisWeekDays = useMemo(() => {
     const activeCoachPlan = coachPlans.find((p: any) => p.type === 'workout' && p.status === 'active');
-    const weekStart = weekMondayForWorkoutView(activeCoachPlan?.current_schedule?.start_date);
+    // Basiswoche = die echte aktuelle Woche; angezeigt wird sie um `weekOffset` verschoben.
+    const baseWeekStart = mondayOfWeek(new Date());
+    const weekStart = shiftWeek(baseWeekStart, weekOffset);
+    const coachWeekStart = weekMondayForWorkoutView(activeCoachPlan?.current_schedule?.start_date);
+    const isCurrentWeek = weekOffset === 0;
 
     return WEEKDAYS.map((name, i) => {
       const date = addDays(weekStart, i);
@@ -865,7 +879,7 @@ export default function WorkoutPage() {
       const coachDays = activeCoachPlan?.current_schedule?.schedule
         ? resolveCoachScheduleDayList(activeCoachPlan.current_schedule.schedule)
         : [];
-      if (coachDays.length > 0) {
+      if (coachDays.length > 0 && dateInCoachWeek(coachWeekStart ? toLocalYmd(coachWeekStart) : null, date)) {
         const startYmd = parseCoachStartYmd(activeCoachPlan.current_schedule?.start_date);
         const rows = coachScheduleRowsForCalendarDate(
           startYmd,
@@ -897,7 +911,7 @@ export default function WorkoutPage() {
 
       return { name, date, dayNumber, planSession, planSessions, weekStartYmd: toLocalYmd(weekStart) };
     });
-  }, [coachPlans, profile]);
+  }, [coachPlans, profile, weekOffset]);
 
   const hasManualWeek =
     !!profile?.workoutPlan?.schedule ||
@@ -1565,6 +1579,73 @@ export default function WorkoutPage() {
               className="px-1 pb-1"
             />
           )}
+
+          {/* Wochen-Navigation: zurück · Titel · vor (Wischen auf dem Streifen) */}
+          {(() => {
+            const baseMonday = mondayOfWeek(new Date());
+            const shownMonday = shiftWeek(baseMonday, weekOffset);
+            const canBack = weekOffset > -8;
+            const canForward = weekOffset < 8;
+            return (
+              <div
+                className="mb-3 flex items-center justify-between gap-2 rounded-2xl border border-[var(--border-muted)] bg-[var(--background)] px-2 py-1.5 select-none"
+                onTouchStart={(e) => {
+                  const t = e.touches[0];
+                  setSwipeStart({ x: t.clientX, y: t.clientY });
+                }}
+                onTouchEnd={(e) => {
+                  if (!swipeStart) return;
+                  const t = e.changedTouches[0];
+                  const dx = t.clientX - swipeStart.x;
+                  const dy = t.clientY - swipeStart.y;
+                  setSwipeStart(null);
+                  // Nur waagrechte Wische (sonst würde vertikales Scrollen blättern)
+                  if (Math.abs(dx) < 55 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
+                  setWeekOffset((prev) => clampWeekOffset(prev + (dx < 0 ? 1 : -1)));
+                }}
+                role="group"
+                aria-label={t('work.week.navLabel')}
+              >
+                <button
+                  type="button"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--border-muted)] text-[var(--text-muted)] disabled:opacity-30"
+                  onClick={() => setWeekOffset((prev) => clampWeekOffset(prev - 1))}
+                  disabled={!canBack}
+                  aria-label={t('work.week.prev')}
+                >
+                  <ChevronRight size={16} className="rotate-180" />
+                </button>
+                <div className="min-w-0 text-center">
+                  <p className="truncate text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">
+                    {weekRelationLabel(shownMonday, new Date(), locale === 'de' ? 'de' : 'en')}
+                  </p>
+                  <p className="truncate text-xs font-bold text-[var(--text-primary)]">
+                    {weekRangeLabel(shownMonday, locale === 'de' ? 'de' : 'en')}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  {weekOffset !== 0 && (
+                    <button
+                      type="button"
+                      className="h-9 rounded-xl px-2 text-[10px] font-black uppercase tracking-widest text-[var(--accent)]"
+                      onClick={() => setWeekOffset(0)}
+                    >
+                      {t('work.week.today')}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border-muted)] text-[var(--text-muted)] disabled:opacity-30"
+                    onClick={() => setWeekOffset((prev) => clampWeekOffset(prev + 1))}
+                    disabled={!canForward}
+                    aria-label={t('work.week.next')}
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Week days — immer Montag → Sonntag (auch mobil) */}
           {!thisWeekScheduleReady ? (

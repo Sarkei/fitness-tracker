@@ -55,13 +55,31 @@ import {
 
 const WEEK_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-function dateOfDayKey(key: string): string {
-  const today = new Date();
-  const todayIndex = WEEK_ORDER.indexOf(dayKeyOf(todayYmd()));
-  const offset = WEEK_ORDER.indexOf(key) - todayIndex;
-  const date = new Date(today);
-  date.setDate(date.getDate() + offset);
+/** Montag der Kalenderwoche von `ymd` (Montag-basiert, lokale Zeit). */
+function mondayOfYmd(ymd: string): Date {
+  const d = new Date(`${ymd}T12:00:00`);
+  const weekday = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - weekday);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function isoWeekNumberSafe(date: Date): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+}
+
+function ymdOf(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+/** Datum eines Wochentags innerhalb der Woche, die an `weekMonday` beginnt. */
+function dateOfDayKey(key: string, weekMonday: string = ymdOf(mondayOfYmd(todayYmd()))): string {
+  const monday = new Date(`${weekMonday}T12:00:00`);
+  const date = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + WEEK_ORDER.indexOf(key));
+  return ymdOf(date);
 }
 
 export default function TrainingPage() {
@@ -69,6 +87,9 @@ export default function TrainingPage() {
   const [week, setWeek] = useState<CoachWeek>(null);
   const [workouts, setWorkouts] = useState<WorkoutEntry[]>([]);
   const [selected, setSelected] = useState<string>(dayKeyOf(today));
+  /** 0 = diese Woche, 1 = nächste Woche, -1 = letzte Woche … */
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [wischStart, setWischStart] = useState<{ x: number; y: number } | null>(null);
   const [running, setRunning] = useState(false);
   const [tagOffen, setTagOffen] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -92,13 +113,21 @@ export default function TrainingPage() {
     void load();
   }, [load]);
 
+  const mondayToday = useMemo(() => mondayOfYmd(today), [today]);
+  const shownMonday = useMemo(() => {
+    const d = new Date(mondayToday);
+    d.setDate(d.getDate() + weekOffset * 7);
+    return d;
+  }, [mondayToday, weekOffset]);
+  const shownMondayYmd = ymdOf(shownMonday);
+
   const days = useMemo<PlanDay[]>(() => {
     const schedule = week?.schedule ?? [];
     return WEEK_ORDER.map((key) => schedule.find((d) => d.day === key) ?? { day: key, isRest: true, title: 'Ruhetag' });
   }, [week]);
 
   const planDay = days.find((d) => d.day === selected) ?? null;
-  const selectedYmd = dateOfDayKey(selected);
+  const selectedYmd = dateOfDayKey(selected, shownMondayYmd);
   const trainingAmTag = workouts.find((w) => toYmd(w.date) === selectedYmd) ?? null;
 
   // Auswertungen
@@ -208,11 +237,73 @@ export default function TrainingPage() {
 
       {/* Wochenleiste */}
       <Card className="p-3">
+        <div
+          className="mb-2 flex items-center justify-between gap-2 select-none"
+          onTouchStart={(e) => {
+            const t = e.touches[0];
+            setWischStart({ x: t.clientX, y: t.clientY });
+          }}
+          onTouchEnd={(e) => {
+            if (!wischStart) return;
+            const t = e.changedTouches[0];
+            const dx = t.clientX - wischStart.x;
+            const dy = t.clientY - wischStart.y;
+            setWischStart(null);
+            // Nur deutliche, waagrechte Wische werten — sonst blättert Scrollen die Woche um
+            if (Math.abs(dx) < 55 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
+            setWeekOffset((v) => Math.max(-8, Math.min(8, v + (dx < 0 ? 1 : -1))));
+          }}
+          role="group"
+          aria-label="Woche wählen — wischen oder Pfeile"
+        >
+          <button
+            type="button"
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-muted)] text-[var(--text-muted)] disabled:opacity-30"
+            onClick={() => setWeekOffset((v) => Math.max(-8, v - 1))}
+            disabled={weekOffset <= -8}
+            aria-label="Woche zurück"
+          >
+            <ChevronRight className="h-4 w-4 rotate-180" />
+          </button>
+          <div className="min-w-0 text-center">
+            <p className="truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+              {weekOffset === 0 ? 'Diese Woche' : weekOffset === 1 ? 'Nächste Woche' : weekOffset === -1 ? 'Letzte Woche' : weekOffset > 0 ? `In ${weekOffset} Wochen` : `Vor ${Math.abs(weekOffset)} Wochen`}
+            </p>
+            <p className="truncate text-xs font-bold tabular-nums text-[var(--foreground)]">
+              {shownMonday.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })} –{' '}
+              {new Date(shownMonday.getFullYear(), shownMonday.getMonth(), shownMonday.getDate() + 6).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
+              {weekOffset !== 0 && <span className="text-[var(--text-muted)]"> · KW {isoWeekNumberSafe(shownMonday)}</span>}
+            </p>
+          </div>
+          <div className="flex items-center gap-1">
+            {weekOffset !== 0 && (
+              <button
+                type="button"
+                className="h-8 rounded-lg px-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--simple-accent)]"
+                onClick={() => {
+                  setWeekOffset(0);
+                  setSelected(dayKeyOf(today));
+                }}
+              >
+                Heute
+              </button>
+            )}
+            <button
+              type="button"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-muted)] text-[var(--text-muted)] disabled:opacity-30"
+              onClick={() => setWeekOffset((v) => Math.min(8, v + 1))}
+              disabled={weekOffset >= 8}
+              aria-label="Nächste Woche"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
         <div className="flex gap-1.5">
           {days.map((day) => {
             const active = day.day === selected;
             const isToday = day.day === dayKeyOf(today);
-            const ymd = dateOfDayKey(day.day);
+            const ymd = dateOfDayKey(day.day, shownMondayYmd);
             const erledigt = workouts.some((w) => toYmd(w.date) === ymd);
             const nummer = Number(ymd.slice(8, 10));
             return (
