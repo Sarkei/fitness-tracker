@@ -121,6 +121,16 @@ export default function TrainingPage() {
   }, [mondayToday, weekOffset]);
   const shownMondayYmd = ymdOf(shownMonday);
 
+  /**
+   * Woche wechseln und dabei immer den Montag auswählen.
+   * Wer eine Woche aufschlägt, will deren Anfang sehen — nicht den Wochentag von vorher.
+   */
+  const wechsleWoche = useCallback((naechsterOffset: number) => {
+    const ziel = Math.max(-8, Math.min(8, naechsterOffset));
+    setWeekOffset(ziel);
+    setSelected(WEEK_ORDER[0]);
+  }, []);
+
   const days = useMemo<PlanDay[]>(() => {
     const schedule = week?.schedule ?? [];
     return WEEK_ORDER.map((key) => schedule.find((d) => d.day === key) ?? { day: key, isRest: true, title: 'Ruhetag' });
@@ -251,7 +261,7 @@ export default function TrainingPage() {
             setWischStart(null);
             // Nur deutliche, waagrechte Wische werten — sonst blättert Scrollen die Woche um
             if (Math.abs(dx) < 55 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
-            setWeekOffset((v) => Math.max(-8, Math.min(8, v + (dx < 0 ? 1 : -1))));
+            wechsleWoche(weekOffset + (dx < 0 ? 1 : -1));
           }}
           role="group"
           aria-label="Woche wählen — wischen oder Pfeile"
@@ -259,7 +269,7 @@ export default function TrainingPage() {
           <button
             type="button"
             className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-muted)] text-[var(--text-muted)] disabled:opacity-30"
-            onClick={() => setWeekOffset((v) => Math.max(-8, v - 1))}
+            onClick={() => wechsleWoche(weekOffset - 1)}
             disabled={weekOffset <= -8}
             aria-label="Woche zurück"
           >
@@ -291,7 +301,7 @@ export default function TrainingPage() {
             <button
               type="button"
               className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-muted)] text-[var(--text-muted)] disabled:opacity-30"
-              onClick={() => setWeekOffset((v) => Math.min(8, v + 1))}
+              onClick={() => wechsleWoche(weekOffset + 1)}
               disabled={weekOffset >= 8}
               aria-label="Nächste Woche"
             >
