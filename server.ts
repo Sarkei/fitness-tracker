@@ -31,6 +31,11 @@ import {
   type IntervalsSettings,
 } from "./src/lib/intervals";
 import {
+  deleteEvent as intervalsDeleteEvent,
+  syncWorkout as intervalsSyncWorkout,
+  type SyncCall,
+} from "./src/lib/intervalsWorkoutSync";
+import {
   AI_MODEL_AREAS,
   AI_MODEL_AREA_LABELS,
   AI_MODEL_RECOMMENDATIONS,
@@ -227,6 +232,9 @@ async function initDb(): Promise<void> {
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_extras JSONB NOT NULL DEFAULT '{}'::jsonb`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name VARCHAR(100)`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name VARCHAR(100)`,
+    `ALTER TABLE workouts ADD COLUMN IF NOT EXISTS intervals_event_id TEXT`,
+    `ALTER TABLE workouts ADD COLUMN IF NOT EXISTS intervals_hash TEXT`,
+    `ALTER TABLE workouts ADD COLUMN IF NOT EXISTS intervals_synced_at TIMESTAMPTZ`,
   ];
   for (const sql of migrations) {
     await pool.query(sql);
@@ -2305,7 +2313,16 @@ ${exerciseCatalog}
         cardioSessionFeedback ? JSON.stringify(cardioSessionFeedback) : null,
       ],
     );
-    res.json({ id: result.rows[0].id });
+    const newId = result.rows[0].id;
+    // Direkt nach Intervals (Garmin) übertragen — Fehler dürfen das Speichern nicht kippen.
+    let intervals: unknown = null;
+    try {
+      intervals = await pushWorkoutToIntervals(req.userId!, String(newId));
+    } catch (e) {
+      intervals = { error: e instanceof Error ? e.message : String(e) };
+      console.warn("[intervals] Workout-Upload:", e);
+    }
+    res.json({ id: newId, intervals });
   });
 
   app.put("/api/workouts/:id", requireAuth, async (req: AuthRequest, res) => {
@@ -2325,12 +2342,33 @@ ${exerciseCatalog}
         req.userId,
       ]
     );
-    res.json({ ok: true });
+    // Geänderte Einheit: gleichen Termin bei Intervals überschreiben (kein Duplikat).
+    let intervals: unknown = null;
+    try {
+      intervals = await pushWorkoutToIntervals(req.userId!, String(req.params.id));
+    } catch (e) {
+      intervals = { error: e instanceof Error ? e.message : String(e) };
+      console.warn("[intervals] Workout-Update:", e);
+    }
+    res.json({ ok: true, intervals });
   });
 
   app.delete("/api/workouts/:id", requireAuth, async (req: AuthRequest, res) => {
+    // Vor dem Löschen den Intervals-Termin entfernen, sonst bleibt er auf der Uhr stehen.
+    let intervals: unknown = null;
+    try {
+      const row = await pool.query(
+        "SELECT intervals_event_id FROM workouts WHERE id=$1 AND user_id=$2",
+        [req.params.id, req.userId],
+      );
+      await removeWorkoutFromIntervals(req.userId!, row.rows[0]?.intervals_event_id);
+      intervals = { removed: Boolean(row.rows[0]?.intervals_event_id) };
+    } catch (e) {
+      intervals = { error: e instanceof Error ? e.message : String(e) };
+      console.warn("[intervals] Workout-Delete:", e);
+    }
     await pool.query("DELETE FROM workouts WHERE id=$1 AND user_id=$2", [req.params.id, req.userId]);
-    res.json({ ok: true });
+    res.json({ ok: true, intervals });
   });
 
   app.get("/api/workout-session-draft", requireAuth, async (req: AuthRequest, res) => {
@@ -5247,6 +5285,91 @@ ${JSON.stringify(userCtx, null, 2)}
     return (extras.intervals as IntervalsSettings) || {};
   };
 
+  /**
+   * Call-Wrapper für den Workout-Sync: nutzt denselben Basis-URL und dieselbe
+   * Basic-Auth wie der Coach-Sync, wirft bei Fehlern aber den HTTP-Code im Text.
+   */
+  const intervalsCallFor = (apiKey: string): SyncCall => {
+    return async (method, path, body) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
+      try {
+        const res = await fetch(`https://intervals.icu/api/v1${path}`, {
+          method,
+          headers: {
+            Authorization: `Basic ${Buffer.from(`API_KEY:${apiKey}`).toString("base64")}`,
+            Accept: "application/json",
+            ...(body ? { "Content-Type": "application/json" } : {}),
+          },
+          body: body ? JSON.stringify(body) : undefined,
+          signal: controller.signal,
+        });
+        if (!res.ok) throw new Error(`Intervals.icu antwortete mit HTTP ${res.status}.`);
+        if (res.status === 204) return null;
+        const text = await res.text();
+        return text ? JSON.parse(text) : null;
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+  };
+
+  /** Ein Workout nach Intervals übertragen (anlegen oder aktualisieren) und ID merken. */
+  const pushWorkoutToIntervals = async (
+    userId: number,
+    workoutId: string,
+    opts: { force?: boolean } = {},
+  ): Promise<{ skipped: true; reason: string } | { action: "create" | "update"; eventId: string }> => {
+    const settings = await readIntervalsSettings(userId);
+    const apiKey = settings.apiKey?.trim();
+    if (!apiKey) return { skipped: true, reason: "intervals-nicht-verbunden" };
+    if (settings.syncWorkouts === false) return { skipped: true, reason: "sync-aus" };
+
+    const row = await pool.query(
+      `SELECT id, name, type, duration, calories_burned, date, notes, exercises,
+              intervals_event_id, intervals_hash
+         FROM workouts WHERE id=$1 AND user_id=$2`,
+      [workoutId, userId],
+    );
+    if (!row.rows.length) return { skipped: true, reason: "workout-weg" };
+    const w = row.rows[0];
+
+    const workout = {
+      id: w.id,
+      name: w.name,
+      type: w.type,
+      duration: w.duration,
+      caloriesBurned: w.calories_burned,
+      date: w.date,
+      notes: w.notes,
+      exercises: w.exercises,
+    };
+    const result = await intervalsSyncWorkout(
+      intervalsCallFor(apiKey),
+      workout,
+      settings.athleteId || "0",
+      opts.force
+        ? null
+        : { intervalsEventId: w.intervals_event_id, intervalsHash: w.intervals_hash },
+    );
+
+    if (result.action === "skip") return { skipped: true, reason: result.reason ?? "unveraendert" };
+    await pool.query(
+      `UPDATE workouts SET intervals_event_id=$2, intervals_hash=$3, intervals_synced_at=NOW() WHERE id=$1`,
+      [workoutId, result.eventId, result.hash],
+    );
+    return { action: result.action, eventId: result.eventId! };
+  };
+
+  /** Workout bei Intervals entfernen (der App-Eintrag bleibt unberührt). */
+  const removeWorkoutFromIntervals = async (userId: number, eventId: string | null | undefined) => {
+    if (!eventId) return;
+    const settings = await readIntervalsSettings(userId);
+    const apiKey = settings.apiKey?.trim();
+    if (!apiKey) return;
+    await intervalsDeleteEvent(intervalsCallFor(apiKey), settings.athleteId || "0", eventId);
+  };
+
   const writeIntervalsSettings = async (userId: number, next: IntervalsSettings) => {
     await pool.query(
       `UPDATE users
@@ -5272,6 +5395,7 @@ ${JSON.stringify(userCtx, null, 2)}
         lastSync: cache?.fetchedAt ?? null,
         syncIntervalHours: normalisiereIntervall(s.syncIntervalHours),
         syncIntervalOptions: SYNC_INTERVAL_OPTIONS,
+        syncWorkouts: s.syncWorkouts !== false,
         activityCount: cache?.activities?.length ?? 0,
         latestActivity: cache?.activities?.[0]
           ? {
@@ -5458,8 +5582,11 @@ ${JSON.stringify(userCtx, null, 2)}
         return;
       }
       const stunden = normalisiereIntervall(req.body?.syncIntervalHours);
-      await writeIntervalsSettings(req.userId!, { ...s, syncIntervalHours: stunden });
-      res.json({ ok: true, syncIntervalHours: stunden });
+      const naechste = { ...s, syncIntervalHours: stunden } as IntervalsSettings;
+      // Schalter "Trainings nach Intervals übertragen" mitschreiben (Standard: an)
+      if (typeof req.body?.syncWorkouts === "boolean") naechste.syncWorkouts = req.body.syncWorkouts;
+      await writeIntervalsSettings(req.userId!, naechste);
+      res.json({ ok: true, syncIntervalHours: stunden, syncWorkouts: naechste.syncWorkouts !== false });
     } catch (err) {
       res.status(500).json({ error: err instanceof Error ? err.message : "Speichern fehlgeschlagen." });
     }

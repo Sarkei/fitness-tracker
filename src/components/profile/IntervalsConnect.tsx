@@ -22,6 +22,7 @@ type Status = {
   fitness: { ctl: number | null; atl: number | null; tsb: number | null } | null;
   syncIntervalHours: number;
   syncIntervalOptions: number[];
+  syncWorkouts?: boolean;
 };
 
 const INTERVALL_LABEL: Record<number, string> = {
@@ -126,6 +127,25 @@ export default function IntervalsConnect() {
       await laden();
     } catch (e) {
       setFehler(e instanceof Error ? e.message : 'Sync fehlgeschlagen.');
+    } finally {
+      setArbeitet(false);
+    }
+  };
+
+  /** Trainings aus der App nach Intervals (und damit auf die Uhr) übertragen. */
+  const workoutSyncSetzen = async (an: boolean) => {
+    setArbeitet(true);
+    setFehler(null);
+    setErfolg(null);
+    try {
+      await api('/api/integrations/intervals/settings', {
+        method: 'PATCH',
+        body: JSON.stringify({ syncWorkouts: an }),
+      });
+      setErfolg(an ? 'Trainings werden nach Intervals übertragen.' : 'Übertragung der Trainings aus.');
+      await laden();
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : 'Einstellung konnte nicht gespeichert werden.');
     } finally {
       setArbeitet(false);
     }
@@ -330,6 +350,27 @@ export default function IntervalsConnect() {
                 ))}
               </select>
             </label>
+            <button
+              type="button"
+              onClick={() => void workoutSyncSetzen(!(status.syncWorkouts !== false))}
+              disabled={arbeitet}
+              className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-muted)] px-3 py-2 text-[12px] font-semibold text-[var(--text-muted)] transition hover:text-[var(--simple-accent)] disabled:opacity-50"
+              aria-pressed={status.syncWorkouts !== false}
+              title="Trainings aus der App nach Intervals übertragen, damit sie auf der Uhr landen"
+            >
+              <span
+                className={`inline-flex h-4 w-7 items-center rounded-full transition ${
+                  status.syncWorkouts !== false ? 'bg-[var(--simple-accent)]' : 'bg-[var(--border-muted)]'
+                }`}
+              >
+                <span
+                  className={`ml-0.5 h-3 w-3 rounded-full bg-white transition ${
+                    status.syncWorkouts !== false ? 'translate-x-3' : ''
+                  }`}
+                />
+              </span>
+              Trainings übertragen
+            </button>
             <button
               type="button"
               onClick={() => void trennen()}

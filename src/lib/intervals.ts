@@ -22,6 +22,8 @@ export type IntervalsSettings = {
   connectedAt?: string;
   /** Anzeigename des Athleten bei Intervals.icu. */
   athleteName?: string;
+  /** Trainings aus der App automatisch nach Intervals übertragen (Standard: an). */
+  syncWorkouts?: boolean;
   /** Letzter Fehler beim Verbinden/Syncen. */
   lastError?: string;
   /** Cache der zuletzt geholten Daten. */
