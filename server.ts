@@ -4054,8 +4054,8 @@ COMPARISON WITH WEEK ${plan.current_week - 1}:
       const planMode = String(req.body?.planMode ?? onboardingData?.planMode ?? "ongoing");
 
       const planResult = await pool.query(
-        `INSERT INTO coach_plans (user_id,type,discipline,plan_mode,event_name,event_date,event_distance,onboarding_data,generation_status,coach_plan_state,name)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'generating',$9,$10) RETURNING *`,
+        `INSERT INTO coach_plans (user_id,type,discipline,plan_mode,event_name,event_date,event_distance,onboarding_data,generation_status,coach_plan_state,name,current_week)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'generating',$9,$10,1) RETURNING *`,
         [req.userId, type, discipline, planMode, eventName, eventDate || null, eventDistance, JSON.stringify(onboardingData),
          JSON.stringify(DEFAULT_COACH_PLAN_STATE), sinnvollerPlanName(type, discipline, { weeks: Number(onboardingData?.weeks) || undefined })],
       );

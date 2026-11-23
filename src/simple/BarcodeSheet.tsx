@@ -64,7 +64,7 @@ export function BarcodeSheet({
         }
         setStatus('scanning');
         const detector = new (window as any).BarcodeDetector({
-          formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128'],
+          formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'qr_code'],
         });
         const tick = async () => {
           if (cancelled || !videoRef.current) return;

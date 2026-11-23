@@ -16,6 +16,7 @@ import {
 } from './ui';
 import PhotoMealSheet from './PhotoMealSheet';
 import SessionSheet from './SessionSheet';
+import { BarcodeSheet } from './BarcodeSheet';
 import {
   DAY_LABELS,
   dayKeyOf,
@@ -57,6 +58,8 @@ export default function TodayPage() {
   const [workouts, setWorkouts] = useState<WorkoutEntry[]>([]);
   const [showPhoto, setShowPhoto] = useState(false);
   const [showSession, setShowSession] = useState(false);
+  /** Barcode-/QR-Scanner aus dem Erfassungs-Sheet. */
+  const [showScan, setShowScan] = useState(false);
   const [laedt, setLaedt] = useState(true);
 
   const load = useCallback(async () => {
@@ -442,7 +445,28 @@ export default function TodayPage() {
         )}
       </Card>
 
-      {showPhoto && <PhotoMealSheet date={date} onClose={() => setShowPhoto(false)} onSaved={() => void load()} />}
+      {showPhoto && (
+        <PhotoMealSheet
+          date={date}
+          onClose={() => setShowPhoto(false)}
+          onSaved={() => void load()}
+          onScan={() => {
+            setShowPhoto(false);
+            setShowScan(true);
+          }}
+        />
+      )}
+      {showScan && (
+        <BarcodeSheet
+          category="lunch"
+          date={date}
+          onClose={() => setShowScan(false)}
+          onSaved={() => {
+            setShowScan(false);
+            void load();
+          }}
+        />
+      )}
       {showSession && (
         <SessionSheet
           day={planDay}

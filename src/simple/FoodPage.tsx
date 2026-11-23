@@ -7,7 +7,6 @@ import {
   Dumbbell,
   Loader2,
   Moon,
-  Pencil,
   Plus,
   Sandwich,
   Sun,
@@ -33,6 +32,9 @@ import {
 import PhotoMealSheet from './PhotoMealSheet';
 import MealEditRow from './EditRows';
 import MealplannerRezeptSheet from './MealplannerRezeptSheet';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
+import { BarcodeSheet } from './BarcodeSheet';
+import { isValidPlan, liegtImFasten, type FastingPlan } from '../lib/fasting';
 import {
   addFoodEntry,
   dayKeyOf,
@@ -89,6 +91,10 @@ export default function FoodPage() {
   const [trainingDay, setTrainingDay] = useState(false);
   const [sheetFor, setSheetFor] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
+  /** Eintrag, dessen Löschung bestätigt werden soll. */
+  const [loeschKandidat, setLoeschKandidat] = useState<{ id: string; name: string } | null>(null);
+  /** Offener Barcode-/QR-Scanner und die Mahlzeit, in die gescannt wird. */
+  const [scanFor, setScanFor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [laedt, setLaedt] = useState(true);
   /** Gerichte aus dem verbundenen Mealplanner für die Schnellerfassung. */
@@ -128,7 +134,32 @@ export default function FoodPage() {
   const goals = (profile?.goals ?? {}) as {
     dailyCalories?: number;
     macros?: { protein?: number; carbs?: number; fat?: number };
+    fasting?: FastingPlan;
   };
+
+  /**
+   * Fastenplan → welche Mahlzeiten liegen außerhalb des Essensfensters?
+   * Bei 20:4 (Essen 16–20 Uhr) sind Frühstück und Mittag gesperrt. Die Zeiten
+   * kommen aus der MEALS-Liste, damit Markierung und Anzeige zusammenpassen.
+   */
+  const fastenSperre = useMemo(() => {
+    const plan = goals.fasting;
+    const leer = new Map<string, 'gesperrt' | 'teilweise'>();
+    if (!plan || !isValidPlan(plan)) return leer;
+    const zeitFenster: Record<string, [string, string]> = {
+      breakfast: ['06:00', '10:00'],
+      lunch: ['11:00', '15:00'],
+      dinner: ['17:00', '21:00'],
+      snack: ['15:00', '17:00'],
+    };
+    const karte = new Map<string, 'gesperrt' | 'teilweise'>();
+    for (const [id, [von, bis]] of Object.entries(zeitFenster)) {
+      const r = liegtImFasten(plan, von, bis);
+      if (r.komplett) karte.set(id, 'gesperrt');
+      else if (r.teilweise) karte.set(id, 'teilweise');
+    }
+    return karte;
+  }, [goals.fasting]);
   // An Trainingstagen mehr Kalorien und Kohlenhydrate — wie bei MacroBurn.
   const kcalBoost = trainingDay ? 1.12 : 1;
   const carbBoost = trainingDay ? 55 : 0;
@@ -379,15 +410,34 @@ export default function FoodPage() {
           const anteil = goalKcal > 0 ? Math.round((meal.kcal / goalKcal) * 100) : 0;
           // Vorlage aus dem Mealplanner für genau diese Mahlzeit (nur heute).
           const vorlage = vorlageProMahlzeit.get(meal.id) ?? null;
+          // Liegt diese Mahlzeit im Fastenfenster? Dann deutlich markieren.
+          const fasten = fastenSperre.get(meal.id) ?? null;
+          const gesperrt = fasten === 'gesperrt';
           return (
-            <Card key={meal.id} className="flex flex-col p-5">
+            <Card
+              key={meal.id}
+              className={`flex flex-col p-5 ${
+                gesperrt ? 'border-[#f87171]/40 bg-[#f87171]/5' : ''
+              }`}
+            >
               <div className="flex items-center gap-2.5">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--simple-accent-soft)] text-[var(--simple-accent)]">
+                <span
+                  className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                    gesperrt
+                      ? 'bg-[#f87171]/15 text-[#f87171]'
+                      : 'bg-[var(--simple-accent-soft)] text-[var(--simple-accent)]'
+                  }`}
+                >
                   <Icon className="h-4 w-4" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold">{meal.label}</p>
-                  <p className="text-[10.5px] text-[var(--text-muted)]">{meal.hours}</p>
+                  <p className={`text-sm font-semibold ${gesperrt ? 'text-[#f87171]' : ''}`}>
+                    {meal.label}
+                  </p>
+                  <p className="text-[10.5px] text-[var(--text-muted)]">
+                    {meal.hours}
+                    {gesperrt ? ' · Fastenzeit' : fasten === 'teilweise' ? ' · teils Fastenzeit' : ''}
+                  </p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-semibold tabular-nums">{Math.round(meal.kcal)}</p>
@@ -446,26 +496,34 @@ export default function FoodPage() {
                       />
                     ) : (
                     <li key={entry.id} className="flex items-center gap-2 py-2">
-                      <div className="min-w-0 flex-1">
+                      {/* Klick auf den Namen oeffnet die Karte zum Gericht (Zutaten, Portionen). */}
+                      <button
+                        type="button"
+                        className="min-w-0 flex-1 text-left transition hover:opacity-80"
+                        onClick={() => {
+                          const ausPlan = gerichte.find(
+                            (g) => g.titel.trim().toLowerCase() === String(entry.meal).trim().toLowerCase(),
+                          );
+                          if (ausPlan) {
+                            setRezeptOffen({ gericht: ausPlan, kategorie: meal.id });
+                          } else {
+                            setEditId(entry.id);
+                          }
+                        }}
+                        aria-label={`${entry.meal} öffnen`}
+                      >
                         <p className="truncate text-[13px]">{entry.meal}</p>
                         <p className="text-[10.5px] text-[var(--text-muted)]">
                           {Math.round(Number(entry.protein) || 0)} P · {Math.round(Number(entry.carbs) || 0)} K ·{' '}
                           {Math.round(Number(entry.fat) || 0)} F
                         </p>
-                      </div>
+                      </button>
                       <span className="text-[13px] font-semibold tabular-nums">
                         {Math.round(Number(entry.calories) || 0)}
                       </span>
                       <button
-                        className="rounded-md p-1 text-[var(--text-muted)] transition hover:text-[var(--simple-accent)]"
-                        onClick={() => setEditId(entry.id)}
-                        aria-label="Bearbeiten"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button
                         className="rounded-md p-1 text-[var(--text-muted)] transition hover:text-[var(--simple-clay)]"
-                        onClick={() => void remove(entry.id)}
+                        onClick={() => setLoeschKandidat({ id: entry.id, name: entry.meal })}
                         aria-label="Löschen"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -534,6 +592,16 @@ export default function FoodPage() {
 
       {error && <p className="rounded-xl bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-600">{error}</p>}
 
+      <ConfirmDialog
+        open={Boolean(loeschKandidat)}
+        title="Eintrag löschen?"
+        message={loeschKandidat ? `„${loeschKandidat.name}" wird aus dem Tag entfernt.` : undefined}
+        confirmLabel="Löschen"
+        variant="danger"
+        onCancel={() => setLoeschKandidat(null)}
+        onConfirm={() => loeschKandidat && void remove(loeschKandidat.id)}
+      />
+
       {rezeptOffen && (
         <MealplannerRezeptSheet
           gericht={rezeptOffen.gericht}
@@ -550,6 +618,23 @@ export default function FoodPage() {
           initialCategory={sheetFor}
           onClose={() => setSheetFor(null)}
           onSaved={() => void load()}
+          onScan={() => {
+            const ziel = sheetFor;
+            setSheetFor(null);
+            setScanFor(ziel);
+          }}
+        />
+      )}
+
+      {scanFor && (
+        <BarcodeSheet
+          category={scanFor}
+          date={date}
+          onClose={() => setScanFor(null)}
+          onSaved={() => {
+            setScanFor(null);
+            void load();
+          }}
         />
       )}
     </div>
@@ -561,6 +646,8 @@ export default function FoodPage() {
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Löschen fehlgeschlagen.');
+    } finally {
+      setLoeschKandidat(null);
     }
   }
 }

@@ -89,7 +89,21 @@ export type CoachChatAction =
   | { type: "update_measurements"; measurements: Record<string, unknown> }
   | { type: "update_coach_preferences"; preferences: Record<string, unknown> }
   | { type: "update_extras"; extras: Record<string, unknown> }
-  | { type: "create_plan"; planType: "workout" | "nutrition"; discipline?: string }
+  | {
+      type: "create_plan";
+      planType: "workout" | "nutrition";
+      discipline?: string;
+      /** Trainingsplan: freie Vorgaben, damit der Coach alles selbst festlegen kann. */
+      weeks?: number;
+      daysPerWeek?: number;
+      sessionMinutes?: number;
+      /** Zwei Einheiten an einem Tag erlauben (z. B. Kraft morgens, Cardio abends). */
+      doubleSessions?: boolean;
+      /** Zwei Einheiten pro Tag für genau diese Tage (Mo–So). */
+      doubleDays?: string[];
+      trainingDays?: string[];
+      equipment?: string[];
+    }
   | { type: "set_coaching_active"; active: boolean }
   | { type: "rename_plan"; planType: "workout" | "nutrition"; name: string }
   | { type: "activate_plan"; planType: "workout" | "nutrition"; name?: string; newest?: boolean }
@@ -230,6 +244,9 @@ export function buildCoachChatSystemPrompt(input: {
     '- {"type":"update_extras","extras":{...}} - erlaubte Felder: ' + ALLOWED_EXTRA_KEYS.join(", "),
     '- {"type":"update_coach_preferences","preferences":{...}}',
     '- {"type":"create_plan","planType":"workout"|"nutrition"} - legt einen neuen Plan an',
+    '  Optional beim Trainingsplan: "weeks" (1-52), "daysPerWeek" (1-14), "sessionMinutes" (30-180),' +
+      ' "trainingDays":["Montag",...], "equipment":["barbell",...],' +
+      ' "doubleSessions":true und "doubleDays":["Dienstag"] - damit sind ZWEI Einheiten an einem Tag moeglich.' +
     '- {"type":"set_coaching_active","active":true|false}',
     '- {"type":"activate_plan","planType":"workout"|"nutrition","name":"..."} - Plan aktivieren (loest im Chat KEINE Generierung aus)',
     '- {"type":"deactivate_plans","planType":"workout"|"nutrition"} - alle Plaene dieses Typs pausieren (bleiben erhalten)',
@@ -359,9 +376,27 @@ function validateActions(candidate: string): CoachChatAction[] {
           break;
         }
         case "create_plan": {
-          const planType = String((item as Record<string, unknown>).planType ?? "");
+          const raw = item as Record<string, unknown>;
+          const planType = String(raw.planType ?? "");
           if (planType === "workout" || planType === "nutrition") {
-            out.push({ type, planType, discipline: (item as Record<string, unknown>).discipline as string | undefined });
+            // Trainingsvorgaben durchreichen: der Coach darf den Plan frei aufbauen,
+            // inklusive zweier Einheiten an einem Tag.
+            const alsText = (v: unknown): string[] | undefined =>
+              Array.isArray(v) ? v.map((x) => String(x)).filter(Boolean) : undefined;
+            out.push({
+              type,
+              planType,
+              discipline: raw.discipline as string | undefined,
+              weeks: Number(raw.weeks) > 0 ? Math.min(52, Number(raw.weeks)) : undefined,
+              daysPerWeek:
+                Number(raw.daysPerWeek) > 0 ? Math.min(14, Number(raw.daysPerWeek)) : undefined,
+              sessionMinutes:
+                Number(raw.sessionMinutes) > 0 ? Math.min(180, Number(raw.sessionMinutes)) : undefined,
+              doubleSessions: raw.doubleSessions === true,
+              doubleDays: alsText(raw.doubleDays),
+              trainingDays: alsText(raw.trainingDays),
+              equipment: alsText(raw.equipment),
+            });
           }
           break;
         }
@@ -532,11 +567,20 @@ export async function applyCoachChatActions(
         case "create_plan": {
           const discipline = action.discipline ?? (action.planType === "workout" ? "strength" : "balanced");
           const name = sinnvollerPlanName(action.planType, discipline);
+          const onboarding = {
+            ...(action.weeks ? { weeks: action.weeks } : {}),
+            ...(action.daysPerWeek ? { daysPerWeek: action.daysPerWeek } : {}),
+            ...(action.sessionMinutes ? { sessionDuration: action.sessionMinutes } : {}),
+            ...(action.trainingDays?.length ? { availableTrainingDays: action.trainingDays } : {}),
+            ...(action.equipment?.length ? { equipment: action.equipment } : {}),
+            ...(action.doubleSessions ? { allowDoubleSessions: true } : {}),
+            ...(action.doubleDays?.length ? { doubleDays: action.doubleDays } : {}),
+          };
           const inserted = await pool.query(
-            `INSERT INTO coach_plans (user_id, type, discipline, plan_mode, name, generation_status)
-             VALUES ($1,$2,$3,'chat',$4,'idle')
+            `INSERT INTO coach_plans (user_id, type, discipline, plan_mode, name, generation_status, onboarding_data, current_week)
+             VALUES ($1,$2,$3,'chat',$4,'idle',$5::jsonb,1)
              RETURNING id`,
-            [userId, action.planType, discipline, name],
+            [userId, action.planType, discipline, name, JSON.stringify(onboarding)],
           );
           applied.push({
             type: action.type,

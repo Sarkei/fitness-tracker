@@ -85,14 +85,14 @@ export default function CoachPlanGenerationModal({
       aria-modal="true"
       aria-labelledby="coach-gen-title"
     >
-      <div className="absolute inset-0 bg-black/75 backdrop-blur-md" aria-hidden />
+      <div className="absolute inset-0 bg-black/75" aria-hidden />
       <div
         className="relative z-10 mx-4 w-full max-w-md rounded-[2rem] border border-[var(--border-muted)] bg-[var(--card-bg)] p-6 shadow-2xl sm:mx-6 sm:p-8"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-start gap-4">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand/15 text-brand">
-            {error ? <XCircle size={28} /> : <Brain size={28} className={!error ? 'animate-pulse' : ''} />}
+            {error ? <XCircle size={28} /> : <Brain size={28} />}
           </div>
           <div className="min-w-0 flex-1">
             <p id="coach-gen-title" className="text-lg font-black uppercase italic tracking-tight text-[var(--text-primary)]">

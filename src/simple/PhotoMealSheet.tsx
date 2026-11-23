@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Camera, Check, Loader2, X } from 'lucide-react';
+import { Camera, Check, Loader2, ScanBarcode, X } from 'lucide-react';
 import { PrimaryButton } from './ui';
 import { analyzeFood, fileToDataUrl, saveAnalyzedMeal, type V3Result } from './simpleApi';
 
@@ -10,11 +10,14 @@ export default function PhotoMealSheet({
   initialCategory,
   onClose,
   onSaved,
+  onScan,
 }: {
   date: string;
   initialCategory?: string;
   onClose: () => void;
   onSaved: () => void;
+  /** Öffnet den Barcode-/QR-Scanner. */
+  onScan: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -94,28 +97,49 @@ export default function PhotoMealSheet({
                 className="hidden"
                 onChange={(e) => void onFile(e.target.files?.[0])}
               />
-              <button
-                type="button"
-                onClick={() => inputRef.current?.click()}
-                className="flex w-full flex-col items-center gap-2 rounded-3xl border border-dashed border-[var(--border-muted)] py-10"
-              >
-                <Camera className="h-8 w-8 text-brand" />
-                <span className="text-sm font-bold">Foto machen</span>
-                <span className="text-xs text-[var(--text-muted)]">Die KI erkennt das Gericht und rechnet die Nährwerte</span>
-              </button>
-
+              {/* Beschreibung zuerst — gross und oben */}
               <div className="space-y-2">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                  Beschreibung
+                </p>
                 <textarea
-                  className="w-full rounded-2xl border border-[var(--border-muted)] bg-transparent px-3 py-2 text-sm"
-                  rows={2}
-                  placeholder="…oder kurz beschreiben: „2 Brötchen mit Käse und ein Kaffee mit Milch“"
+                  className="w-full rounded-2xl border border-[var(--border-muted)] bg-transparent px-3 py-3 text-sm"
+                  rows={4}
+                  placeholder="z. B. „2 Brötchen mit Käse und ein Kaffee mit Milch“"
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                 />
-                <PrimaryButton full disabled={text.trim().length < 3} onClick={() => void analyze({ text: text.trim() })}>
-                  Aus Text schätzen
-                </PrimaryButton>
               </div>
+
+              {/* Beides über „Aus Text schätzen": scannen oder fotografieren */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={onScan}
+                  className="flex flex-col items-center gap-1.5 rounded-2xl border border-[var(--border-muted)] py-3 text-center transition hover:border-[var(--simple-accent)]"
+                >
+                  <ScanBarcode className="h-5 w-5 text-[var(--simple-accent)]" />
+                  <span className="text-[12px] font-semibold">QR / Barcode</span>
+                  <span className="px-2 text-[10px] leading-tight text-[var(--text-muted)]">
+                    Kamera erkennt den Code
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => inputRef.current?.click()}
+                  className="flex flex-col items-center gap-1.5 rounded-2xl border border-[var(--border-muted)] py-3 text-center transition hover:border-[var(--simple-accent)]"
+                >
+                  <Camera className="h-5 w-5 text-[var(--simple-accent)]" />
+                  <span className="text-[12px] font-semibold">Foto machen</span>
+                  <span className="px-2 text-[10px] leading-tight text-[var(--text-muted)]">
+                    KI erkennt das Gericht
+                  </span>
+                </button>
+              </div>
+
+              <PrimaryButton full disabled={text.trim().length < 3} onClick={() => void analyze({ text: text.trim() })}>
+                Aus Text schätzen
+              </PrimaryButton>
             </>
           )}
 

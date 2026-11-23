@@ -162,3 +162,43 @@ export function nextEatingStart(plan: FastingPlan, now: Date = new Date()): Date
   if (now < todayEatEnd) return todayEat;
   return new Date(todayEat.getTime() + 24 * 60 * 60000);
 }
+
+/**
+ * Liegt ein Zeitfenster (z. B. eine Mahlzeit von 17–21 Uhr) außerhalb des
+ * Essensfensters? Damit lassen sich Mahlzeiten markieren, die beim Fasten
+ * eigentlich nicht erlaubt sind.
+ *
+ * Gerechnet wird in Minuten des Tages; das Essensfenster darf über Mitternacht
+ * laufen (20:00 + 4 h = 00:00).
+ */
+export function liegtImFasten(
+  plan: FastingPlan,
+  vonHHMM: string,
+  bisHHMM: string,
+): { komplett: boolean; teilweise: boolean } {
+  const von = parseClock(vonHHMM);
+  const bis = parseClock(bisHHMM);
+  const start = parseClock(plan.startTime) ?? 20 * 60;
+  if (von == null || bis == null) return { komplett: false, teilweise: false };
+
+  const eatStart = (start + Math.round(Number(plan.fastHours) * 60)) % (24 * 60);
+  const eatEnde = (eatStart + Math.round(Number(plan.eatHours) * 60)) % (24 * 60);
+
+  /** Liegt Minute m im Essensfenster? */
+  const imEssen = (m: number): boolean => {
+    const t = ((m % (24 * 60)) + 24 * 60) % (24 * 60);
+    if (eatStart < eatEnde) return t >= eatStart && t < eatEnde;
+    // Fenster über Mitternacht
+    return t >= eatStart || t < eatEnde;
+  };
+
+  // Jede Viertelstunde des Zeitfensters prüfen — reicht für Mahlzeiten-Grenzen.
+  const schritte: number[] = [];
+  for (let m = von; m <= bis; m += 15) schritte.push(m);
+  if (!schritte.length) schritte.push(von);
+
+  const drin = schritte.filter(imEssen).length;
+  if (drin === 0) return { komplett: true, teilweise: false };
+  if (drin === schritte.length) return { komplett: false, teilweise: false };
+  return { komplett: false, teilweise: true };
+}
