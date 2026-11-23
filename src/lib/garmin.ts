@@ -178,6 +178,98 @@ async function hole<T>(token: string, pfad: string): Promise<T | null> {
   }
 }
 
+/** Ein Messpunkt einer Einheit: Zeit, Puls, Pace, Höhe, Kadenz … */
+export type GarminMesspunkt = {
+  /** Sekunden seit Beginn der Einheit. */
+  t: number;
+  hr?: number;
+  /** Geschwindigkeit in m/s. */
+  speed?: number;
+  /** Grad der Steigung/Gefälls. */
+  elevation?: number;
+  cadence?: number;
+  power?: number;
+  bodyBattery?: number;
+  temperature?: number;
+  /** Zurückgelegte Strecke in Metern (kumuliert). */
+  distance?: number;
+};
+
+/**
+ * Zeitreihen einer Einheit abrufen.
+ *
+ * Ohne diese Daten bleiben die Detailseiten bei Einzelwerten — Tim will bei einem
+ * Lauf aber verlaufen sehen, wie Puls, Pace und Höhe sich entwickelt haben.
+ * Garmin liefert je Einheit bis zu 1800 Messpunkte über 26 Metriken.
+ */
+export async function ladeEinheitZeitreihen(
+  apiKey: string,
+  activityId: number,
+): Promise<GarminMesspunkt[]> {
+  const { token } = await garminToken(apiKey);
+  const roh = await hole<{
+    metricDescriptors?: Array<{ key: string; metricsIndex: number }>;
+    activityDetailMetrics?: Array<{ metrics: Array<number | null> }>;
+  }>(
+    token,
+    `/activity-service/activity/${activityId}/details?maxChartSize=2000&maxPolylineSize=5000`,
+  );
+  if (!roh?.metricDescriptors || !roh.activityDetailMetrics) return [];
+
+  // Spaltennamen auf die Indizes abbilden — die Reihenfolge ist nicht stabil.
+  const idx = new Map<string, number>();
+  for (const d of roh.metricDescriptors) idx.set(d.key, d.metricsIndex);
+
+  const holeWert = (werte: Array<number | null>, key: string): number | undefined => {
+    const i = idx.get(key);
+    if (i == null) return undefined;
+    const v = werte[i];
+    return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+  };
+
+  const punkte: GarminMesspunkt[] = [];
+  let startzeit: number | null = null;
+
+  for (const zeile of roh.activityDetailMetrics) {
+    const w = zeile.metrics ?? [];
+    const ts = holeWert(w, 'directTimestamp');
+    if (ts == null) continue;
+    if (startzeit == null) startzeit = ts;
+    const t = Math.max(0, Math.round((ts - startzeit) / 1000));
+
+    const punkt: GarminMesspunkt = { t };
+    const hr = holeWert(w, 'directHeartRate');
+    if (hr) punkt.hr = Math.round(hr);
+    const speed = holeWert(w, 'directSpeed');
+    if (speed != null && speed > 0) punkt.speed = speed;
+    const elev = holeWert(w, 'directElevation');
+    if (elev != null) punkt.elevation = Math.round(elev * 10) / 10;
+    const cad = holeWert(w, 'directRunCadence') ?? holeWert(w, 'directDoubleCadence');
+    if (cad) punkt.cadence = Math.round(cad);
+    const power = holeWert(w, 'directPower');
+    if (power) punkt.power = Math.round(power);
+    const bb = holeWert(w, 'directBodyBattery');
+    if (bb) punkt.bodyBattery = Math.round(bb);
+    const temp = holeWert(w, 'directAirTemperature');
+    if (temp != null) punkt.temperature = Math.round(temp * 10) / 10;
+    const dist = holeWert(w, 'sumDistance');
+    if (dist) punkt.distance = Math.round(dist);
+
+    punkte.push(punkt);
+  }
+
+  /*
+   * Auf ~200 Punkte ausdünnen: 1800 Werte pro Diagramm sind im Browser unnötig
+   * schwer und im SVG nicht mehr unterscheidbar.
+   */
+  if (punkte.length <= 240) return punkte;
+  const schritt = punkte.length / 240;
+  const duenn: GarminMesspunkt[] = [];
+  for (let i = 0; i < 240; i++) duenn.push(punkte[Math.floor(i * schritt)]);
+  if (duenn[duenn.length - 1] !== punkte[punkte.length - 1]) duenn.push(punkte[punkte.length - 1]);
+  return duenn;
+}
+
 /** Eine Aktivität, die Tim mit der Uhr getrackt hat. */
 export type GarminAktivitaet = {
   activityId: number;

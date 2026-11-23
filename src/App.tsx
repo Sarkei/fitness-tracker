@@ -12,6 +12,7 @@ import RouteErrorBoundary from './components/ui/RouteErrorBoundary';
 const TodayPage = lazy(() => import('./simple/TodayPage'));
 const TrainingPage = lazy(() => import('./simple/TrainingPage'));
 const FoodPage = lazy(() => import('./simple/FoodPage'));
+const EinheitPage = lazy(() => import('./simple/EinheitPage'));
 const ProgressPage = lazy(() => import('./simple/ProgressPage'));
 const WorkoutPage = lazy(() => import('./components/workout/WorkoutPage'));
 const NutritionPage = lazy(() => import('./components/nutrition/NutritionPage'));
@@ -62,6 +63,14 @@ const AppContent = () => {
         />
         <Route path="/today" element={<Navigate to="/" replace />} />
         <Route path="/dashboard" element={<Navigate to="/" replace />} />
+        <Route
+          path="/einheit/:id"
+          element={
+            <RouteErrorBoundary title="Einheit konnte nicht geladen werden">
+              <EinheitPage />
+            </RouteErrorBoundary>
+          }
+        />
         <Route
           path="/training"
           element={

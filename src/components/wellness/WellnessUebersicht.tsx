@@ -214,9 +214,11 @@ export default function WellnessUebersicht() {
           role="button"
           tabIndex={0}
           className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-[var(--border-muted)] bg-[var(--card-bg)] p-5 transition hover:border-[var(--simple-accent)]"
-          onClick={() => setEinheitOffen(naechsteEinheit as EinheitDaten)}
+          onClick={() => navigate(`/einheit/${encodeURIComponent(String((naechsteEinheit as { id?: string }).id ?? ''))}`)}
           onKeyDown={(ev) => {
-            if (ev.key === 'Enter' || ev.key === ' ') setEinheitOffen(naechsteEinheit as EinheitDaten);
+            if (ev.key === 'Enter' || ev.key === ' ') {
+              navigate(`/einheit/${encodeURIComponent(String((naechsteEinheit as { id?: string }).id ?? ''))}`);
+            }
           }}
         >
           <div className="min-w-0">

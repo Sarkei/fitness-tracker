@@ -35,7 +35,7 @@ import {
   SYNC_INTERVAL_OPTIONS,
   type IntervalsSettings,
 } from "./src/lib/intervals";
-import { syncGarmin, syncGarminAktivitaeten, felderStand, type GarminCache, type GarminAktivitaet } from "./src/lib/garmin";
+import { syncGarmin, syncGarminAktivitaeten, ladeEinheitZeitreihen, felderStand, type GarminCache, type GarminAktivitaet } from "./src/lib/garmin";
 import {
   deleteEvent as intervalsDeleteEvent,
   syncWorkout as intervalsSyncWorkout,
@@ -6285,6 +6285,40 @@ ${JSON.stringify(userCtx, null, 2)}
       res.status(500).json({ error: err instanceof Error ? err.message : "activities failed" });
     }
   });
+
+  /**
+   * Zeitreihen einer Einheit — Grundlage der Diagramme.
+   *
+   * Die Detailseite zeigt damit Puls, Pace, Höhe und Kadenz im Verlauf. Ohne
+   * diese Werte bleiben es Einzelzahlen, aus denen man nichts ablesen kann.
+   */
+  app.get(
+    "/api/integrations/garmin/activities/:id/timeseries",
+    requireAuth,
+    async (req: AuthRequest, res) => {
+      try {
+        const g = await readGarminSettings(req.userId!);
+        if (!g.apiKey) {
+          res.json({ punkte: [] });
+          return;
+        }
+        // Nur Einheiten des angemeldeten Nutzers — keine fremden IDs abrufen.
+        const id = String(req.params.id).replace(/^garmin_/, "");
+        const gehoert = await pool.query(
+          "SELECT 1 FROM garmin_activities WHERE user_id = $1 AND activity_id = $2 LIMIT 1",
+          [req.userId, Number(id)],
+        );
+        if ((gehoert.rowCount ?? 0) === 0) {
+          res.status(404).json({ error: "Einheit nicht gefunden." });
+          return;
+        }
+        const punkte = await ladeEinheitZeitreihen(g.apiKey, Number(id));
+        res.json({ aktivitaetId: id, punkte });
+      } catch (err: unknown) {
+        res.status(500).json({ error: err instanceof Error ? err.message : "timeseries failed" });
+      }
+    },
+  );
 
   app.get("/api/integrations/garmin", requireAuth, async (req: AuthRequest, res) => {
     try {

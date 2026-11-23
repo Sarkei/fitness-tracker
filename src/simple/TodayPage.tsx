@@ -202,7 +202,7 @@ export default function TodayPage() {
                 <li key={`${String(e.id ?? i)}`}>
                   <button
                     type="button"
-                    onClick={() => setEinheitOffen(e as EinheitDaten)}
+                    onClick={() => navigate(`/einheit/${encodeURIComponent(String(e.id ?? ''))}`)}
                     className="flex w-full items-baseline justify-between gap-3 py-2 text-left transition hover:text-[var(--simple-accent)]"
                   >
                     <span className="flex min-w-0 flex-1 items-baseline gap-2">

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useExerciseDetailOptional } from '@/src/lib/exerciseDetailContext';
 import { api } from '../lib/api';
 import EinheitDetailModal, { type EinheitDaten } from '../components/wellness/EinheitDetailModal';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   BarChart3,
   Calendar,
@@ -89,6 +89,7 @@ function dateOfDayKey(key: string, weekMonday: string = ymdOf(mondayOfYmd(todayY
 }
 
 export default function TrainingPage() {
+  const navigate = useNavigate();
   // Uebungen antippbar machen: Erklaerung, Video und eigener Verlauf.
   const exerciseDetail = useExerciseDetailOptional();
   const today = todayYmd();
@@ -577,7 +578,7 @@ export default function TrainingPage() {
                 <li key={`uhr-${String(e.id ?? i)}`}>
                   <button
                     type="button"
-                    onClick={() => setEinheitOffen2(e as EinheitDaten)}
+                    onClick={() => navigate(`/einheit/${encodeURIComponent(String(e.id ?? ''))}`)}
                     className="flex w-full items-baseline justify-between gap-3 py-2.5 text-left transition hover:text-[var(--simple-accent)]"
                   >
                     <span className="flex min-w-0 flex-1 items-baseline gap-2">
