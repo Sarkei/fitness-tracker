@@ -8,17 +8,7 @@
  * Der Key geht nie an den Browser zurück — die Karte zeigt nur, ob einer gesetzt ist.
  */
 import { useCallback, useEffect, useState } from 'react';
-import {
-  Activity,
-  CheckCircle2,
-  ExternalLink,
-  Heart,
-  Loader2,
-  Moon,
-  RefreshCw,
-  Trash2,
-  Watch,
-} from 'lucide-react';
+import { CheckCircle2, ExternalLink, Loader2, RefreshCw, Trash2, Watch } from 'lucide-react';
 import { api } from '@/src/lib/api';
 
 type GarminTag = {
@@ -58,8 +48,9 @@ type Status = {
   lastSync: string | null;
   lastError: string | null;
   nichtVerfuegbar: string[];
-  heute: GarminTag | null;
-  tage: GarminTag[];
+  felder: { gesamt: number; erfolgreich: number; fehlend: string[] };
+  laufend: { schritt: number; gesamt: number } | null;
+  tage: number;
 };
 
 function fmtDatum(iso: string | null): string {
@@ -123,6 +114,16 @@ export default function GarminConnect() {
     void laden();
   }, [laden]);
 
+  /*
+   * Waehrend ein Abgleich laeuft, alle 2 Sekunden nachfragen. So sieht Tim den
+   * Fortschritt, statt auf einen fertigen Stand zu warten.
+   */
+  useEffect(() => {
+    if (!status?.laufend) return;
+    const t = window.setInterval(() => void laden(), 2000);
+    return () => window.clearInterval(t);
+  }, [status?.laufend, laden]);
+
   const verbinden = async () => {
     if (!key.trim()) {
       setFehler('Bitte den Garmin-API-Key einfügen.');
@@ -179,8 +180,6 @@ export default function GarminConnect() {
       setArbeitet(false);
     }
   };
-
-  const heute = status?.heute;
 
   return (
     <div className="rounded-2xl border border-[var(--border-muted)] bg-[var(--card-bg)] p-4">
@@ -284,85 +283,30 @@ export default function GarminConnect() {
         </div>
       )}
 
-      {/* Heutige Werte direkt von der Uhr */}
-      {status?.connected && heute && (
-        <div className="mt-3 grid grid-cols-2 gap-2 border-t border-[var(--border-muted)] pt-3 sm:grid-cols-4">
-          <div className="rounded-xl bg-[var(--background)] px-2.5 py-2">
-            <p className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
-              <Moon className="h-3 w-3" /> Schlaf
-            </p>
-            <p className="mt-0.5 text-[13px] font-semibold tabular-nums">{stunden(heute.sleepSecs)}</p>
-            <p className="text-[10px] text-[var(--text-muted)]">
-              {heute.sleepScore != null ? `Score ${Math.round(heute.sleepScore)}` : 'kein Score'}
-            </p>
-          </div>
-          <div className="rounded-xl bg-[var(--background)] px-2.5 py-2">
-            <p className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
-              <Heart className="h-3 w-3" /> HRV
-            </p>
-            <p className="mt-0.5 text-[13px] font-semibold tabular-nums">
-              {heute.hrv != null ? `${Math.round(heute.hrv)} ms` : '—'}
-            </p>
-            <p className="text-[10px] text-[var(--text-muted)]">
-              {heute.restingHr != null ? `Puls ${Math.round(heute.restingHr)}` : 'kein Puls'}
-            </p>
-          </div>
-          <div className="rounded-xl bg-[var(--background)] px-2.5 py-2">
-            <p className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
-              <Activity className="h-3 w-3" /> Stress
-            </p>
-            <p className="mt-0.5 text-[13px] font-semibold tabular-nums">
-              {heute.stressAvg != null ? Math.round(heute.stressAvg) : '—'}
-            </p>
-            <p className="text-[10px] text-[var(--text-muted)]">
-              {heute.bodyBatteryMax != null ? `Akku ${Math.round(heute.bodyBatteryMax)}` : 'kein Akku'}
-            </p>
-          </div>
-          <div className="rounded-xl bg-[var(--background)] px-2.5 py-2">
-            <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">Schritte</p>
-            <p className="mt-0.5 text-[13px] font-semibold tabular-nums">
-              {heute.steps != null ? heute.steps.toLocaleString('de-DE') : '—'}
-            </p>
-            <p className="text-[10px] text-[var(--text-muted)]">
-              {heute.floorsClimbed != null ? `${heute.floorsClimbed} Etagen` : 'keine Etagen'}
-            </p>
-          </div>
-          <div className="rounded-xl bg-[var(--background)] px-2.5 py-2">
-            <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">Body Battery</p>
-            <p className="mt-0.5 text-[13px] font-semibold tabular-nums">
-              {heute.bodyBatteryMax != null ? Math.round(heute.bodyBatteryMax) : '—'}
-            </p>
-            <p className="text-[10px] text-[var(--text-muted)]">
-              {heute.bodyBatteryMin != null ? `Tief ${Math.round(heute.bodyBatteryMin)}` : 'kein Tief'}
-            </p>
-          </div>
-          <div className="rounded-xl bg-[var(--background)] px-2.5 py-2">
-            <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">SpO₂</p>
-            <p className="mt-0.5 text-[13px] font-semibold tabular-nums">
-              {heute.spo2Avg != null ? `${Math.round(heute.spo2Avg)} %` : '—'}
-            </p>
-            <p className="text-[10px] text-[var(--text-muted)]">
-              {heute.respirationAvg != null ? `${Math.round(heute.respirationAvg)}/min` : 'keine Atmung'}
-            </p>
-          </div>
-          <div className="rounded-xl bg-[var(--background)] px-2.5 py-2">
-            <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">Fitness</p>
-            <p className="mt-0.5 text-[13px] font-semibold tabular-nums">
-              {heute.vo2max != null ? `VO₂ ${Math.round(heute.vo2max)}` : '—'}
-            </p>
-            <p className="text-[10px] text-[var(--text-muted)]">
-              {heute.fitnessAge != null ? `Alter ${Math.round(heute.fitnessAge)}` : 'kein Alter'}
-            </p>
-          </div>
-          <div className="rounded-xl bg-[var(--background)] px-2.5 py-2">
-            <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">Gewicht</p>
-            <p className="mt-0.5 text-[13px] font-semibold tabular-nums">
-              {heute.weightKg != null ? `${heute.weightKg} kg` : '—'}
-            </p>
-            <p className="text-[10px] text-[var(--text-muted)]">
-              {heute.bodyFat != null ? `${Math.round(heute.bodyFat)} % Fett` : 'kein Fettanteil'}
-            </p>
-          </div>
+      {/* Abgleich-Stand: wie viele Werte sind angekommen, laeuft es noch? */}
+      {status?.connected && (
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-[var(--border-muted)] pt-3">
+          {status.laufend ? (
+            <>
+              <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[var(--simple-accent)]">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Synct gerade … {status.laufend.schritt}/{status.laufend.gesamt}
+              </span>
+              <span className="text-[10.5px] text-[var(--text-muted)]">Daten werden geholt</span>
+            </>
+          ) : (
+            <>
+              <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[var(--simple-accent)]">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Erfolgreich: {status.felder?.erfolgreich ?? 0}/{status.felder?.gesamt ?? 0}
+              </span>
+              {status.tage > 0 && (
+                <span className="text-[10.5px] text-[var(--text-muted)]">
+                  {status.tage} {status.tage === 1 ? 'Tag' : 'Tage'} dabei
+                </span>
+              )}
+            </>
+          )}
         </div>
       )}
 

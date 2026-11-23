@@ -17,6 +17,16 @@ const BASE = 'https://personal.connectapi.garmin.com';
 
 export type GarminToken = { token: string; expiresAt: number };
 
+/** Garmins Textqualifier auf eine 0-100-Stufe abbilden (Schlafqualitaet). */
+const QUALIFIER_STUFE: Record<string, number> = {
+  EXCELLENT: 95,
+  VERY_GOOD: 85,
+  GOOD: 75,
+  FAIR: 55,
+  POOR: 35,
+  VERY_POOR: 20,
+};
+
 export type GarminTag = {
   date: string; // YYYY-MM-DD
   /** Schlaf */
@@ -53,6 +63,44 @@ export type GarminTag = {
   weightKg?: number;
   bodyFat?: number;
 };
+
+/**
+ * Alle Felder, die die App aus Garmin lesen will. Grundlage fuer die Anzeige
+ * „Erfolgreich: 24/24" im Profil — Tim will sehen, wie viele Werte wirklich
+ * angekommen sind, statt einzelner Kacheln.
+ */
+export const GARMIN_FELDER = [
+  'sleepSecs', 'sleepScore', 'sleepQuality', 'deepSecs', 'lightSecs', 'remSecs', 'awakeSecs',
+  'hrv', 'hrvStatus', 'restingHr', 'minHr', 'maxHr',
+  'steps', 'floorsClimbed', 'distanceMeters', 'activeCalories', 'totalCalories',
+  'stressAvg', 'stressMax', 'bodyBatteryMin', 'bodyBatteryMax',
+  'spo2Avg', 'respirationAvg',
+  'vo2max', 'fitnessAge', 'weightKg', 'bodyFat',
+] as const;
+
+/**
+ * Felder, die Garmin nur bei Gelegenheit misst: Gewicht beim Wiegen, VO2max beim
+ * Laufen. Sie fehlen an einem normalen Tag zu Recht — dann zaehlt der letzte
+ * bekannte Wert, sonst wirkt der Abgleich schlechter als er ist.
+ */
+const LANGSAME_FELDER = new Set(['vo2max', 'fitnessAge', 'weightKg', 'bodyFat']);
+
+/** Wie viele Felder sind gefuellt? Schnelle Felder vom juengsten Tag, langsame vom letzten Messwert. */
+export function felderStand(tage: GarminTag[]): { gesamt: number; erfolgreich: number; fehlend: string[] } {
+  const gesamt = GARMIN_FELDER.length;
+  if (!tage.length) return { gesamt, erfolgreich: 0, fehlend: [...GARMIN_FELDER] };
+  const juengster = tage[tage.length - 1] as Record<string, unknown>;
+
+  const hatWert = (feld: string): boolean => {
+    if (juengster[feld] != null) return true;
+    if (!LANGSAME_FELDER.has(feld)) return false;
+    // Letzter bekannter Messwert, egal wie alt.
+    return tage.some((t) => (t as Record<string, unknown>)[feld] != null);
+  };
+
+  const fehlend = GARMIN_FELDER.filter((f) => !hatWert(f));
+  return { gesamt, erfolgreich: gesamt - fehlend.length, fehlend: [...fehlend] };
+}
 
 export type GarminCache = {
   fetchedAt: string;
@@ -150,7 +198,13 @@ function zahl(v: unknown): number | undefined {
  * die Uhr kein SpO₂ misst), bleiben die anderen Bereiche nutzbar und der Grund
  * landet in `nichtVerfuegbar`.
  */
-export async function syncGarmin(apiKey: string, tage = 30): Promise<GarminCache> {
+export type SyncFortschritt = (stand: { schritt: number; gesamt: number }) => void;
+
+export async function syncGarmin(
+  apiKey: string,
+  tage = 30,
+  onFortschritt?: SyncFortschritt,
+): Promise<GarminCache> {
   const { token } = await garminToken(apiKey);
   const { von, bis } = tageZurueck(tage);
   const heute = ymd(new Date());
@@ -163,18 +217,57 @@ export async function syncGarmin(apiKey: string, tage = 30): Promise<GarminCache
     return proTag.get(key)!;
   };
 
-  const [profil, schlaf, hrv, steps, stress, bodyBattery, spo2, herz, summary, gewicht] = await Promise.all([
-    hole<{ displayName?: string; fullName?: string }>(token, '/userprofile-service/userprofile/settings'),
-    hole<unknown>(token, `/sleep-service/sleep/dailySleepSummariesByDate?fromDate=${von}&toDate=${bis}`),
-    hole<unknown>(token, `/hrv-service/hrv/daily/${von}/${bis}`),
-    hole<unknown>(token, `/usersummary-service/stats/steps/daily/${von}/${bis}`),
-    hole<unknown>(token, `/usersummary-service/stats/stress/daily/${von}/${bis}`),
-    hole<unknown>(token, `/wellness-service/wellness/bodyBattery/reports/daily?fromDate=${von}&toDate=${bis}`),
-    hole<unknown>(token, `/wellness-service/wellness/daily/spo2acclimation/${heute}`),
-    hole<unknown>(token, '/wellness-service/wellness/dailyHeartRate'),
-    hole<unknown>(token, `/usersummary-service/v2/dailysummaries?fromDate=${von}&toDate=${bis}`),
-    hole<unknown>(token, `/weight-service/weight/range/${von}/${bis}`),
+  // Fortschritt melden, waehrend die Abrufe durchlaufen — die App zeigt damit
+  // „laeuft gerade" statt faelschlich „abgeschlossen".
+  let erledigt = 0;
+  const gesamtSchritte = 9 + Math.min(tage, 14) + Math.min(tage, 30) * 2;
+  const tick = () => {
+    erledigt += 1;
+    onFortschritt?.({ schritt: erledigt, gesamt: gesamtSchritte });
+  };
+
+  /*
+   * Endpunkte und Parameter — an der echten API verifiziert (23.11.2026):
+   *  - Die Zeitreihen erwarten durchgaengig `startDate`/`endDate`, NICHT
+   *    `fromDate`/`toDate`. Mit den falschen Namen antwortet Garmin mit HTTP 400
+   *    und leerem Body, ohne Fehlermeldung.
+   *  - steps und stress gibt es NUR mit Datum im Pfad und nur fuer kurze
+   *    Zeitraeume; `?startDate=` endet dort in 404.
+   *  - v2/dailysummaries buendelt Body Battery, Kalorien, Herzfrequenz, Stress,
+   *    Atmung und Etagen in einem Aufruf — das spart die meisten Einzelabrufe.
+   */
+  const kurzVon = ymd(new Date(Date.now() - Math.min(tage, 7) * 86_400_000));
+
+  const [profil, schlaf, hrv, steps, stress, spo2, herz, summary, gewicht] = await Promise.all([
+    hole<{ displayName?: string; fullName?: string }>(token, '/userprofile-service/userprofile/settings').then((r) => (tick(), r)),
+    hole<unknown>(token, `/sleep-service/sleep/dailySleepSummariesByDate?startDate=${von}&endDate=${bis}`).then((r) => (tick(), r)),
+    hole<unknown>(token, `/hrv-service/hrv/daily/${von}/${bis}`).then((r) => (tick(), r)),
+    hole<unknown>(token, `/usersummary-service/stats/steps/daily/${kurzVon}/${bis}`).then((r) => (tick(), r)),
+    hole<unknown>(token, `/usersummary-service/stats/stress/daily/${kurzVon}/${bis}`).then((r) => (tick(), r)),
+    hole<unknown>(token, `/wellness-service/wellness/daily/spo2acclimation/${heute}`).then((r) => (tick(), r)),
+    hole<unknown>(token, '/wellness-service/wellness/dailyHeartRate').then((r) => (tick(), r)),
+    hole<unknown>(token, `/usersummary-service/v2/dailysummaries?startDate=${von}&endDate=${bis}`).then((r) => (tick(), r)),
+    hole<unknown>(token, `/weight-service/weight/range/${von}/${bis}`).then((r) => (tick(), r)),
   ]);
+
+  /*
+   * Tages-Einzelabruf: `usersummary/daily?calendarDate=…` ist die vollstaendigste
+   * Quelle — sie liefert Etagen, Schritte, Distanz, Stress, Body Battery, SpO2 und
+   * Atmung in einem Objekt. Die Sammel-Endpunkte lassen genau diese Felder weg,
+   * deshalb kam vorher fast nichts an. Begrenzt auf die letzten 14 Tage, damit der
+   * Abgleich schnell bleibt.
+   */
+  const tagesEinzel = await Promise.all(
+    Array.from({ length: Math.min(tage, 14) }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const datum = ymd(d);
+      return hole<Record<string, unknown>>(
+        token,
+        `/usersummary-service/usersummary/daily?calendarDate=${datum}`,
+      ).then((r) => (tick(), { datum, daten: r }));
+    }),
+  );
 
   // VO2max und Fitnessalter je Tag (eigene Endpunkte) — nur für die letzten 30 Tage,
   // damit der Abruf nicht ausufert.
@@ -184,8 +277,8 @@ export async function syncGarmin(apiKey: string, tage = 30): Promise<GarminCache
       d.setDate(d.getDate() - i);
       const ymd0 = ymd(d);
       return Promise.all([
-        hole<unknown>(token, `/metrics-service/metrics/maxmet/daily/${ymd0}/${ymd0}`),
-        hole<unknown>(token, `/fitnessage-service/fitnessage/v2/${ymd0}`),
+        hole<unknown>(token, `/metrics-service/metrics/maxmet/daily/${ymd0}/${ymd0}`).then((r) => (tick(), r)),
+        hole<unknown>(token, `/fitnessage-service/fitnessage/v2/${ymd0}`).then((r) => (tick(), r)),
       ]).then(([m, f]) => ({ datum: ymd0, maxmet: m, fitness: f }));
     }),
   );
@@ -195,7 +288,7 @@ export async function syncGarmin(apiKey: string, tage = 30): Promise<GarminCache
     if (Array.isArray(roh)) return roh as Array<Record<string, unknown>>;
     if (roh && typeof roh === 'object') {
       const o = roh as Record<string, unknown>;
-      for (const k of ['dailySleepDTOs', 'sleepSummaries', 'summaries', 'values', 'items', 'data', 'days']) {
+      for (const k of ['dailySleepDTOs', 'sleepSummaries', 'summaries', 'hrvSummaries', 'values', 'items', 'data', 'days']) {
         if (Array.isArray(o[k])) return o[k] as Array<Record<string, unknown>>;
       }
       // Einzelobjekt mit Datum
@@ -212,10 +305,19 @@ export async function syncGarmin(apiKey: string, tage = 30): Promise<GarminCache
     const t = eintrag(d);
     const secs = zahl(s.sleepTimeSeconds) ?? zahl(s.sleepSeconds) ?? zahl(s.totalSleepSeconds);
     if (secs) t.sleepSecs = secs;
-    const score = zahl(s.sleepScore) ?? zahl(s.overallSleepScore) ?? zahl(s.sleepScores);
+    // Score steckt in sleepScores.overall.value; die Qualifier sind Textlabels.
+    const scores = s.sleepScores as Record<string, unknown> | undefined;
+    const overall = scores?.overall as Record<string, unknown> | undefined;
+    const score = zahl(s.sleepScore) ?? zahl(overall) ?? zahl(s.overallSleepScore);
     if (score) t.sleepScore = score;
     const q = zahl(s.sleepQuality);
     if (q) t.sleepQuality = q;
+    // Garmin liefert statt einer Zahl nur einen Qualifier (EXCELLENT, FAIR, POOR).
+    const qualifier = typeof overall?.qualifierKey === 'string' ? overall.qualifierKey : '';
+    if (qualifier) {
+      const stufe = QUALIFIER_STUFE[qualifier];
+      if (stufe != null) t.sleepQuality = stufe;
+    }
     // Schlafphasen (aus den Detailwerten, wenn vorhanden)
     const tief = zahl(s.deepSleepSeconds);
     const leicht = zahl(s.lightSleepSeconds);
@@ -227,16 +329,27 @@ export async function syncGarmin(apiKey: string, tage = 30): Promise<GarminCache
     if (wach) t.awakeSecs = wach;
   }
 
-  // Gewicht
+  /*
+   * Gewicht: die Antwort heisst dailyWeightSummaries, die Werte stecken unter
+   * latestWeight und kommen in GRAMM (112690 = 112,69 kg).
+   */
   if (gewicht) {
-    for (const w of liste(gewicht)) {
-      const d = String(w.calendarDate ?? w.date ?? w.samplePk ?? '').slice(0, 10);
+    const rohG = gewicht as Record<string, unknown>;
+    const gewichtsListe = Array.isArray(rohG.dailyWeightSummaries)
+      ? (rohG.dailyWeightSummaries as Array<Record<string, unknown>>)
+      : liste(gewicht);
+    for (const w of gewichtsListe) {
+      const detail = (w.latestWeight ?? w) as Record<string, unknown>;
+      const d = String(
+        w.summaryDate ?? detail.calendarDate ?? detail.date ?? '',
+      ).slice(0, 10);
       if (!d) continue;
-      const kg = zahl(w.weight) ?? zahl(w.weightInGrams);
+      const gramm = zahl(detail.weight) ?? zahl(detail.weightInGrams);
       const t = eintrag(d);
-      // Garmin liefert teils Gramm — auf Kilogramm normalisieren.
-      if (kg) t.weightKg = kg > 1000 ? Math.round((kg / 1000) * 10) / 10 : Math.round(kg * 10) / 10;
-      const fett = zahl(w.bodyFat);
+      if (gramm) {
+        t.weightKg = gramm > 1000 ? Math.round((gramm / 1000) * 10) / 10 : Math.round(gramm * 10) / 10;
+      }
+      const fett = zahl(detail.bodyFat);
       if (fett) t.bodyFat = fett;
     }
   }
@@ -244,9 +357,11 @@ export async function syncGarmin(apiKey: string, tage = 30): Promise<GarminCache
   // VO2max + Fitnessalter (Einzelabrufe je Tag)
   for (const k of koerper) {
     const t = eintrag(k.datum);
-    const v = liste(k.maxmet)[0];
-    if (v) {
-      const vo2 = zahl(v.vo2Max) ?? zahl(v.vo2max) ?? zahl(v.value);
+    // VO2max steckt in maxmet[i].generic.vo2MaxValue (nicht auf oberster Ebene).
+    const eintragMaxmet = liste(k.maxmet)[0];
+    if (eintragMaxmet) {
+      const generic = (eintragMaxmet.generic ?? eintragMaxmet) as Record<string, unknown>;
+      const vo2 = zahl(generic.vo2MaxPreciseValue) ?? zahl(generic.vo2MaxValue) ?? zahl(generic.vo2Max);
       if (vo2) t.vo2max = vo2;
     }
     if (k.fitness && typeof k.fitness === 'object') {
@@ -269,7 +384,10 @@ export async function syncGarmin(apiKey: string, tage = 30): Promise<GarminCache
       zahl(h.weeklyAvg) ??
       zahl(h.hrv) ??
       zahl(h.value);
-    if (v) eintrag(d).hrv = v;
+    const t = eintrag(d);
+    if (v) t.hrv = v;
+    // Status kommt als Text: BALANCED, LOW, HIGH, UNBALANCED.
+    if (typeof h.status === 'string' && h.status) t.hrvStatus = h.status;
   }
 
   // Schritte
@@ -286,24 +404,17 @@ export async function syncGarmin(apiKey: string, tage = 30): Promise<GarminCache
   for (const s of liste(stress)) {
     const d = String(s.calendarDate ?? s.date ?? '').slice(0, 10);
     if (!d) continue;
-    const avg = zahl(s.averageStressLevel) ?? zahl(s.avg) ?? zahl(s.value);
-    const max = zahl(s.maxStressLevel) ?? zahl(s.max);
+    // Stress kommt verschachtelt: {"values":{"overallStressLevel":42,...}}
+    const values = s.values as Record<string, unknown> | undefined;
+    const avg =
+      zahl(s.averageStressLevel) ?? zahl(values?.overallStressLevel) ?? zahl(s.avg) ?? zahl(s.value);
+    const max = zahl(s.maxStressLevel) ?? zahl(values) ?? zahl(s.max);
     const t = eintrag(d);
     if (avg) t.stressAvg = avg;
     if (max) t.stressMax = max;
   }
 
-  // Body Battery
-  if (bodyBattery == null) nichtVerfuegbar.push('Body Battery');
-  for (const b of liste(bodyBattery)) {
-    const d = String(b.calendarDate ?? b.date ?? b.summaryDate ?? '').slice(0, 10);
-    if (!d) continue;
-    const min = zahl(b.bodyBatteryMin) ?? zahl(b.min) ?? zahl(b.lowest);
-    const max = zahl(b.bodyBatteryMax) ?? zahl(b.max) ?? zahl(b.highest);
-    const t = eintrag(d);
-    if (min != null) t.bodyBatteryMin = min;
-    if (max != null) t.bodyBatteryMax = max;
-  }
+  // Body Battery kommt aus der Dailysummary (siehe unten) — eigener Abruf entfaellt.
 
   // SpO2 (nur heute, Garmin liefert tagesaktuell)
   if (spo2 == null) nichtVerfuegbar.push('SpO₂');
@@ -326,29 +437,117 @@ export async function syncGarmin(apiKey: string, tage = 30): Promise<GarminCache
     if (max) t.maxHr = max;
   }
 
-  // Tageszusammenfassung (Schritte, Etagen, Kalorien, Ruhepuls, Atmung)
+  /*
+   * Tageszusammenfassung: das dichteste Paket der API. Liefert Schritte, Etagen,
+   * Distanz, Kalorien, Ruhepuls, Stress, Body Battery, Atmung und SpO2 in einem
+   * Aufruf. Die Werte stecken in verschachtelten Objekten:
+   *   bodyBattery: {maxValue, minValue}   calories: {burnedActive, burnedResting}
+   *   heartRate:   {restingValue, minValue, maxValue}
+   *   stress:      {avgLevel, maxLevel}   respiration: {avgValue}
+   */
   for (const s of liste(summary)) {
     const d = String(s.calendarDate ?? s.date ?? s.summaryDate ?? '').slice(0, 10);
     if (!d) continue;
     const t = eintrag(d);
-    const steps2 = zahl(s.totalSteps) ?? zahl(s.steps);
-    if (steps2 && !t.steps) t.steps = steps2;
-    const floors = zahl(s.floorsClimbed) ?? zahl(s.totalFloors);
-    if (floors) t.floorsClimbed = floors;
-    const dist = zahl(s.totalDistanceMeters) ?? zahl(s.distance);
-    if (dist) t.distanceMeters = Math.round(dist);
-    const aktiv = zahl(s.activeKilocalories) ?? zahl(s.activeCalories);
-    if (aktiv) t.activeCalories = Math.round(aktiv);
-    const gesamt = zahl(s.totalKilocalories) ?? zahl(s.totalCalories);
-    if (gesamt) t.totalCalories = Math.round(gesamt);
-    const rest = zahl(s.restingHeartRate);
+
+    // Schritte stecken in movement.steps, nicht auf oberster Ebene.
+    const bewegung = s.movement as Record<string, unknown> | undefined;
+    const schrittBlock = bewegung?.steps as Record<string, unknown> | undefined;
+    const schritte =
+      zahl(schrittBlock?.value) ?? zahl(s.totalSteps) ?? zahl(s.steps);
+    if (schritte && !t.steps) t.steps = schritte;
+    const distRaw =
+      zahl(schrittBlock?.distanceInMeters) ?? zahl(s.totalDistanceMeters) ?? zahl(s.distance);
+    if (distRaw) t.distanceMeters = Math.round(distRaw);
+    const etagen =
+      zahl(schrittBlock?.floorsClimbed) ?? zahl(s.floorsClimbed) ?? zahl(s.floors);
+    if (etagen) t.floorsClimbed = etagen;
+
+    const kcal = s.calories as Record<string, unknown> | undefined;
+    if (kcal) {
+      const aktiv = zahl(kcal.burnedActive) ?? zahl(kcal.activeKilocalories);
+      const gesamt = zahl(kcal.burnedTotal);
+      const ruhe = zahl(kcal.burnedResting);
+      if (aktiv) t.activeCalories = Math.round(aktiv);
+      if (gesamt) t.totalCalories = Math.round(gesamt);
+      else if (aktiv && ruhe) t.totalCalories = Math.round(aktiv + ruhe);
+    }
+
+    const hf = s.heartRate as Record<string, unknown> | undefined;
+    if (hf) {
+      const rest = zahl(hf.restingValue) ?? zahl(hf.restingHeartRate);
+      const min = zahl(hf.minValue);
+      const max = zahl(hf.maxValue);
+      if (rest && !t.restingHr) t.restingHr = rest;
+      if (min && !t.minHr) t.minHr = min;
+      if (max && !t.maxHr) t.maxHr = max;
+    }
+
+    const stressBlock = s.stress as Record<string, unknown> | undefined;
+    if (stressBlock) {
+      const schnitt = zahl(stressBlock.avgLevel) ?? zahl(stressBlock.averageStressLevel);
+      const max = zahl(stressBlock.maxLevel);
+      if (schnitt && !t.stressAvg) t.stressAvg = schnitt;
+      if (max && !t.stressMax) t.stressMax = max;
+    }
+
+    const akku = s.bodyBattery as Record<string, unknown> | undefined;
+    if (akku) {
+      const max = zahl(akku.maxValue) ?? zahl(akku.mostRecentValue);
+      const min = zahl(akku.minValue) ?? zahl(akku.lowestValue);
+      if (max != null && t.bodyBatteryMax == null) t.bodyBatteryMax = max;
+      if (min != null && t.bodyBatteryMin == null) t.bodyBatteryMin = min;
+    }
+
+    const atem = s.respiration as Record<string, unknown> | undefined;
+    if (atem) {
+      const v = zahl(atem.avgValue) ?? zahl(atem.avgWakingRespirationValue);
+      if (v) t.respirationAvg = v;
+    }
+
+    // SpO2 heisst in der Dailysummary pulsox.
+    const sauerstoff = (s.pulseOx ?? s.spo2) as Record<string, unknown> | undefined;
+    if (sauerstoff) {
+      const v = zahl(sauerstoff.avgValue) ?? zahl(sauerstoff.averageValue);
+      if (v) t.spo2Avg = v;
+    }
+  }
+
+  /*
+   * Einzelabrufe auswerten: sie fuellen die Felder, die in den Sammel-Endpunkten
+   * fehlen (Etagen, Distanz, SpO2) oder dort anders heissen.
+   */
+  for (const { datum, daten } of tagesEinzel) {
+    if (!daten) continue;
+    const t = eintrag(datum);
+    const schritte = zahl(daten.totalSteps);
+    if (schritte && !t.steps) t.steps = schritte;
+    const dist = zahl(daten.totalDistanceMeters) ?? zahl(daten.wellnessDistanceMeters);
+    if (dist && !t.distanceMeters) t.distanceMeters = Math.round(dist);
+    const etagen = zahl(daten.floorsAscended);
+    if (etagen != null && t.floorsClimbed == null) t.floorsClimbed = Math.round(etagen);
+    const stress = zahl(daten.averageStressLevel);
+    if (stress && !t.stressAvg) t.stressAvg = stress;
+    const stressMax = zahl(daten.maxStressLevel);
+    if (stressMax && !t.stressMax) t.stressMax = stressMax;
+    const bbMax = zahl(daten.bodyBatteryHighestValue) ?? zahl(daten.bodyBatteryMostRecentValue);
+    if (bbMax != null && t.bodyBatteryMax == null) t.bodyBatteryMax = bbMax;
+    const bbMin = zahl(daten.bodyBatteryLowestValue);
+    if (bbMin != null && t.bodyBatteryMin == null) t.bodyBatteryMin = bbMin;
+    const spo2 = zahl(daten.averageSpo2) ?? zahl(daten.latestSpo2);
+    if (spo2 && !t.spo2Avg) t.spo2Avg = spo2;
+    const atem = zahl(daten.avgWakingRespirationValue);
+    if (atem && !t.respirationAvg) t.respirationAvg = atem;
+    const rest = zahl(daten.restingHeartRate);
     if (rest && !t.restingHr) t.restingHr = rest;
-    const atem = zahl(s.avgWakingRespirationValue) ?? zahl(s.respiration);
-    if (atem) t.respirationAvg = atem;
-    const minBb = zahl(s.bodyBatteryLowestValue);
-    const maxBb = zahl(s.bodyBatteryMostRecentValue);
-    if (minBb != null && t.bodyBatteryMin == null) t.bodyBatteryMin = minBb;
-    if (maxBb != null && t.bodyBatteryMax == null) t.bodyBatteryMax = maxBb;
+    const minHr = zahl(daten.minHeartRate);
+    if (minHr && !t.minHr) t.minHr = minHr;
+    const maxHr = zahl(daten.maxHeartRate);
+    if (maxHr && !t.maxHr) t.maxHr = maxHr;
+    const aktiv = zahl(daten.activeKilocalories);
+    if (aktiv && !t.activeCalories) t.activeCalories = Math.round(aktiv);
+    const gesamt = zahl(daten.totalKilocalories);
+    if (gesamt && !t.totalCalories) t.totalCalories = Math.round(gesamt);
   }
 
   const tageListe = [...proTag.values()].sort((a, b) => a.date.localeCompare(b.date));

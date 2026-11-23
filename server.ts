@@ -35,7 +35,7 @@ import {
   SYNC_INTERVAL_OPTIONS,
   type IntervalsSettings,
 } from "./src/lib/intervals";
-import { syncGarmin, type GarminCache } from "./src/lib/garmin";
+import { syncGarmin, felderStand, type GarminCache } from "./src/lib/garmin";
 import {
   deleteEvent as intervalsDeleteEvent,
   syncWorkout as intervalsSyncWorkout,
@@ -5706,6 +5706,12 @@ ${JSON.stringify(userCtx, null, 2)}
    * Nicht möglich: Trainings auf die Uhr schreiben. Die Personal API hat
    * ausschließlich GET-Endpunkte; der Rückweg läuft über Intervals.icu.
    */
+  /**
+   * Laeuft gerade ein Abgleich? Dann zeigt das Profil „laeuft" statt
+   * „abgeschlossen" — Tim will sehen, dass im Hintergrund noch Daten kommen.
+   */
+  const garminSyncLaufend = new Map<number, { schritt: number; gesamt: number; seit: number }>();
+
   type GarminSettings = {
     apiKey?: string;
     connectedAt?: string;
@@ -5762,7 +5768,9 @@ ${JSON.stringify(userCtx, null, 2)}
         t.stressAvg ?? null, t.stressMax ?? null,
         t.bodyBatteryMin ?? null, t.bodyBatteryMax ?? null,
         t.spo2Avg ?? null, t.respirationAvg ?? null,
-        t.vo2max ?? null, t.fitnessAge ?? null,
+        t.vo2max ?? null,
+        // Fitnessalter kommt als Kommazahl, die Spalte ist INTEGER — runden.
+        t.fitnessAge != null ? Math.round(t.fitnessAge) : null,
         t.weightKg ?? null, t.bodyFat ?? null,
       );
     }
@@ -5806,7 +5814,8 @@ ${JSON.stringify(userCtx, null, 2)}
     try {
       const g = await readGarminSettings(req.userId!);
       const tage = g.cache?.tage ?? [];
-      const heute = tage[tage.length - 1] ?? null;
+      const stand = felderStand(tage);
+      const laufend = garminSyncLaufend.get(req.userId!);
       res.json({
         connected: Boolean(g.apiKey),
         connectedAt: g.connectedAt ?? null,
@@ -5814,8 +5823,13 @@ ${JSON.stringify(userCtx, null, 2)}
         lastSync: g.cache?.fetchedAt ?? null,
         lastError: g.lastError ?? null,
         nichtVerfuegbar: g.cache?.nichtVerfuegbar ?? [],
-        heute,
-        tage,
+        /** Wie viele der gewuenschten Felder beim juengsten Tag gefuellt sind. */
+        felder: stand,
+        /** Laufender Abgleich: null wenn fertig, sonst Fortschritt. */
+        laufend: laufend
+          ? { schritt: laufend.schritt, gesamt: laufend.gesamt }
+          : null,
+        tage: tage.length,
       });
     } catch (err: unknown) {
       res.status(500).json({ error: err instanceof Error ? err.message : "load failed" });
@@ -5913,7 +5927,11 @@ ${JSON.stringify(userCtx, null, 2)}
         return;
       }
       // Erst prüfen, dann speichern — ein falscher Key landet nicht in der DB.
-      const cache = await syncGarmin(apiKey, 30);
+      garminSyncLaufend.set(req.userId!, { schritt: 0, gesamt: 26, seit: Date.now() });
+      const cache = await syncGarmin(apiKey, 30, (f) =>
+        garminSyncLaufend.set(req.userId!, { ...f, seit: Date.now() }),
+      );
+      garminSyncLaufend.delete(req.userId!);
       await writeGarminSettings(req.userId!, {
         apiKey,
         connectedAt: new Date().toISOString(),
@@ -5950,7 +5968,10 @@ ${JSON.stringify(userCtx, null, 2)}
         return;
       }
       const t0 = Date.now();
-      const cache = await syncGarmin(g.apiKey, 30);
+      garminSyncLaufend.set(req.userId!, { schritt: 0, gesamt: 26, seit: Date.now() });
+      const cache = await syncGarmin(g.apiKey, 30, (f) =>
+        garminSyncLaufend.set(req.userId!, { ...f, seit: Date.now() }),
+      );
       await writeGarminSettings(req.userId!, {
         ...g,
         cache,
@@ -5961,14 +5982,16 @@ ${JSON.stringify(userCtx, null, 2)}
       await speichereGarminTage(req.userId!, cache.tage).catch((e) =>
         console.warn("[garmin] Historie:", e),
       );
+      garminSyncLaufend.delete(req.userId!);
       res.json({
         ok: true,
         ms: Date.now() - t0,
         tage: cache.tage.length,
-        heute: cache.tage[cache.tage.length - 1] ?? null,
+        felder: felderStand(cache.tage),
         nichtVerfuegbar: cache.nichtVerfuegbar,
       });
     } catch (err: unknown) {
+      garminSyncLaufend.delete(req.userId!);
       const meldung = err instanceof Error ? err.message : "Sync fehlgeschlagen.";
       const g = await readGarminSettings(req.userId!).catch(() => ({} as GarminSettings));
       await writeGarminSettings(req.userId!, { ...g, lastError: meldung }).catch(() => {});
@@ -6352,7 +6375,11 @@ ${JSON.stringify(userCtx, null, 2)}
         const letzter = Date.parse(g.cache?.fetchedAt ?? g.lastAutoSyncAt ?? "");
         if (Number.isFinite(letzter) && Date.now() - letzter < 5 * 60_000) continue;
         try {
-          const cache = await syncGarmin(g.apiKey, 30);
+          garminSyncLaufend.set(Number(row.id), { schritt: 0, gesamt: 26, seit: Date.now() });
+          const cache = await syncGarmin(g.apiKey, 30, (f) =>
+            garminSyncLaufend.set(Number(row.id), { ...f, seit: Date.now() }),
+          );
+          garminSyncLaufend.delete(Number(row.id));
           await writeGarminSettings(Number(row.id), {
             ...g,
             cache,
@@ -6362,6 +6389,7 @@ ${JSON.stringify(userCtx, null, 2)}
           });
           await speichereGarminTage(Number(row.id), cache.tage).catch(() => {});
         } catch (e) {
+          garminSyncLaufend.delete(Number(row.id));
           await writeGarminSettings(Number(row.id), {
             ...g,
             lastError: e instanceof Error ? e.message : "Garmin-Abgleich fehlgeschlagen.",
