@@ -195,7 +195,7 @@ import {
 } from "./src/lib/server/migrateUserData";
 import type { BatchMigrationResult } from "./src/lib/server/migrateUserData";
 import { pushoverRouter } from "./src/lib/server/pushover-route.ts";
-import { pushRouter, sendePushAnNutzer } from "./server/push-route";
+import { pushRouter, sendePushAnNutzer, sendeEreignis } from "./server/push-route";
 const { Pool } = pg;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -7212,6 +7212,180 @@ ${JSON.stringify(userCtx, null, 2)}
       erinnerungLaeuft = false;
     }
   };
+
+  /**
+   * Morgenbericht, Fasten-Begleitung und Trainingsvorschau.
+   *
+   * Läuft alle 15 Minuten und prüft je Nutzer, welche Meldung faellig ist.
+   * Doppelte werden über `push_ereignisse` verhindert (Ereignis + Datum).
+   */
+  let beobachtungLaeuft = false;
+  const beobachtungTick = async () => {
+    if (beobachtungLaeuft) return;
+    beobachtungLaeuft = true;
+    try {
+      const jet = new Date();
+      const stunde = Number(
+        new Intl.DateTimeFormat("de-DE", { hour: "numeric", hour12: false, timeZone: "Europe/Berlin" }).format(jet),
+      );
+      const heute = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" });
+      const wochentag = new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "Europe/Berlin" }).format(jet);
+      const uhr = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" }).format(jet);
+
+      const nutzer = await pool.query<{ id: number; goals: unknown }>(
+        "SELECT id, goals FROM users WHERE is_active IS NOT FALSE",
+      );
+
+      for (const u of nutzer.rows) {
+        try {
+          const goals = (u.goals ?? {}) as {
+            fasting?: { fastHours?: number; eatHours?: number; startTime?: string; label?: string };
+            dailyCalories?: number;
+            dailySteps?: number;
+          };
+
+          /* ---- 1. Morgenbericht: Schlaf der letzten Nacht ---- */
+          if (stunde >= 6 && stunde <= 11) {
+            const g = await pool.query(
+              `SELECT sleep_secs, sleep_score, hrv, resting_hr, hrv_status
+                 FROM garmin_days WHERE user_id = $1 AND date = $2 LIMIT 1`,
+              [u.id, heute],
+            );
+            if (g.rowCount) {
+              const r = g.rows[0] as Record<string, unknown>;
+              const std = r.sleep_secs ? Math.round((Number(r.sleep_secs) / 3600) * 10) / 10 : null;
+              const score = r.sleep_score ? Number(r.sleep_score) : null;
+              const hrv = r.hrv ? Math.round(Number(r.hrv)) : null;
+              const ruhe = r.resting_hr ? Number(r.resting_hr) : null;
+
+              if (std != null) {
+                // Was steht heute an?
+                const woche = await pool.query<{ schedule: unknown }>(
+                  `SELECT w.schedule FROM coach_plan_weeks w
+                     JOIN coach_plans p ON p.id = w.plan_id
+                    WHERE p.user_id = $1 AND p.status = 'active'
+                      AND w.start_date <= $2 AND w.start_date + INTERVAL '6 days' >= $2
+                    LIMIT 1`,
+                  [u.id, heute],
+                );
+                let planText = "";
+                if (woche.rowCount) {
+                  const plan = (woche.rows[0].schedule as { schedule?: Array<{ day: string; isRest?: boolean; label?: string; title?: string }> })?.schedule ?? [];
+                  const tag = plan.find((d) => d.day === wochentag);
+                  planText = tag && !tag.isRest
+                    ? `Heute steht ${tag.title ?? tag.label ?? "eine Einheit"} an.`
+                    : "Heute ist Ruhetag.";
+                }
+
+                // Einordnung des Schlafs
+                const urteil =
+                  score == null ? "" :
+                  score >= 80 ? "Sehr gut geschlafen." :
+                  score >= 60 ? "Ordentlich geschlafen." :
+                  score >= 40 ? "Mässig geschlafen — heute lieber etwas ruhiger." :
+                  "Schlecht geschlafen — heute kein hartes Training.";
+
+                const teile = [`${std} Stunden Schlaf`];
+                if (score != null) teile.push(`Score ${score}`);
+                if (hrv != null) teile.push(`HRV ${hrv} ms`);
+                if (ruhe != null) teile.push(`Ruhepuls ${ruhe}`);
+
+                await sendeEreignis(pool, u.id, "morgenbericht", heute, {
+                  titel: "Deine Nacht",
+                  text: [teile.join(" · ") + ".", urteil, planText].filter(Boolean).join(" "),
+                  url: "https://fitness.nas-timgreen.com/",
+                  tag: "morgenbericht",
+                });
+              }
+            }
+          }
+
+          /* ---- 2. Fasten: Start, Halbzeit, Ende ---- */
+          const f = goals.fasting;
+          if (f?.startTime && f.fastHours) {
+            const [sh, sm] = f.startTime.split(":").map(Number);
+            const startMin = sh * 60 + (sm || 0);
+            const jetztMin = (() => {
+              const [hh, mm] = uhr.split(":").map(Number);
+              return hh * 60 + mm;
+            })();
+            const fastMin = f.fastHours * 60;
+            const vergangen = (jetztMin - startMin + 1440) % 1440;
+
+            // Start des Fastens
+            if (vergangen >= 0 && vergangen <= 15) {
+              await sendeEreignis(pool, u.id, "fasten-start", heute, {
+                titel: "Fasten beginnt",
+                text: `${f.label ?? `${f.fastHours}:${f.eatHours}`} läuft — nächste Mahlzeit ab ${endeZeit(startMin + fastMin)}.`,
+                url: "https://fitness.nas-timgreen.com/",
+                tag: "fasten",
+              });
+            }
+            // Halbzeit
+            const halb = Math.floor(fastMin / 2);
+            if (vergangen >= halb && vergangen <= halb + 15) {
+              await sendeEreignis(pool, u.id, "fasten-halbzeit", heute, {
+                titel: "Halbzeit beim Fasten",
+                text: `Die Hälfte ist geschafft — noch ${Math.round((fastMin - vergangen) / 60)} Stunden bis zum Essen.`,
+                url: "https://fitness.nas-timgreen.com/",
+                tag: "fasten",
+              });
+            }
+            // Eine Stunde vor Ende
+            if (vergangen >= fastMin - 60 && vergangen <= fastMin - 45) {
+              await sendeEreignis(pool, u.id, "fasten-bald", heute, {
+                titel: "Eine Stunde noch",
+                text: `Dein Essensfenster öffnet um ${endeZeit(startMin + fastMin)}.`,
+                url: "https://fitness.nas-timgreen.com/",
+                tag: "fasten",
+              });
+            }
+          }
+
+          /* ---- 3. Training heute: Vorschau am Morgen ---- */
+          if (stunde >= 6 && stunde <= 9) {
+            const woche = await pool.query<{ schedule: unknown }>(
+              `SELECT w.schedule FROM coach_plan_weeks w
+                 JOIN coach_plans p ON p.id = w.plan_id
+                WHERE p.user_id = $1 AND p.status = 'active'
+                  AND w.start_date <= $2 AND w.start_date + INTERVAL '6 days' >= $2
+                LIMIT 1`,
+              [u.id, heute],
+            );
+            if (woche.rowCount) {
+              const plan = (woche.rows[0].schedule as { schedule?: Array<{ day: string; isRest?: boolean; title?: string; label?: string; exercises?: unknown[] }> })?.schedule ?? [];
+              const tag = plan.find((d) => d.day === wochentag);
+              if (tag && !tag.isRest) {
+                const anzahl = Array.isArray(tag.exercises) ? tag.exercises.length : null;
+                await sendeEreignis(pool, u.id, "training-heute", heute, {
+                  titel: "Dein Training heute",
+                  text: `${tag.title ?? tag.label ?? "Einheit"}${anzahl ? ` · ${anzahl} Übungen` : ""}. Du schaffst das.`,
+                  url: "https://fitness.nas-timgreen.com/",
+                  tag: "training",
+                });
+              }
+            }
+          }
+        } catch {
+          /* ein Nutzer darf den Lauf nicht abbrechen */
+        }
+      }
+    } catch {
+      /* Tabelle fehlt oder Query-Fehler — beim nächsten Takt erneut */
+    } finally {
+      beobachtungLaeuft = false;
+    }
+  };
+
+  /** "HH:MM" aus Minuten seit Mitternacht. */
+  function endeZeit(minuten: number): string {
+    const m = ((minuten % 1440) + 1440) % 1440;
+    return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+  }
+
+  const beobachtungTimer = setInterval(() => void beobachtungTick(), 15 * 60_000);
+  beobachtungTimer.unref?.();
+  setTimeout(() => void beobachtungTick(), 45_000).unref?.();
 
   const erinnerungTimer = setInterval(() => void erinnerungTick(), 15 * 60_000);
   erinnerungTimer.unref?.();
