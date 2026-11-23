@@ -155,10 +155,20 @@ export default function GarminConnect() {
     setFehler(null);
     setErfolg(null);
     try {
-      const r = await api<{ ms: number; tage: number }>('/api/integrations/garmin/sync', {
+      // Vollstaendiger Abgleich: Tageswerte, Aktivitaeten und Historie.
+      const r = await api<{
+        ms?: number;
+        garmin?: { tage?: number; felder?: { erfolgreich: number; gesamt: number }; aktivitaeten?: number };
+      }>('/api/integrations/refresh', {
         method: 'POST',
+        body: JSON.stringify({ days: 30 }),
       });
-      setErfolg(`${r.tage} Tage abgeglichen in ${r.ms} ms.`);
+      const g = r.garmin;
+      setErfolg(
+        g?.tage != null
+          ? `${g.tage} Tage, ${g.aktivitaeten ?? 0} Einheiten abgeglichen in ${r.ms ?? 0} ms.`
+          : 'Abgleich abgeschlossen.',
+      );
       await laden();
     } catch (e) {
       setFehler(e instanceof Error ? e.message : 'Sync fehlgeschlagen.');

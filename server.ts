@@ -6319,6 +6319,85 @@ ${JSON.stringify(userCtx, null, 2)}
   });
 
   /** Erneut synchronisieren (Coach sieht frische Daten). */
+  /**
+   * Alles neu ziehen — Garmin komplett plus die Trainingslast aus Intervals.
+   *
+   * Der Aktualisieren-Button in der Wellness-Ansicht rief bisher nur den
+   * Intervals-Sync auf. Bei Garmin als Quelle passierte damit nichts: kein
+   * Tageswert, keine Aktivität, keine Historie wurde neu geholt.
+   *
+   * Hier läuft stattdessen der vollständige Abgleich aller Kanäle:
+   * Tageswerte (27 Felder), Aktivitäten, Historientabelle.
+   */
+  app.post("/api/integrations/refresh", requireAuth, async (req: AuthRequest, res) => {
+    const t0 = Date.now();
+    const tage = Math.min(120, Math.max(7, Number(req.body?.days) || 30));
+    const bericht: Record<string, unknown> = {};
+
+    try {
+      const g = await readGarminSettings(req.userId!);
+      if (g.apiKey) {
+        garminSyncLaufend.set(req.userId!, { schritt: 0, gesamt: 27, seit: Date.now() });
+        try {
+          // Ein einziger vollständiger Durchlauf: alle 27 Felder, alle Aktivitäten.
+          const cache = await syncGarmin(g.apiKey, tage, (f) =>
+            garminSyncLaufend.set(req.userId!, { ...f, seit: Date.now() }),
+          );
+          await writeGarminSettings(req.userId!, {
+            ...g,
+            cache,
+            displayName: cache.displayName ?? g.displayName,
+            lastError: undefined,
+            lastAutoSyncAt: new Date().toISOString(),
+          });
+          await speichereGarminTage(req.userId!, cache.tage).catch((e) =>
+            console.warn("[garmin] Historie:", e),
+          );
+          const aktivitaeten = await syncGarminAktivitaeten(g.apiKey, 40).catch(() => []);
+          await speichereGarminAktivitaeten(req.userId!, aktivitaeten).catch((e) =>
+            console.warn("[garmin] Aktivitaeten:", e),
+          );
+
+          bericht.garmin = {
+            tage: cache.tage.length,
+            felder: felderStand(cache.tage),
+            aktivitaeten: aktivitaeten.length,
+            nichtVerfuegbar: cache.nichtVerfuegbar,
+          };
+        } catch (e) {
+          bericht.garmin = { fehler: e instanceof Error ? e.message : "Garmin-Abgleich fehlgeschlagen." };
+        } finally {
+          // Immer aufraeumen, auch im Fehlerfall — sonst steht die App ewig auf "laeuft".
+          garminSyncLaufend.delete(req.userId!);
+        }
+      } else {
+        bericht.garmin = { nichtVerbunden: true };
+      }
+
+      // Intervals zusaetzlich, falls verbunden — liefert die Trainingslast.
+      const s = await readIntervalsSettings(req.userId!);
+      if (s.apiKey) {
+        try {
+          const cache = await syncIntervals(s.apiKey, s.athleteId ?? "0", tage);
+          await writeIntervalsSettings(req.userId!, {
+            ...s,
+            cache,
+            lastError: undefined,
+            lastAutoSyncAt: new Date().toISOString(),
+          });
+          bericht.intervals = { tage: cache.wellness?.length ?? 0 };
+        } catch (e) {
+          bericht.intervals = { fehler: e instanceof Error ? e.message : "Intervals-Abgleich fehlgeschlagen." };
+        }
+      }
+
+      res.json({ ok: true, ms: Date.now() - t0, ...bericht });
+    } catch (err: unknown) {
+      garminSyncLaufend.delete(req.userId!);
+      res.status(500).json({ error: err instanceof Error ? err.message : "Aktualisieren fehlgeschlagen." });
+    }
+  });
+
   app.post("/api/integrations/intervals/sync", requireAuth, async (req: AuthRequest, res) => {
     try {
       const s = await readIntervalsSettings(req.userId!);

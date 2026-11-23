@@ -40,6 +40,8 @@ type Kontext = {
   laedt: boolean;
   syncJetzt: () => void;
   synct: boolean;
+  /** Fortschritt des laufenden Garmin-Abgleichs, null wenn fertig. */
+  fortschritt: { schritt: number; gesamt: number } | null;
 };
 
 const WellnessKontext = createContext<Kontext | null>(null);
@@ -56,6 +58,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
   const [zeitraum, setZeitraum] = useState(30);
   const [laedt, setLaedt] = useState(true);
   const [synct, setSynct] = useState(false);
+  const [fortschritt, setFortschritt] = useState<{ schritt: number; gesamt: number } | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
 
   const laden = useCallback(async () => {
@@ -79,20 +82,38 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
    * Holt die Daten frisch bei Intervals.icu. Aktualisiert nur still - die Werte in
    * der App aendern sich dadurch, eine Meldung braucht es dafuer nicht.
    */
+  /*
+   * Aktualisieren holt ALLES neu: Garmin-Tageswerte (alle 27 Felder),
+   * Aktivitaeten und die Historie — nicht mehr nur den Intervals-Sync.
+   * Vorher passierte bei Garmin als Quelle gar nichts.
+   */
   const syncJetzt = useCallback(async () => {
     setSynct(true);
     setFehler(null);
+    setFortschritt(null);
+    // Waehrend des Abgleichs alle 1,5 s nachfragen, damit man den Fortschritt sieht.
+    const takt = window.setInterval(() => {
+      void api<{ laufend: { schritt: number; gesamt: number } | null }>(
+        '/api/integrations/garmin',
+      )
+        .then((r) => setFortschritt(r.laufend))
+        .catch(() => {});
+    }, 1500);
     try {
-      await api<{ ok: boolean }>('/api/integrations/intervals/sync', {
-        method: 'POST',
-        body: JSON.stringify({ days: zeitraum }),
-      });
-
+      const r = await api<{ ok: boolean; garmin?: { fehler?: string }; ms?: number }>(
+        '/api/integrations/refresh',
+        { method: 'POST', body: JSON.stringify({ days: zeitraum }) },
+      );
+      if (r.garmin?.fehler) {
+        setFehler(r.garmin.fehler);
+      }
       // Still nachladen: die Ansicht zeigt danach die frischen Werte.
       await laden();
     } catch (e) {
       setFehler(e instanceof Error ? e.message : 'Abgleich fehlgeschlagen.');
     } finally {
+      window.clearInterval(takt);
+      setFortschritt(null);
       setSynct(false);
     }
   }, [zeitraum, laden]);
@@ -100,9 +121,9 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
   const wert = useMemo<Kontext | null>(
     () =>
       daten
-        ? { daten, zeitraum, setZeitraum, neuLaden: () => void laden(), laedt, syncJetzt: () => void syncJetzt(), synct }
+        ? { daten, zeitraum, setZeitraum, neuLaden: () => void laden(), laedt, syncJetzt: () => void syncJetzt(), synct, fortschritt }
         : null,
-    [daten, zeitraum, laden, laedt, syncJetzt, synct],
+    [daten, zeitraum, laden, laedt, syncJetzt, synct, fortschritt],
   );
 
   if (fehler || (!laedt && !daten)) {
@@ -143,7 +164,7 @@ export function useWellness(): Kontext {
  * die Zeiträume gehören in die einzelnen Bereiche.
  */
 export function WellnessAktualisieren() {
-  const { laedt, daten, syncJetzt, synct } = useWellness();
+  const { laedt, daten, syncJetzt, synct, fortschritt } = useWellness();
   return (
     <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
       {daten.fetchedAt && (
@@ -162,9 +183,14 @@ export function WellnessAktualisieren() {
         onClick={() => void syncJetzt()}
         disabled={laedt || synct}
         className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-muted)] px-2.5 py-1.5 font-semibold transition hover:border-[var(--simple-accent)] hover:text-[var(--simple-accent)] disabled:opacity-50"
-        title="Daten jetzt neu abholen (kommen sonst automatisch)"
+        title="Alle Garmin-Werte, Aktivitäten und den Verlauf jetzt neu abrufen"
       >
-        {synct ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Aktualisieren
+        {synct ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+        {synct
+          ? fortschritt
+            ? `Aktualisiert … ${fortschritt.schritt}/${fortschritt.gesamt}`
+            : 'Aktualisiert …'
+          : 'Aktualisieren'}
       </button>
     </div>
   );
@@ -175,7 +201,7 @@ export function WellnessAktualisieren() {
  * Die Übersicht nutzt nur `WellnessAktualisieren`, weil sie die Tageslage zeigt.
  */
 export function WellnessToolbar() {
-  const { zeitraum, setZeitraum, laedt, daten, syncJetzt, synct } = useWellness();
+  const { zeitraum, setZeitraum, laedt, daten, syncJetzt, synct, fortschritt } = useWellness();
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div className="flex gap-1.5">
