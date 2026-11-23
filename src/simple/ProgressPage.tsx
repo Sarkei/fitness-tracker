@@ -308,7 +308,7 @@ export default function ProgressPage() {
                 </div>
               </div>
 
-              <Sparkline values={linie} height={84} goal={zielGewicht > 0 ? zielGewicht : undefined} />
+              <Sparkline values={linie} height={84} goal={zielGewicht > 0 ? zielGewicht : undefined} einheit="kg" />
 
               <div className="mt-1 flex justify-between text-[9.5px] text-[var(--text-muted)]">
                 <span>{dayLabelShort(praktisch[0].ymd)} · {formatDay(praktisch[0].ymd)}</span>

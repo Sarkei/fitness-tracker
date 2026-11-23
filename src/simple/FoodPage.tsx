@@ -628,7 +628,7 @@ export default function FoodPage() {
           </SectionTitle>
           {hatVerlauf ? (
             <>
-              <Sparkline values={verlauf.map((v) => v.kcal)} goal={Number(goals.dailyCalories) || 2400} height={64} />
+              <Sparkline values={verlauf.map((v) => v.kcal)} goal={Number(goals.dailyCalories) || 2400} height={64} einheit="kcal" minY={0} />
               {/* Tag antippen, um ihn zu laden */}
               <div className="mt-1 flex gap-1 text-[9.5px] text-[var(--text-muted)]">
                 {verlauf.map((v, i) => (
