@@ -260,6 +260,37 @@ function zahl(v: unknown): number | undefined {
  */
 export type SyncFortschritt = (stand: { schritt: number; gesamt: number }) => void;
 
+/**
+ * Aufgaben mit begrenzter Parallelitaet abarbeiten.
+ *
+ * Warum nicht `Promise.all`: dann starten alle Abrufe gleichzeitig und der
+ * Fortschrittszaehler springt am Ende von 0 auf 27 — man sieht nie, dass etwas
+ * passiert. Mit einer kleinen Warteschlange laufen die Abrufe nacheinander in
+ * Gruppen, der Zaehler steigt gleichmaessig, und Garmin wird nicht mit 40
+ * gleichzeitigen Anfragen belegt.
+ */
+async function inPortionen<T, R>(
+  posten: T[],
+  gleichzeitig: number,
+  arbeit: (p: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const ergebnisse = new Array<R>(posten.length);
+  let naechster = 0;
+
+  const arbeiter = async (): Promise<void> => {
+    while (true) {
+      const i = naechster;
+      naechster += 1;
+      if (i >= posten.length) return;
+      ergebnisse[i] = await arbeit(posten[i], i);
+    }
+  };
+
+  // So viele Arbeiter starten, wie gleichzeitig erlaubt sind.
+  await Promise.all(Array.from({ length: Math.min(gleichzeitig, posten.length) }, arbeiter));
+  return ergebnisse;
+}
+
 export async function syncGarmin(
   apiKey: string,
   tage = 30,
@@ -280,7 +311,13 @@ export async function syncGarmin(
   // Fortschritt melden, waehrend die Abrufe durchlaufen — die App zeigt damit
   // „laeuft gerade" statt faelschlich „abgeschlossen".
   let erledigt = 0;
-  const gesamtSchritte = 9 + Math.min(tage, 14) + Math.min(tage, 30) * 2;
+  const anzahlEinzel = Math.min(tage, 14);
+  const anzahlKoerper = Math.min(tage, 30);
+  // 9 Sammelabrufe + Tagesdetails + Koerperwerte (2 je Tag). Die Aktivitaeten
+  // werden ausserhalb geholt und nicht mitgezaehlt — sonst endet die Anzeige bei 83/84.
+  const gesamtSchritte = 9 + anzahlEinzel + anzahlKoerper * 2;
+  // Startwert sofort melden, damit die Anzeige nicht bei 0/… stehen bleibt.
+  onFortschritt?.({ schritt: 0, gesamt: gesamtSchritte });
   const tick = () => {
     erledigt += 1;
     onFortschritt?.({ schritt: erledigt, gesamt: gesamtSchritte });
@@ -298,17 +335,30 @@ export async function syncGarmin(
    */
   const kurzVon = ymd(new Date(Date.now() - Math.min(tage, 7) * 86_400_000));
 
-  const [profil, schlaf, hrv, steps, stress, spo2, herz, summary, gewicht] = await Promise.all([
-    hole<{ displayName?: string; fullName?: string }>(token, '/userprofile-service/userprofile/settings').then((r) => (tick(), r)),
-    hole<unknown>(token, `/sleep-service/sleep/dailySleepSummariesByDate?startDate=${von}&endDate=${bis}`).then((r) => (tick(), r)),
-    hole<unknown>(token, `/hrv-service/hrv/daily/${von}/${bis}`).then((r) => (tick(), r)),
-    hole<unknown>(token, `/usersummary-service/stats/steps/daily/${kurzVon}/${bis}`).then((r) => (tick(), r)),
-    hole<unknown>(token, `/usersummary-service/stats/stress/daily/${kurzVon}/${bis}`).then((r) => (tick(), r)),
-    hole<unknown>(token, `/wellness-service/wellness/daily/spo2acclimation/${heute}`).then((r) => (tick(), r)),
-    hole<unknown>(token, '/wellness-service/wellness/dailyHeartRate').then((r) => (tick(), r)),
-    hole<unknown>(token, `/usersummary-service/v2/dailysummaries?startDate=${von}&endDate=${bis}`).then((r) => (tick(), r)),
-    hole<unknown>(token, `/weight-service/weight/range/${von}/${bis}`).then((r) => (tick(), r)),
-  ]);
+  /*
+   * Die neun Sammelabrufe laufen in Zweiergruppen statt alle gleichzeitig.
+   * Damit steigt der Fortschrittszaehler sichtbar Schritt fuer Schritt.
+   */
+  const sammelPfade: Array<{ pfad: string; profil?: boolean }> = [
+    { pfad: '/userprofile-service/userprofile/settings', profil: true },
+    { pfad: `/sleep-service/sleep/dailySleepSummariesByDate?startDate=${von}&endDate=${bis}` },
+    { pfad: `/hrv-service/hrv/daily/${von}/${bis}` },
+    { pfad: `/usersummary-service/stats/steps/daily/${kurzVon}/${bis}` },
+    { pfad: `/usersummary-service/stats/stress/daily/${kurzVon}/${bis}` },
+    { pfad: `/wellness-service/wellness/daily/spo2acclimation/${heute}` },
+    { pfad: '/wellness-service/wellness/dailyHeartRate' },
+    { pfad: `/usersummary-service/v2/dailysummaries?startDate=${von}&endDate=${bis}` },
+    { pfad: `/weight-service/weight/range/${von}/${bis}` },
+  ];
+  const sammelErgebnis = await inPortionen(sammelPfade, 2, async (p) => {
+    const r = await hole<unknown>(token, p.pfad);
+    tick();
+    return r;
+  });
+  const [profil, schlaf, hrv, steps, stress, spo2, herz, summary, gewicht] = sammelErgebnis as [
+    { displayName?: string; fullName?: string } | null,
+    unknown, unknown, unknown, unknown, unknown, unknown, unknown, unknown,
+  ];
 
   /*
    * Tages-Einzelabruf: `usersummary/daily?calendarDate=…` ist die vollstaendigste
@@ -317,31 +367,37 @@ export async function syncGarmin(
    * deshalb kam vorher fast nichts an. Begrenzt auf die letzten 14 Tage, damit der
    * Abgleich schnell bleibt.
    */
-  const tagesEinzel = await Promise.all(
-    Array.from({ length: Math.min(tage, 14) }, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const datum = ymd(d);
-      return hole<Record<string, unknown>>(
-        token,
-        `/usersummary-service/usersummary/daily?calendarDate=${datum}`,
-      ).then((r) => (tick(), { datum, daten: r }));
-    }),
-  );
+  const tagesDaten = Array.from({ length: anzahlEinzel }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    return ymd(d);
+  });
+  const tagesEinzel = await inPortionen(tagesDaten, 3, async (datum) => {
+    const daten = await hole<Record<string, unknown>>(
+      token,
+      `/usersummary-service/usersummary/daily?calendarDate=${datum}`,
+    );
+    tick();
+    return { datum, daten };
+  });
 
   // VO2max und Fitnessalter je Tag (eigene Endpunkte) — nur für die letzten 30 Tage,
   // damit der Abruf nicht ausufert.
-  const koerper = await Promise.all(
-    Array.from({ length: Math.min(tage, 30) }, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const ymd0 = ymd(d);
-      return Promise.all([
-        hole<unknown>(token, `/metrics-service/metrics/maxmet/daily/${ymd0}/${ymd0}`).then((r) => (tick(), r)),
-        hole<unknown>(token, `/fitnessage-service/fitnessage/v2/${ymd0}`).then((r) => (tick(), r)),
-      ]).then(([m, f]) => ({ datum: ymd0, maxmet: m, fitness: f }));
-    }),
-  );
+  const koerperDaten = Array.from({ length: anzahlKoerper }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    return ymd(d);
+  });
+  const koerper = await inPortionen(koerperDaten, 3, async (ymd0) => {
+    const [maxmet, fitness] = await Promise.all([
+      hole<unknown>(token, `/metrics-service/metrics/maxmet/daily/${ymd0}/${ymd0}`),
+      hole<unknown>(token, `/fitnessage-service/fitnessage/v2/${ymd0}`),
+    ]);
+    // Beide Abrufe zaehlen einzeln, damit der Balken gleichmaessig laeuft.
+    tick();
+    tick();
+    return { datum: ymd0, maxmet, fitness };
+  });
 
   /** Liste aus verschiedenen Umschlagformen ziehen. */
   const liste = (roh: unknown): Array<Record<string, unknown>> => {

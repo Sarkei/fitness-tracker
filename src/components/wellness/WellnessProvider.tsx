@@ -98,7 +98,7 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
       )
         .then((r) => setFortschritt(r.laufend))
         .catch(() => {});
-    }, 1500);
+    }, 700);
     try {
       const r = await api<{ ok: boolean; garmin?: { fehler?: string }; ms?: number }>(
         '/api/integrations/refresh',

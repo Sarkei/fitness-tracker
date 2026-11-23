@@ -6157,7 +6157,7 @@ ${JSON.stringify(userCtx, null, 2)}
         return;
       }
       // Erst prüfen, dann speichern — ein falscher Key landet nicht in der DB.
-      garminSyncLaufend.set(req.userId!, { schritt: 0, gesamt: 26, seit: Date.now() });
+      garminSyncLaufend.set(req.userId!, { schritt: 0, gesamt: 0, seit: Date.now() });
       const cache = await syncGarmin(apiKey, 30, (f) =>
         garminSyncLaufend.set(req.userId!, { ...f, seit: Date.now() }),
       );
@@ -6201,7 +6201,7 @@ ${JSON.stringify(userCtx, null, 2)}
         return;
       }
       const t0 = Date.now();
-      garminSyncLaufend.set(req.userId!, { schritt: 0, gesamt: 26, seit: Date.now() });
+      garminSyncLaufend.set(req.userId!, { schritt: 0, gesamt: 0, seit: Date.now() });
       const cache = await syncGarmin(g.apiKey, 30, (f) =>
         garminSyncLaufend.set(req.userId!, { ...f, seit: Date.now() }),
       );
@@ -6337,7 +6337,8 @@ ${JSON.stringify(userCtx, null, 2)}
     try {
       const g = await readGarminSettings(req.userId!);
       if (g.apiKey) {
-        garminSyncLaufend.set(req.userId!, { schritt: 0, gesamt: 27, seit: Date.now() });
+        // Startwert 0/0 — syncGarmin meldet gleich danach die echte Gesamtzahl.
+        garminSyncLaufend.set(req.userId!, { schritt: 0, gesamt: 0, seit: Date.now() });
         try {
           // Ein einziger vollständiger Durchlauf: alle 27 Felder, alle Aktivitäten.
           const cache = await syncGarmin(g.apiKey, tage, (f) =>
@@ -6702,7 +6703,7 @@ ${JSON.stringify(userCtx, null, 2)}
         const letzter = Date.parse(g.cache?.fetchedAt ?? g.lastAutoSyncAt ?? "");
         if (Number.isFinite(letzter) && Date.now() - letzter < 5 * 60_000) continue;
         try {
-          garminSyncLaufend.set(Number(row.id), { schritt: 0, gesamt: 26, seit: Date.now() });
+          garminSyncLaufend.set(Number(row.id), { schritt: 0, gesamt: 0, seit: Date.now() });
           const cache = await syncGarmin(g.apiKey, 30, (f) =>
             garminSyncLaufend.set(Number(row.id), { ...f, seit: Date.now() }),
           );
