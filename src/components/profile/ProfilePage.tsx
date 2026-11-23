@@ -80,6 +80,13 @@ const PROTOCOL_COLORS = {
 export default function ProfilePage() {
   const location = useLocation();
   const { profile, logout, deleteAccount, updateProfile } = useAuth();
+  // Intervallfasten: Schalter im Profil blendet die Fasten-Box auf der Startseite ein/aus.
+  const fastingGoals = (profile as unknown as { goals?: { fastingEnabled?: boolean } } | null)?.goals;
+  const fastingEnabled = fastingGoals?.fastingEnabled !== false;
+  const setFastingEnabled = async (on: boolean) => {
+    const current = (profile as unknown as { goals?: Record<string, unknown> } | null)?.goals ?? {};
+    await updateProfile({ goals: { ...current, fastingEnabled: on } } as never);
+  };
   const { t, setLocale, locale } = useI18n();
   const dfLocale = locale === 'de' ? dfDe : dfEnUS;
   const { workouts } = useWorkouts();
@@ -619,6 +626,37 @@ export default function ProfilePage() {
                   {t('profile.theme.dark')}
                 </button>
               </div>
+            </div>
+            <div>
+              <p className="text-[9px] font-black uppercase text-[var(--text-muted)] mb-2">{t('profile.fasting.section')}</p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => void setFastingEnabled(true)}
+                  className={cn(
+                    'flex-1 min-h-[44px] rounded-xl text-[10px] font-black uppercase tracking-widest border transition-colors flex items-center justify-center gap-2',
+                    fastingEnabled
+                      ? 'border-2 border-brand bg-brand/15 text-[var(--text-primary)]'
+                      : 'bg-[var(--background)] border-[var(--border-muted)] text-[var(--text-muted)] hover:border-brand'
+                  )}
+                >
+                  <Moon size={16} />
+                  {t('profile.fasting.on')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void setFastingEnabled(false)}
+                  className={cn(
+                    'flex-1 min-h-[44px] rounded-xl text-[10px] font-black uppercase tracking-widest border transition-colors flex items-center justify-center gap-2',
+                    !fastingEnabled
+                      ? 'border-2 border-brand bg-brand/15 text-[var(--text-primary)]'
+                      : 'bg-[var(--background)] border-[var(--border-muted)] text-[var(--text-muted)] hover:border-brand'
+                  )}
+                >
+                  {t('profile.fasting.off')}
+                </button>
+              </div>
+              <p className="mt-1.5 text-[10px] text-[var(--text-muted)]">{t('profile.fasting.hint')}</p>
             </div>
             <div>
               <p className="text-[9px] font-black uppercase text-[var(--text-muted)] mb-2">{t('profile.settings.focus')}</p>
