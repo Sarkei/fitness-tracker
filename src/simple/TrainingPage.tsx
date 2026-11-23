@@ -478,8 +478,8 @@ export default function TrainingPage() {
           )}
         </Card>
 
-        {/* Rechte Spalte */}
-        <div className="space-y-4">
+        {/* Rechte Spalte: füllt die Höhe der linken Karte, damit beide Unterkanten abschließen */}
+        <div className="flex h-full flex-col gap-4">
           <Card className="p-5">
             <SectionTitle>Diese Woche</SectionTitle>
             <div className="space-y-2.5">
@@ -516,7 +516,7 @@ export default function TrainingPage() {
             )}
           </Card>
 
-          <Card className="p-5">
+          <Card className="flex flex-1 flex-col p-5">
             <SectionTitle>Muskelbalance · 30 Tage</SectionTitle>
             {muskel.length ? (
               <div className="space-y-2">
@@ -525,7 +525,7 @@ export default function TrainingPage() {
                 ))}
               </div>
             ) : (
-              <p className="py-4 text-center text-[11.5px] text-[var(--text-muted)]">
+              <p className="flex flex-1 items-center justify-center py-4 text-center text-[11.5px] text-[var(--text-muted)]">
                 Sobald du Trainings erfasst, siehst du hier die Verteilung.
               </p>
             )}
