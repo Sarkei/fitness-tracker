@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useExerciseDetailOptional } from '@/src/lib/exerciseDetailContext';
+import { api } from '../lib/api';
+import EinheitDetailModal, { type EinheitDaten } from '../components/wellness/EinheitDetailModal';
 import { Link } from 'react-router-dom';
 import {
   BarChart3,
@@ -94,6 +96,9 @@ export default function TrainingPage() {
   /** Alle Wochen des aktiven Plans (mit Startdatum) — Grundlage für die Wochenansicht. */
   const [planWochen, setPlanWochen] = useState<PlanWeek[]>([]);
   const [workouts, setWorkouts] = useState<WorkoutEntry[]>([]);
+  /** Aktivitaeten von der Uhr — Einheiten ohne geplantes Workout. */
+  const [uhrEinheiten, setUhrEinheiten] = useState<Array<Record<string, unknown>>>([]);
+  const [einheitOffen2, setEinheitOffen2] = useState<EinheitDaten | null>(null);
   const [selected, setSelected] = useState<string>(dayKeyOf(today));
   /** 0 = diese Woche, 1 = nächste Woche, -1 = letzte Woche … */
   const [weekOffset, setWeekOffset] = useState(0);
@@ -116,6 +121,10 @@ export default function TrainingPage() {
       setWeek(plan?.week ?? null);
       setPlanWochen(plan?.weeks ?? []);
       setWorkouts(list);
+      // Einheiten von der Uhr dazuladen — die stehen nicht in den Workouts.
+      api<{ aktivitaeten?: Array<Record<string, unknown>> }>('/api/integrations/garmin/activities?limit=8')
+        .then((r) => setUhrEinheiten(Array.isArray(r.aktivitaeten) ? r.aktivitaeten : []))
+        .catch(() => setUhrEinheiten([]));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Konnte nicht laden.');
     } finally {
@@ -550,6 +559,46 @@ export default function TrainingPage() {
         </div>
       </div>
 
+      {/* Einheiten von der Uhr — Trainings ohne geplantes Workout */}
+      {uhrEinheiten.length > 0 && (
+        <Card className="p-5">
+          <SectionTitle action={<span className="text-[11px] text-[var(--text-muted)]">von Garmin</span>}>
+            Einheiten von der Uhr
+          </SectionTitle>
+          <ul className="divide-y divide-[var(--border-muted)]">
+            {uhrEinheiten.slice(0, 6).map((e, i) => {
+              const datum = String(e.date ?? e.start_date_local ?? '').slice(0, 10);
+              const distanz = e.distance != null ? Number(e.distance) / 1000 : null;
+              const dauerSek =
+                e.moving_time != null ? Number(e.moving_time) : e.duration != null ? Number(e.duration) : null;
+              return (
+                <li key={`uhr-${String(e.id ?? i)}`}>
+                  <button
+                    type="button"
+                    onClick={() => setEinheitOffen2(e as EinheitDaten)}
+                    className="flex w-full items-baseline justify-between gap-3 py-2.5 text-left transition hover:text-[var(--simple-accent)]"
+                  >
+                    <span className="flex min-w-0 flex-1 items-baseline gap-2">
+                      <span className="w-11 shrink-0 text-[10.5px] tabular-nums text-[var(--text-muted)]">
+                        {datum ? `${datum.slice(8, 10)}.${datum.slice(5, 7)}.` : '—'}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-[13px]">
+                        {String(e.name ?? e.type ?? 'Einheit')}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-[11.5px] tabular-nums text-[var(--text-muted)]">
+                      {[distanz != null ? `${distanz.toFixed(2)} km` : null, dauerSek != null ? `${Math.round(dauerSek / 60)} min` : null]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      )}
+
       {/* Volumen-Verlauf */}
       <Card className="p-5">
         <SectionTitle action={<span className="text-[11px] text-[var(--text-muted)]">Sätze pro Woche</span>}>
@@ -667,6 +716,7 @@ export default function TrainingPage() {
           onSaved={() => void load()}
         />
       )}
+      <EinheitDetailModal einheit={einheitOffen2} onClose={() => setEinheitOffen2(null)} />
     </div>
   );
 }
