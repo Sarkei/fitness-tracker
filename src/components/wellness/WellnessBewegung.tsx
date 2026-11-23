@@ -76,7 +76,7 @@ export default function WellnessBewegung() {
           <Footprints className="h-3.5 w-3.5 text-[var(--simple-accent)]" />
           <p className="text-[12.5px] font-semibold text-[var(--foreground)]">Schritte pro Tag</p>
         </div>
-        <Sparkline values={schritte} height={90} />
+        <Sparkline values={schritte} height={90} minY={0} />
         {besteTag?.steps && (
           <p className="text-[11px] text-[var(--text-muted)]">
             Bester Tag: {besteTag.date} mit {Math.round(besteTag.steps).toLocaleString('de-DE')} Schritten
@@ -90,7 +90,7 @@ export default function WellnessBewegung() {
             <Mountain className="h-3.5 w-3.5 text-[var(--simple-accent)]" />
             <p className="text-[12.5px] font-semibold text-[var(--foreground)]">Etagen pro Tag</p>
           </div>
-          <Sparkline values={etagen} height={70} />
+          <Sparkline values={etagen} height={70} minY={0} />
         </Card>
       )}
 

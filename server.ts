@@ -35,7 +35,7 @@ import {
   SYNC_INTERVAL_OPTIONS,
   type IntervalsSettings,
 } from "./src/lib/intervals";
-import { syncGarmin, felderStand, type GarminCache } from "./src/lib/garmin";
+import { syncGarmin, syncGarminAktivitaeten, felderStand, type GarminCache, type GarminAktivitaet } from "./src/lib/garmin";
 import {
   deleteEvent as intervalsDeleteEvent,
   syncWorkout as intervalsSyncWorkout,
@@ -5921,6 +5921,125 @@ ${JSON.stringify(userCtx, null, 2)}
     );
   };
 
+  /**
+   * Aktivitaeten dauerhaft ablegen.
+   *
+   * Trainings, die Tim mit der Uhr aufzeichnet, kommen NICHT ueber die
+   * Tageswerte — sie brauchen einen eigenen Abruf und eine eigene Tabelle.
+   * Sonst fehlen sie in der App komplett.
+   */
+  const speichereGarminAktivitaeten = async (
+    userId: number,
+    liste: GarminAktivitaet[],
+  ): Promise<void> => {
+    if (!liste.length) return;
+    const werte: unknown[] = [];
+    const platzhalter: string[] = [];
+    let i = 0;
+    for (const a of liste) {
+      i += 1;
+      const b = (i - 1) * 12;
+      platzhalter.push(
+        `($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5},$${b + 6},$${b + 7},$${b + 8},$${b + 9},$${b + 10},$${b + 11},$${b + 12})`,
+      );
+      werte.push(
+        userId, a.activityId, a.date, a.name, a.type,
+        a.distanceM ?? null, a.durationSecs ?? null, a.movingSecs ?? null,
+        a.avgHr ?? null, a.maxHr ?? null, a.calories ?? null, a.elevationM ?? null,
+      );
+    }
+    await pool.query(
+      `INSERT INTO garmin_activities (
+         user_id, activity_id, date, name, type, distance_m, duration_s, moving_s,
+         avg_hr, max_hr, calories, elevation_m
+       ) VALUES ${platzhalter.join(",")}
+       ON CONFLICT (user_id, activity_id) DO UPDATE SET
+         name = EXCLUDED.name,
+         type = EXCLUDED.type,
+         distance_m = COALESCE(EXCLUDED.distance_m, garmin_activities.distance_m),
+         duration_s = COALESCE(EXCLUDED.duration_s, garmin_activities.duration_s),
+         avg_hr = COALESCE(EXCLUDED.avg_hr, garmin_activities.avg_hr),
+         max_hr = COALESCE(EXCLUDED.max_hr, garmin_activities.max_hr),
+         calories = COALESCE(EXCLUDED.calories, garmin_activities.calories),
+         updated_at = NOW()`,
+      werte,
+    );
+  };
+
+  /** Alle Aktivitaeten des Nutzers, neueste zuerst. */
+  const ladeGarminAktivitaeten = async (userId: number, limit = 60) => {
+    const r = await pool.query(
+      `SELECT activity_id, date, name, type, distance_m, duration_s, moving_s,
+              avg_hr, max_hr, calories, elevation_m
+         FROM garmin_activities
+        WHERE user_id = $1
+        ORDER BY date DESC, activity_id DESC
+        LIMIT $2`,
+      [userId, limit],
+    );
+    return r.rows.map((x) => {
+      // date kommt als JS-Date-String — auf ISO kuerzen.
+      const d = new Date(x.date);
+      const iso = Number.isNaN(d.getTime()) ? String(x.date).slice(0, 10) : d.toISOString().slice(0, 10);
+      /*
+       * Feldnamen an Intervals angleichen (start_date_local, moving_time, avg_hr),
+       * damit die Aktivitaeten-Ansicht beide Quellen ohne Sonderfall darstellt.
+       */
+      const distanz = x.distance_m != null ? Number(x.distance_m) : null;
+      const bewegung = x.moving_s != null ? Number(x.moving_s) : x.duration_s != null ? Number(x.duration_s) : null;
+      return {
+        id: `garmin_${x.activity_id}`,
+        name: x.name,
+        type: x.type,
+        start_date_local: `${iso}T12:00:00`,
+        date: iso,
+        distance: distanz,
+        moving_time: bewegung,
+        elapsed_time: x.duration_s != null ? Number(x.duration_s) : null,
+        avg_hr: x.avg_hr != null ? Number(x.avg_hr) : null,
+        average_hr: x.avg_hr != null ? Number(x.avg_hr) : null,
+        max_hr: x.max_hr != null ? Number(x.max_hr) : null,
+        calories: x.calories != null ? Number(x.calories) : null,
+        total_elevation_gain: x.elevation_m != null ? Number(x.elevation_m) : null,
+        average_speed: distanz && bewegung ? distanz / bewegung : null,
+        source: 'garmin',
+      };
+    });
+  };
+
+  app.get("/api/integrations/garmin/activities", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const g = await readGarminSettings(req.userId!);
+      if (!g.apiKey) {
+        res.json({ aktivitaeten: [] });
+        return;
+      }
+      const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 40));
+      /*
+       * Bei Bedarf nachziehen. Entscheidend ist die Tabelle, nicht der Cache:
+       * nach dem ersten Deploy ist der Cache schon frisch, die Aktivitaeten-Tabelle
+       * aber noch leer — dann darf der Abruf nicht uebersprungen werden.
+       */
+      const vorhanden = await pool.query(
+        "SELECT 1 FROM garmin_activities WHERE user_id = $1 LIMIT 1",
+        [req.userId],
+      );
+      const letzter = Date.parse(g.cache?.fetchedAt ?? "");
+      const tabelleLeer = (vorhanden.rowCount ?? 0) === 0;
+      if (tabelleLeer || !Number.isFinite(letzter) || Date.now() - letzter > 5 * 60_000) {
+        try {
+          const liste = await syncGarminAktivitaeten(g.apiKey, 40);
+          await speichereGarminAktivitaeten(req.userId!, liste);
+        } catch (e) {
+          console.warn("[garmin] Aktivitaeten:", e);
+        }
+      }
+      res.json({ aktivitaeten: await ladeGarminAktivitaeten(req.userId!, limit) });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "activities failed" });
+    }
+  });
+
   app.get("/api/integrations/garmin", requireAuth, async (req: AuthRequest, res) => {
     try {
       const g = await readGarminSettings(req.userId!);
@@ -6053,8 +6172,11 @@ ${JSON.stringify(userCtx, null, 2)}
       await speichereGarminTage(req.userId!, cache.tage).catch((e) =>
         console.warn("[garmin] Historie:", e),
       );
+      const ersteAktivitaeten = await syncGarminAktivitaeten(apiKey, 40).catch(() => []);
+      await speichereGarminAktivitaeten(req.userId!, ersteAktivitaeten).catch(() => {});
       res.json({
         ok: true,
+        aktivitaeten: ersteAktivitaeten.length,
         displayName: cache.displayName ?? null,
         tage: cache.tage.length,
         nichtVerfuegbar: cache.nichtVerfuegbar,
@@ -6390,7 +6512,10 @@ ${JSON.stringify(userCtx, null, 2)}
       res.json({
         fetchedAt: g.cache?.fetchedAt ?? intervals.cache?.fetchedAt ?? null,
         tage: alle,
-        aktivitaeten: (intervals.cache?.activities ?? []).slice(0, 50),
+        // Garmin-Aktivitaeten zuerst — dort landen auch die spontanen Einheiten,
+        // die Tim ohne geplantes Workout mit der Uhr aufzeichnet.
+        aktivitaeten: [...(await ladeGarminAktivitaeten(req.userId!, 50)), ...(intervals.cache?.activities ?? [])]
+          .slice(0, 50),
         verfuegbar: {
           schlaf: hat("sleepSecs"),
           schritte: hat("steps"),
@@ -6511,6 +6636,8 @@ ${JSON.stringify(userCtx, null, 2)}
             lastAutoSyncAt: new Date().toISOString(),
           });
           await speichereGarminTage(Number(row.id), cache.tage).catch(() => {});
+          const aktivitaetenBg = await syncGarminAktivitaeten(g.apiKey, 40).catch(() => []);
+          await speichereGarminAktivitaeten(Number(row.id), aktivitaetenBg).catch(() => {});
         } catch (e) {
           garminSyncLaufend.delete(Number(row.id));
           await writeGarminSettings(Number(row.id), {

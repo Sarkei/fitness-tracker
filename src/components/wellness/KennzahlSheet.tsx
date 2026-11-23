@@ -156,7 +156,7 @@ export function KennzahlSheet({
                 <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
                   Verlauf
                 </p>
-                <Sparkline values={reihe} height={110} />
+                <Sparkline values={reihe} height={110} einheit={def.einheit} />
                 <div className="mt-1 flex justify-between text-[9.5px] text-[var(--text-muted)]">
                   <span>{datumKurz(punkte[0].datum)}</span>
                   <span>{datumKurz(punkte[punkte.length - 1].datum)}</span>

@@ -357,56 +357,118 @@ export function Heatmap({
 }
 
 /** Kleine Verlaufslinie ohne Achsen. */
+/**
+ * Sparkline mit echter Skala.
+ *
+ * Ohne Achsen sagt eine Kurve nichts: man sieht, dass sie sich bewegt, aber nicht
+ * ob das viel oder wenig ist. Deshalb hier drei horizontale Hilfslinien mit
+ * beschriftetem Wertebereich und eine Datumsbeschriftung am Rand.
+ */
 export function Sparkline({
   values,
   height = 42,
   goal,
   color,
+  einheit,
+  minY,
+  maxY,
 }: {
   values: number[];
   height?: number;
   goal?: number;
   /** Linienfarbe (CSS-Farbe oder Variable). Standard nutzt die Akzentfarbe. */
   color?: string;
+  /** Einheit für die Achsenbeschriftung, z. B. „h" oder „bpm". */
+  einheit?: string;
+  /** Untere Achsengrenze erzwingen (z. B. 0). */
+  minY?: number;
+  /** Obere Achsengrenze erzwingen. */
+  maxY?: number;
 }) {
   if (values.length < 2) return <div style={{ height }} />;
 
-  const max = Math.max(...values, goal ?? 0, 1);
-  const min = 0;
+  const echteWerte = values.filter((v) => Number.isFinite(v));
+  const datenMax = echteWerte.length ? Math.max(...echteWerte) : 1;
+  const datenMin = echteWerte.length ? Math.min(...echteWerte) : 0;
+
+  // Bei kleinen Schwankungen (z. B. HRV 20-33) nicht bei 0 starten, sonst
+  // wirkt die Kurve flach. Etwas Luft nach oben und unten lassen.
+  const spanne = datenMax - datenMin;
+  const polster = spanne > 0 ? spanne * 0.15 : Math.max(1, datenMax * 0.1);
+  const min = minY ?? Math.max(0, datenMin - polster);
+  const max = maxY ?? Math.max(datenMax + polster, goal ?? 0, min + 1);
+
   const w = 100;
+  const h = height;
   const step = w / (values.length - 1);
-  const y = (v: number) => height - ((v - min) / (max - min || 1)) * height;
+  const y = (v: number) => h - ((v - min) / (max - min || 1)) * h;
 
   const punkte = values.map((v, i) => `${(i * step).toFixed(2)},${y(v).toFixed(2)}`).join(' ');
-  const flaeche = `0,${height} ${punkte} ${w},${height}`;
+  const flaeche = `0,${h} ${punkte} ${w},${h}`;
   const zielY = goal !== undefined ? y(goal) : null;
 
+  /** Achsenwert lesbar runden. */
+  const zeige = (v: number) => {
+    if (Math.abs(v) >= 100) return String(Math.round(v));
+    if (Math.abs(v) >= 10) return v.toFixed(0);
+    return v.toFixed(1);
+  };
+
+  // Drei Hilfslinien: oben, Mitte, unten
+  const linien = [max, (max + min) / 2, min];
+
   return (
-    <svg viewBox={`0 0 ${w} ${height}`} preserveAspectRatio="none" className="w-full" style={{ height }}>
-      <polygon points={flaeche} fill={color ?? 'var(--simple-accent)'} opacity={0.12} />
-      <polyline
-        points={punkte}
-        fill="none"
-        stroke={color ?? 'var(--simple-accent)'}
-        strokeWidth={1.6}
-        vectorEffect="non-scaling-stroke"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-      {zielY !== null && (
-        <line
-          x1={0}
-          x2={w}
-          y1={zielY}
-          y2={zielY}
-          stroke="var(--text-muted)"
-          strokeWidth={1}
-          strokeDasharray="3 3"
-          opacity={0.5}
+    <div className="relative">
+      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="w-full" style={{ height: h }}>
+        {linien.map((wert, i) => (
+          <line
+            key={`g${i}`}
+            x1={0}
+            x2={w}
+            y1={y(wert)}
+            y2={y(wert)}
+            stroke="var(--border-muted)"
+            strokeWidth={1}
+            strokeDasharray={i === 1 ? '2 3' : undefined}
+            opacity={0.7}
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
+        <polygon points={flaeche} fill={color ?? 'var(--simple-accent)'} opacity={0.12} />
+        <polyline
+          points={punkte}
+          fill="none"
+          stroke={color ?? 'var(--simple-accent)'}
+          strokeWidth={1.6}
           vectorEffect="non-scaling-stroke"
+          strokeLinejoin="round"
+          strokeLinecap="round"
         />
-      )}
-    </svg>
+        {zielY !== null && (
+          <line
+            x1={0}
+            x2={w}
+            y1={zielY}
+            y2={zielY}
+            stroke="var(--text-muted)"
+            strokeWidth={1}
+            strokeDasharray="3 3"
+            opacity={0.6}
+            vectorEffect="non-scaling-stroke"
+          />
+        )}
+      </svg>
+
+      {/* Beschriftung der Achse — rechts neben der Kurve, damit nichts verdeckt wird */}
+      <div
+        className="pointer-events-none absolute inset-y-0 right-0 flex flex-col justify-between pl-1 text-[9px] leading-none text-[var(--text-muted)]"
+        style={{ height: h }}
+      >
+        <span>{zeige(max)}{einheit ? ` ${einheit}` : ''}</span>
+        <span className="opacity-70">{zeige((max + min) / 2)}</span>
+        <span>{zeige(min)}{einheit ? ` ${einheit}` : ''}</span>
+      </div>
+    </div>
   );
 }
 

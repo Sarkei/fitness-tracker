@@ -178,6 +178,66 @@ async function hole<T>(token: string, pfad: string): Promise<T | null> {
   }
 }
 
+/** Eine Aktivität, die Tim mit der Uhr getrackt hat. */
+export type GarminAktivitaet = {
+  activityId: number;
+  date: string;
+  name: string;
+  type: string;
+  distanceM?: number;
+  durationSecs?: number;
+  movingSecs?: number;
+  avgHr?: number;
+  maxHr?: number;
+  calories?: number;
+  elevationM?: number;
+};
+
+/**
+ * Aktivitäten abrufen.
+ *
+ * Wichtig: Trainings, die Tim einfach mit der Uhr aufzeichnet (ohne geplante
+ * Einheit), landen nur hier — nicht in den Tageswerten und nicht im Wochenplan.
+ * Ohne diesen Abruf fehlen sie in der App komplett.
+ */
+export async function syncGarminAktivitaeten(
+  apiKey: string,
+  limit = 30,
+): Promise<GarminAktivitaet[]> {
+  const { token } = await garminToken(apiKey);
+  const roh = await hole<unknown[]>(
+    token,
+    `/activitylist-service/activities/search/activities?limit=${limit}&start=0`,
+  );
+  if (!Array.isArray(roh)) return [];
+
+  const ergebnis: GarminAktivitaet[] = [];
+  for (const eintrag of roh as Array<Record<string, unknown>>) {
+    const id = Number(eintrag.activityId);
+    if (!Number.isFinite(id)) continue;
+    const typ = eintrag.activityType as Record<string, unknown> | undefined;
+    const start = String(eintrag.startTimeLocal ?? eintrag.startTimeGMT ?? '');
+    // startTimeLocal kommt als "2026-11-23 12:24:43" — Datum reicht.
+    const datum = start.slice(0, 10);
+    if (!datum) continue;
+    ergebnis.push({
+      activityId: id,
+      date: datum,
+      name: String(eintrag.activityName ?? ''),
+      type: String(typ?.typeKey ?? 'other'),
+      distanceM: zahl(eintrag.distance),
+      durationSecs: zahl(eintrag.duration) != null ? Math.round(zahl(eintrag.duration)!) : undefined,
+      movingSecs:
+        zahl(eintrag.movingDuration) != null ? Math.round(zahl(eintrag.movingDuration)!) : undefined,
+      avgHr: zahl(eintrag.averageHR) != null ? Math.round(zahl(eintrag.averageHR)!) : undefined,
+      maxHr: zahl(eintrag.maxHR) != null ? Math.round(zahl(eintrag.maxHR)!) : undefined,
+      calories: zahl(eintrag.calories) != null ? Math.round(zahl(eintrag.calories)!) : undefined,
+      elevationM: zahl(eintrag.elevationGain),
+    });
+  }
+  return ergebnis;
+}
+
 /** Zahl aus verschiedenen Feldformen lesen (Garmin liefert oft Objekte). */
 function zahl(v: unknown): number | undefined {
   if (typeof v === 'number' && Number.isFinite(v)) return v;

@@ -72,11 +72,11 @@ export default function WellnessForm() {
       <div className="grid gap-3 lg:grid-cols-2">
         <Card className="space-y-2 p-5">
           <p className="text-[12.5px] font-semibold text-[var(--foreground)]">Fitness (CTL)</p>
-          <Sparkline values={ctl} height={70} />
+          <Sparkline values={ctl} height={70} minY={0} />
         </Card>
         <Card className="space-y-2 p-5">
           <p className="text-[12.5px] font-semibold text-[var(--foreground)]">Ermüdung (ATL)</p>
-          <Sparkline values={atl} height={70} />
+          <Sparkline values={atl} height={70} minY={0} />
         </Card>
       </div>
 

@@ -10,6 +10,7 @@ import { Card } from '@/src/simple/ui';
 import { useWellness, WellnessAktualisieren } from './WellnessProvider';
 import { KennzahlSheet, KlickKachel, type KennzahlDef, type KennzahlPunkt } from './KennzahlSheet';
 import { Tagesdetail } from './Tagesdetail';
+import EinheitDetailModal, { type EinheitDaten } from './EinheitDetailModal';
 import { formLabel, heuteWert, juengsterTag, schlafBewertung, schlafStunden } from '@/src/lib/wellness';
 
 type Kennzahl = { def: KennzahlDef; punkte: KennzahlPunkt[] };
@@ -20,6 +21,7 @@ export default function WellnessUebersicht() {
   const tage = daten.tage;
   const [offen, setOffen] = useState<string | null>(null);
   const [tagOffen, setTagOffen] = useState<string | null>(null);
+  const [einheitOffen, setEinheitOffen] = useState<EinheitDaten | null>(null);
 
   // Bewusst nur der heutige Tag: fehlt ein Wert, steht „—" statt eines alten Stands.
   const schlafLetzte = schlafStunden(heuteWert(tage, 'sleepSecs'));
@@ -208,7 +210,15 @@ export default function WellnessUebersicht() {
       </div>
 
       {naechsteEinheit && (
-        <Card className="flex items-center justify-between gap-3 p-5">
+        <div
+          role="button"
+          tabIndex={0}
+          className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-[var(--border-muted)] bg-[var(--card-bg)] p-5 transition hover:border-[var(--simple-accent)]"
+          onClick={() => setEinheitOffen(naechsteEinheit as EinheitDaten)}
+          onKeyDown={(ev) => {
+            if (ev.key === 'Enter' || ev.key === ' ') setEinheitOffen(naechsteEinheit as EinheitDaten);
+          }}
+        >
           <div className="min-w-0">
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
               Letzte Einheit
@@ -228,7 +238,7 @@ export default function WellnessUebersicht() {
           >
             Alle <ChevronRight className="h-3.5 w-3.5" />
           </Link>
-        </Card>
+        </div>
       )}
 
       <div className="grid grid-cols-2 gap-3">
@@ -287,6 +297,8 @@ export default function WellnessUebersicht() {
           </p>
         </div>
       )}
+
+      <EinheitDetailModal einheit={einheitOffen} onClose={() => setEinheitOffen(null)} />
     </div>
   );
 }

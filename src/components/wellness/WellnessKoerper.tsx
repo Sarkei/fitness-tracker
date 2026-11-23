@@ -221,7 +221,7 @@ function MapCard({
           Ø {schnitt != null ? Math.round(schnitt) : '—'} {einheit}
         </span>
       </div>
-      <Sparkline values={werte} height={80} />
+      <Sparkline values={werte} height={80} einheit={einheit} />
       <p className="text-[11px] leading-relaxed text-[var(--text-muted)]">{hinweis}</p>
     </Card>
   );

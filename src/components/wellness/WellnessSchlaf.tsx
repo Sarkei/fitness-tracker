@@ -199,7 +199,7 @@ export default function WellnessSchlaf() {
           <Moon className="h-3.5 w-3.5 text-[var(--simple-accent)]" />
           <p className="text-[12.5px] font-semibold text-[var(--foreground)]">Schlafdauer</p>
         </div>
-        <Sparkline values={reihe} height={90} />
+        <Sparkline values={reihe} height={90} einheit="h" />
       </Card>
 
       <Card className="space-y-2 p-5">

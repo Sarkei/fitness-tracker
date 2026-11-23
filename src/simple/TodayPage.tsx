@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Camera, ChevronRight, Dumbbell, Flame, Moon, Target } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { FastingCard } from '../components/dashboard/FastingCard';
+import EinheitDetailModal, { type EinheitDaten } from '../components/wellness/EinheitDetailModal';
+import { api } from '../lib/api';
 import {
   Card,
   GhostButton,
@@ -48,6 +50,28 @@ import {
  * die Mahlzeiten als Tabelle und die Kalorienbilanz der letzten 14 Tage.
  */
 export default function TodayPage() {
+  /*
+   * Aktivitaeten von der Uhr. Trainings, die Tim ohne geplante Einheit aufzeichnet,
+   * tauchen sonst nirgends auf — genau die fehlten hier.
+   */
+  const [einheiten, setEinheiten] = useState<Array<Record<string, unknown>>>([]);
+  const [einheitOffen, setEinheitOffen] = useState<EinheitDaten | null>(null);
+
+  useEffect(() => {
+    let abgebrochen = false;
+    api<Array<Record<string, unknown>>>('/api/integrations/garmin/activities?limit=8')
+      .then((r) => {
+        if (!abgebrochen) {
+          const liste = (r as unknown as { aktivitaeten?: Array<Record<string, unknown>> }).aktivitaeten;
+          setEinheiten(Array.isArray(liste) ? liste : []);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      abgebrochen = true;
+    };
+  }, []);
+
   const { profile } = useAuth();
   const navigate = useNavigate();
   const date = todayYmd();
@@ -159,6 +183,45 @@ export default function TodayPage() {
 
       {/* Fasten läuft dauerhaft mit */}
       <FastingCard />
+
+      {/* Einheiten von der Uhr — auch ohne geplantes Training */}
+      {einheiten.length > 0 && (
+        <Card className="p-5">
+          <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+            <Dumbbell className="h-3 w-3" /> Einheiten von der Uhr
+          </p>
+          <ul className="mt-2 divide-y divide-[var(--border-muted)]">
+            {einheiten.slice(0, 5).map((e, i) => {
+              const datum = String(e.date ?? e.start_date_local ?? '').slice(0, 10);
+              const distanz = e.distance != null ? Number(e.distance) / 1000 : null;
+              const dauer = e.moving_time != null ? Number(e.moving_time) : e.duration != null ? Number(e.duration) : null;
+              return (
+                <li key={`${String(e.id ?? i)}`}>
+                  <button
+                    type="button"
+                    onClick={() => setEinheitOffen(e as EinheitDaten)}
+                    className="flex w-full items-baseline justify-between gap-3 py-2 text-left transition hover:text-[var(--simple-accent)]"
+                  >
+                    <span className="flex min-w-0 flex-1 items-baseline gap-2">
+                      <span className="w-11 shrink-0 text-[10.5px] tabular-nums text-[var(--text-muted)]">
+                        {datum ? `${datum.slice(8, 10)}.${datum.slice(5, 7)}.` : '—'}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-[13px]">
+                        {String(e.name ?? e.type ?? 'Einheit')}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-[11.5px] tabular-nums text-[var(--text-muted)]">
+                      {[distanz != null ? `${distanz.toFixed(2)} km` : null, dauer != null ? `${Math.round(dauer / 60)} min` : null]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      )}
 
       {/* Serien auf einen Blick */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -476,6 +539,8 @@ export default function TodayPage() {
           onSaved={() => void load()}
         />
       )}
+
+      <EinheitDetailModal einheit={einheitOffen} onClose={() => setEinheitOffen(null)} />
     </div>
   );
 }
