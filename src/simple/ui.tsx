@@ -98,7 +98,21 @@ export function Ring({
   );
 }
 
-export function MacroBar({ label, value, max, unit = 'g' }: { label: string; value: number; max: number; unit?: string }) {
+/** Makro-Balken: jede Kennzahl hat ihre eigene Farbe, damit die drei auf einen Blick trennbar sind. */
+export function MacroBar({
+  label,
+  value,
+  max,
+  unit = 'g',
+  color,
+}: {
+  label: string;
+  value: number;
+  max: number;
+  unit?: string;
+  /** Füllfarbe; ohne Angabe die Akzentfarbe. */
+  color?: string;
+}) {
   const ratio = max > 0 ? Math.min(1, value / max) : 0;
   const over = value > max && max > 0;
   return (
@@ -116,12 +130,19 @@ export function MacroBar({ label, value, max, unit = 'g' }: { label: string; val
       <div className="h-1.5 overflow-hidden rounded-full bg-[var(--border-muted)]">
         <div
           className="h-full rounded-full transition-[width] duration-500"
-          style={{ width: `${ratio * 100}%`, background: over ? '#f87171' : 'var(--simple-accent)' }}
+          style={{ width: `${ratio * 100}%`, background: over ? '#f87171' : (color ?? 'var(--simple-accent)') }}
         />
       </div>
     </div>
   );
 }
+
+/** Farben der drei Makros in der Heute-Ansicht (Amber / Blau / Violett). */
+export const MAKRO_FARBEN = {
+  protein: '#c2831f',
+  carbs: '#3d7fb8',
+  fat: '#8a6bb5',
+} as const;
 
 export function PrimaryButton({
   children,

@@ -77,7 +77,14 @@ export function FastingCard(): ReactElement {
     setFehler(null);
     try {
       const aktuell = (profile as unknown as { goals?: Record<string, unknown> } | null)?.goals ?? {};
-      await updateProfile({ goals: { ...aktuell, fasting: next } } as never);
+      // Startdatum der Fasten-Serie: beim ersten Speichern setzen, beim Entfernen löschen.
+      const vorher = aktuell as { fastingSince?: string };
+      const fastingSince = next
+        ? (vorher.fastingSince ?? new Date().toISOString().slice(0, 10))
+        : undefined;
+      await updateProfile({
+        goals: { ...aktuell, fasting: next, ...(next ? { fastingSince } : { fastingSince: undefined }) },
+      } as never);
       setOpen(false);
     } catch (e) {
       setFehler(e instanceof Error ? e.message : de ? 'Speichern fehlgeschlagen.' : 'Could not save.');

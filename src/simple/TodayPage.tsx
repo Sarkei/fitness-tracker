@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, ChevronRight, Dumbbell, Flame, Moon, Target, Utensils } from 'lucide-react';
+import { Camera, ChevronRight, Dumbbell, Flame, Moon, Target } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { FastingCard } from '../components/dashboard/FastingCard';
 import {
   Card,
-  EmptyState,
   GhostButton,
   MacroBar,
+  MAKRO_FARBEN,
   PageHeader,
   PrimaryButton,
   Ring,
   SectionTitle,
+  StatTile,
 } from './ui';
 import PhotoMealSheet from './PhotoMealSheet';
 import SessionSheet from './SessionSheet';
@@ -29,15 +30,21 @@ import {
   type PlanWeek,
   type WorkoutEntry,
 } from './simpleApi';
-import { tageSeitLetztemTraining, toYmd, workoutStreak, workoutsInLastDays } from './analytics';
+import { toYmd } from './analytics';
+import {
+  bilanzDurchschnitt,
+  fastenSerie,
+  kcalBilanz,
+  trainingsSerie,
+  verschiebeTage,
+  wochentagKurz,
+} from './serien';
 
 /**
- * Startseite „Heute" — bewusst kein zweites Dashboard.
+ * Startseite „Heute" — Tagesfokus statt zweitem Dashboard.
  *
- * Im Mittelpunkt steht, was heute ansteht: Fasten-Phase, die geplante Einheit, die
- * Mahlzeiten und ein schmaler Wochenbalken. Kennzahlen, Heatmap und Muskelbalance
- * bleiben im Training und in den Statistiken — sie hier zu wiederholen war der Grund,
- * warum sich „Heute" vorher wie eine Kopie der Übersicht angefühlt hat.
+ * Auf einen Blick: Fasten-Phase, Fasten-Serie, Trainings-Serie, das heutige Training,
+ * die Mahlzeiten als Tabelle und die Kalorienbilanz der letzten 14 Tage.
  */
 export default function TodayPage() {
   const { profile } = useAuth();
@@ -74,11 +81,16 @@ export default function TodayPage() {
   const goals = (profile?.goals ?? {}) as {
     dailyCalories?: number;
     macros?: { protein?: number; carbs?: number; fat?: number };
+    fasting?: unknown;
+    fastingSince?: string;
   };
   const goalKcal = Number(goals.dailyCalories) || 2400;
   const goalProtein = Number(goals.macros?.protein) || 180;
   const goalCarbs = Number(goals.macros?.carbs) || 240;
   const goalFat = Number(goals.macros?.fat) || 80;
+  const koerpergewicht = Number(
+    (profile as unknown as { measurements?: { weight?: number } } | null)?.measurements?.weight,
+  );
 
   /** Die Planwoche, in die heute fällt. */
   const heutePlanWoche = useMemo<PlanWeek | null>(() => {
@@ -97,25 +109,24 @@ export default function TodayPage() {
   }, [heutePlanWoche, date]);
 
   const trainingToday = workouts.find((w) => toYmd(w.date) === date) ?? null;
-  const streak = workoutStreak(workouts);
-  const letzte7 = workoutsInLastDays(workouts, 7);
-  const seitLetztem = tageSeitLetztemTraining(workouts);
   const uebrig = Math.max(0, Math.round(goalKcal - sum.kcal));
   const ueber = sum.kcal > goalKcal;
 
-  /** Sieben Tage als schmaler Balken — Tagesfortschritt, keine Statistikwand. */
-  const woche = useMemo(() => {
-    return Array.from({ length: 7 }, (_, i) => {
-      const ymd = verschiebeTage(date, -(6 - i));
-      const kcal = monatEntries
-        .filter((e) => toYmd(e.date) === ymd)
-        .reduce((s, e) => s + (Number(e.calories) || 0), 0);
-      const hatTraining = workouts.some((w) => toYmd(w.date) === ymd);
-      return { ymd, kcal, hatTraining, heute: ymd === date, label: tagKuerzel(ymd) };
-    });
-  }, [date, monatEntries, workouts]);
+  /** Serien und Bilanz */
+  const fasten = useMemo(
+    () => (goals.fasting ? fastenSerie(goals.fastingSince, date) : { tage: 0, seit: null }),
+    [goals.fasting, goals.fastingSince, date],
+  );
+  const serie = useMemo(() => trainingsSerie(workouts, planWochen, date), [workouts, planWochen, date]);
+  const bilanz = useMemo(
+    () => kcalBilanz(monatEntries, workouts, goalKcal, 14, date, koerpergewicht),
+    [monatEntries, workouts, goalKcal, date, koerpergewicht],
+  );
+  const oBilanz = useMemo(() => bilanzDurchschnitt(bilanz), [bilanz]);
+  const maxBilanz = Math.max(1, ...bilanz.map((t) => Math.abs(t.bilanz)));
+  const hatBilanz = bilanz.some((t) => t.hatDaten);
 
-  /** Eine Zeile, die den Tag zusammenfasst. */
+  /** Der Tag in einer Zeile. */
   const naechsterSchritt = useMemo(() => {
     if (trainingToday) return { text: `Training erledigt: ${trainingToday.name}`, tone: 'done' as const };
     if (planDay && !planDay.isRest) {
@@ -157,7 +168,7 @@ export default function TodayPage() {
         }
       />
 
-      {/* Fasten läuft dauerhaft mit, deshalb ganz oben */}
+      {/* Fasten läuft dauerhaft mit */}
       <FastingCard />
 
       {/* Der Tag in einer Zeile */}
@@ -188,8 +199,58 @@ export default function TodayPage() {
         </button>
       </Card>
 
+      {/* Serien auf einen Blick */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile
+          label="Fasten-Serie"
+          value={fasten.tage}
+          unit={fasten.tage === 1 ? 'Tag' : 'Tage'}
+          hint={
+            goals.fasting
+              ? fasten.tage > 0
+                ? `am Stück seit ${fmtKurz(fasten.seit)}`
+                : 'startet heute'
+              : 'kein Fastenplan aktiv'
+          }
+          tone={fasten.tage > 0 ? 'accent' : 'muted'}
+          icon={<Moon className="h-3.5 w-3.5" />}
+        />
+        <StatTile
+          label="Trainings-Serie"
+          value={serie.aktuell}
+          unit={serie.aktuell === 1 ? 'Einheit' : 'Einheiten'}
+          hint={serie.geplant > 0 ? `ohne Auslassen · ${serie.absolviert}/${serie.geplant} in 30 Tagen` : 'kein Plan hinterlegt'}
+          tone={serie.aktuell > 0 ? 'accent' : 'muted'}
+          icon={<Dumbbell className="h-3.5 w-3.5" />}
+        />
+        <StatTile
+          label="Beste Serie"
+          value={serie.laengste}
+          unit="am Stück"
+          hint="längste Kette ohne Auslassen"
+          tone="default"
+          icon={<Target className="h-3.5 w-3.5" />}
+        />
+        <StatTile
+          label="Ø Bilanz"
+          value={oBilanz === null ? '—' : `${oBilanz > 0 ? '+' : ''}${oBilanz}`}
+          unit={oBilanz === null ? undefined : 'kcal'}
+          hint={
+            oBilanz === null
+              ? 'noch keine Mahlzeiten erfasst'
+              : oBilanz < 0
+                ? 'im Defizit'
+                : oBilanz > 0
+                  ? 'im Überschuss'
+                  : 'genau im Ziel'
+          }
+          tone={oBilanz === null ? 'muted' : oBilanz > 0 ? 'warn' : 'accent'}
+          icon={<Flame className="h-3.5 w-3.5" />}
+        />
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-5 lg:items-start">
-        {/* Ernährung heute */}
+        {/* Gegessen: nur die Tabelle */}
         <Card className="flex flex-col p-5 lg:col-span-3">
           <SectionTitle
             action={
@@ -201,16 +262,28 @@ export default function TodayPage() {
             Gegessen
           </SectionTitle>
 
-          <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center">
-            <Ring value={sum.kcal} max={goalKcal} label="kcal" unit="" size={132} />
-            <div className="w-full flex-1 space-y-3">
-              <MacroBar label="Protein" value={sum.protein} max={goalProtein} />
-              <MacroBar label="Kohlenhydrate" value={sum.carbs} max={goalCarbs} />
-              <MacroBar label="Fett" value={sum.fat} max={goalFat} />
+          <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center">
+            <Ring value={sum.kcal} max={goalKcal} label="Kalorien" unit="kcal" size={148} />
+            <div className="w-full flex-1 space-y-3.5">
+              <MacroBar label="Protein" value={sum.protein} max={goalProtein} color={MAKRO_FARBEN.protein} />
+              <MacroBar label="Kohlenhydrate" value={sum.carbs} max={goalCarbs} color={MAKRO_FARBEN.carbs} />
+              <MacroBar label="Fett" value={sum.fat} max={goalFat} color={MAKRO_FARBEN.fat} />
+              <div className="flex items-center justify-between border-t border-[var(--border-muted)] pt-3 text-[11px] text-[var(--text-muted)]">
+                <span>{entries.length} Mahlzeiten</span>
+                <span className="tabular-nums">
+                  {ueber ? (
+                    <span className="font-semibold text-[#f87171]">+{Math.round(sum.kcal - goalKcal)} über Ziel</span>
+                  ) : (
+                    <>
+                      noch <span className="font-semibold text-[var(--foreground)]">{uebrig}</span> kcal
+                    </>
+                  )}
+                </span>
+              </div>
             </div>
           </div>
 
-          {entries.length > 0 ? (
+          {entries.length > 0 && (
             <ul className="mt-4 divide-y divide-[var(--border-muted)] border-t border-[var(--border-muted)]">
               {entries.slice(0, 4).map((entry) => (
                 <li key={entry.id} className="flex items-center gap-3 py-2">
@@ -232,161 +305,183 @@ export default function TodayPage() {
                 </li>
               )}
             </ul>
-          ) : (
-            !laedt && (
-              <EmptyState
-                icon={<Utensils className="h-6 w-6" />}
-                title="Noch nichts eingetragen"
-                hint="Foto vom Essen — die KI schätzt Portion und Nährwerte."
-                action={
-                  <GhostButton onClick={() => setShowPhoto(true)}>
-                    <Camera className="h-3.5 w-3.5" /> Foto aufnehmen
-                  </GhostButton>
-                }
-              />
-            )
           )}
         </Card>
 
-        {/* Training heute */}
+        {/* Training: eine Box mit der heutigen Einheit */}
         <Card className="flex flex-col p-5 lg:col-span-2">
           <SectionTitle action={<GhostButton onClick={() => navigate('/training')}>Plan</GhostButton>}>
-            Training
+            Heutiges Training
           </SectionTitle>
 
           {trainingToday ? (
-            <div className="flex items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--simple-accent-soft)] text-[var(--simple-accent)]">
-                <Dumbbell className="h-5 w-5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold">{trainingToday.name}</p>
-                <p className="text-xs text-[var(--text-muted)]">
-                  erledigt · {trainingToday.duration} min
-                  {Array.isArray(trainingToday.exercises) ? ` · ${trainingToday.exercises.length} Übungen` : ''}
-                </p>
+            <div className="rounded-xl border border-[color-mix(in_srgb,var(--simple-accent)_40%,transparent)] bg-[var(--simple-accent-soft)]/50 p-4">
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--simple-accent)] text-[var(--simple-accent-ink)]">
+                  <Dumbbell className="h-5 w-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold">{trainingToday.name}</p>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    erledigt · {trainingToday.duration} min
+                    {Array.isArray(trainingToday.exercises) ? ` · ${trainingToday.exercises.length} Übungen` : ''}
+                  </p>
+                </div>
               </div>
             </div>
           ) : planDay && !planDay.isRest ? (
             <button
               type="button"
-              className="flex w-full items-start gap-3 text-left"
+              className="w-full rounded-xl border border-[var(--border-muted)] bg-[var(--card-bg)] p-4 text-left transition hover:border-[var(--simple-accent)]/50"
               onClick={() => setShowSession(true)}
             >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--simple-accent-soft)] text-[var(--simple-accent)]">
-                <Dumbbell className="h-5 w-5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold">
-                  {planDay.title || DAY_LABELS[planDay.day] || 'Training'}
-                </p>
-                <p className="text-xs text-[var(--text-muted)]">
-                  {(planDay.exercises ?? []).length} Übungen
-                  {planDay.estimatedDuration ? ` · ca. ${planDay.estimatedDuration} min` : ''}
-                </p>
-                {(planDay.exercises ?? []).length > 0 && (
-                  <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-[var(--text-muted)]">
-                    {(planDay.exercises ?? [])
-                      .slice(0, 3)
-                      .map((e) => e.name)
-                      .join(' · ')}
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--simple-accent-soft)] text-[var(--simple-accent)]">
+                  <Dumbbell className="h-5 w-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold">
+                    {planDay.title || DAY_LABELS[planDay.day] || 'Training'}
                   </p>
-                )}
+                  <p className="text-xs text-[var(--text-muted)]">
+                    {(planDay.exercises ?? []).length} Übungen
+                    {planDay.estimatedDuration ? ` · ca. ${planDay.estimatedDuration} min` : ''}
+                  </p>
+                  {(planDay.exercises ?? []).length > 0 && (
+                    <ul className="mt-2 space-y-1">
+                      {(planDay.exercises ?? []).slice(0, 4).map((e, i) => (
+                        <li key={`${e.name}-${i}`} className="flex items-baseline justify-between gap-2 text-[11.5px]">
+                          <span className="min-w-0 truncate text-[var(--text-muted)]">{e.name}</span>
+                          <span className="shrink-0 tabular-nums text-[var(--text-muted)]">
+                            {[e.sets && `${e.sets}×`, e.reps && `${e.reps}`].filter(Boolean).join(' ')}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[var(--text-muted)]" />
               </div>
-              <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[var(--text-muted)]" />
             </button>
           ) : (
-            <div className="flex items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--border-muted)]/60 text-[var(--text-muted)]">
-                <Moon className="h-5 w-5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold">
-                  {planDay?.isRest ? 'Ruhetag' : laedt ? '…' : 'Kein Plan für heute'}
-                </p>
-                <p className="text-xs text-[var(--text-muted)]">
-                  {planDay?.isRest ? 'Erholung ist Teil des Plans.' : 'Training kannst du trotzdem erfassen.'}
-                </p>
+            <div className="rounded-xl border border-[var(--border-muted)] bg-[var(--card-bg)] p-4">
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--border-muted)]/60 text-[var(--text-muted)]">
+                  <Moon className="h-5 w-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold">
+                    {planDay?.isRest ? 'Ruhetag' : laedt ? '…' : 'Kein Plan für heute'}
+                  </p>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    {planDay?.isRest ? 'Erholung ist Teil des Plans.' : 'Training kannst du trotzdem erfassen.'}
+                  </p>
+                </div>
               </div>
             </div>
           )}
 
-          <div className="mt-auto space-y-2 border-t border-[var(--border-muted)] pt-3">
-            <div className="flex items-baseline justify-between text-[11px] text-[var(--text-muted)]">
-              <span>7 Tage</span>
-              <span className="tabular-nums">
-                <span className="font-semibold text-[var(--foreground)]">{letzte7.length}</span> Einheiten
-                {streak.aktuell > 0
-                  ? ` · ${streak.aktuell} ${streak.aktuell === 1 ? 'Tag' : 'Tage'} Serie`
-                  : ''}
-              </span>
-            </div>
-            <button
-              type="button"
-              className="w-full text-left text-[11px] font-semibold text-[var(--simple-accent)]"
-              onClick={() => setShowSession(true)}
-            >
-              + Training erfassen
-            </button>
-          </div>
+          <button
+            type="button"
+            className="mt-auto w-full pt-3 text-left text-[11px] font-semibold text-[var(--simple-accent)]"
+            onClick={() => setShowSession(true)}
+          >
+            + Training erfassen
+          </button>
         </Card>
       </div>
 
-      {/* Diese Woche: ein Balken, keine Kacheln */}
+      {/* Kalorienbilanz */}
       <Card className="p-5">
         <SectionTitle
-          action={
-            <button
-              type="button"
-              onClick={() => navigate('/stats')}
-              className="text-[11px] font-semibold text-[var(--simple-accent)]"
-            >
-              Statistiken
-            </button>
-          }
+          action={<span className="text-[11px] text-[var(--text-muted)]">Ziel {goalKcal} kcal · 14 Tage</span>}
         >
-          Diese Woche
+          Kalorienbilanz
         </SectionTitle>
-        <div className="grid grid-cols-7 gap-2">
-          {woche.map((tag) => {
-            const relativ = tag.kcal > 0 ? Math.min(1, tag.kcal / goalKcal) : 0;
-            return (
-              <div key={tag.ymd} className="flex flex-col items-center gap-1.5">
-                <div className="flex h-16 w-full items-end overflow-hidden rounded-lg bg-[var(--border-muted)]/40">
+
+        {hatBilanz ? (
+          <>
+            <div className="relative flex items-stretch gap-1.5" style={{ height: 116 }}>
+              {/* Nulllinie */}
+              <div
+                className="pointer-events-none absolute inset-x-0 border-t border-dashed border-[var(--border-muted)]"
+                style={{ top: '50%' }}
+              />
+              {bilanz.map((tag) => {
+                const anteil = Math.min(1, Math.abs(tag.bilanz) / maxBilanz);
+                const defizit = tag.bilanz < 0;
+                const hoehe = tag.hatDaten ? Math.max(3, anteil * 50) : 0;
+                return (
                   <div
-                    className="w-full rounded-lg transition-[height] duration-500"
-                    style={{
-                      height: `${relativ * 100}%`,
-                      background: tag.heute
-                        ? 'var(--simple-accent)'
-                        : 'color-mix(in srgb, var(--simple-accent) 45%, transparent)',
-                    }}
-                  />
-                </div>
+                    key={tag.ymd}
+                    className="relative flex-1"
+                    title={
+                      tag.hatDaten
+                        ? `${fmtDatum(tag.ymd)}: ${tag.kcal} gegessen · ${tag.verbrannt} Training · Bilanz ${
+                            tag.bilanz > 0 ? '+' : ''
+                          }${tag.bilanz} kcal`
+                        : `${fmtDatum(tag.ymd)}: nichts erfasst`
+                    }
+                  >
+                    {hoehe > 0 && (
+                      <div
+                        className="absolute inset-x-0 rounded-sm transition-[height] duration-500"
+                        style={{
+                          height: `${hoehe}%`,
+                          [defizit ? 'bottom' : 'top']: '50%',
+                          background: defizit
+                            ? 'color-mix(in srgb, var(--simple-accent) 75%, transparent)'
+                            : 'color-mix(in srgb, #f87171 70%, transparent)',
+                        }}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-1 flex gap-1.5">
+              {bilanz.map((tag) => (
                 <span
-                  className={`text-[10px] font-semibold uppercase tracking-[0.1em] ${
-                    tag.heute ? 'text-[var(--simple-accent)]' : 'text-[var(--text-muted)]'
+                  key={tag.ymd}
+                  className={`flex-1 text-center text-[9px] font-semibold uppercase tracking-[0.08em] ${
+                    tag.ymd === date ? 'text-[var(--simple-accent)]' : 'text-[var(--text-muted)]'
                   }`}
                 >
-                  {tag.label}
+                  {wochentagKurz(tag.ymd)}
                 </span>
+              ))}
+            </div>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-muted)] pt-2.5 text-[11px] text-[var(--text-muted)]">
+              <span className="flex items-center gap-3">
+                <span className="flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-sm" style={{ background: 'var(--simple-accent)' }} /> Defizit
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-sm" style={{ background: '#f87171' }} /> Überschuss
+                </span>
+              </span>
+              <span className="tabular-nums">
+                Ø{' '}
                 <span
-                  className="h-1.5 w-1.5 rounded-full"
-                  style={{ background: tag.hatTraining ? 'var(--simple-accent)' : 'transparent' }}
-                  aria-label={tag.hatTraining ? 'Training erfasst' : undefined}
-                />
-              </div>
-            );
-          })}
-        </div>
-        <p className="mt-3 border-t border-[var(--border-muted)] pt-2 text-[11px] text-[var(--text-muted)]">
-          Balken: Kalorien gegen dein Tagesziel. Punkt darunter: Training erfasst.
-          {seitLetztem !== null && seitLetztem > 1
-            ? ` Letztes Training vor ${seitLetztem} Tagen.`
-            : seitLetztem === 1
-              ? ' Letztes Training gestern.'
-              : ''}
-        </p>
+                  className="font-semibold"
+                  style={{ color: (oBilanz ?? 0) > 0 ? '#f87171' : 'var(--foreground)' }}
+                >
+                  {oBilanz === null ? '—' : `${oBilanz > 0 ? '+' : ''}${oBilanz}`}
+                </span>{' '}
+                kcal
+              </span>
+            </div>
+            <p className="mt-1.5 text-[10.5px] leading-relaxed text-[var(--text-muted)]">
+              Bilanz = Gegessen − Tagesziel − geschätzter Trainingsverbrauch (7 kcal/min bei 80 kg, anteilig
+              zum Körpergewicht). Der Durchschnitt zählt nur Tage, an denen mindestens die Hälfte des Ziels
+              erfasst wurde — sonst wirkt jeder halb dokumentierte Tag wie ein riesiges Defizit.
+            </p>
+          </>
+        ) : (
+          <p className="py-6 text-center text-[11.5px] text-[var(--text-muted)]">
+            Sobald du ein paar Tage Essen erfasst hast, siehst du hier Defizit und Überschuss.
+          </p>
+        )}
       </Card>
 
       {showPhoto && <PhotoMealSheet date={date} onClose={() => setShowPhoto(false)} onSaved={() => void load()} />}
@@ -403,22 +498,15 @@ export default function TodayPage() {
   );
 }
 
-/** Lokale Datumsarithmetik — kein Zeitzonen-Versatz über UTC. */
-function verschiebeTage(ymd: string, days: number): string {
-  const [y, m, d] = ymd.split('-').map(Number);
-  const dt = new Date(y, (m ?? 1) - 1, d ?? 1);
-  dt.setDate(dt.getDate() + days);
-  const yy = dt.getFullYear();
-  const mm = String(dt.getMonth() + 1).padStart(2, '0');
-  const dd = String(dt.getDate()).padStart(2, '0');
-  return `${yy}-${mm}-${dd}`;
+/** 23.11.2026 → 23.11. */
+function fmtKurz(ymd: string | null): string {
+  if (!ymd) return '—';
+  const [, m, d] = ymd.split('-');
+  return m && d ? `${d}.${m}.` : ymd;
 }
 
-/** Wochentagskürzel für den Balken (Mo, Di …). */
-function tagKuerzel(ymd: string): string {
-  const [y, m, d] = ymd.split('-').map(Number);
-  const dt = new Date(y, (m ?? 1) - 1, d ?? 1);
-  const keys = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
-  const key = keys[dt.getDay()] as keyof typeof DAY_LABELS;
-  return String(DAY_LABELS[key] ?? '').slice(0, 2);
+/** 2026-11-23 → 23.11. */
+function fmtDatum(ymd: string): string {
+  const [, m, d] = ymd.split('-');
+  return m && d ? `${d}.${m}.` : ymd;
 }
