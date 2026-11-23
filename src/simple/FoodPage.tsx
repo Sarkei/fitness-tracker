@@ -337,7 +337,7 @@ export default function FoodPage() {
 
       <div className="grid gap-4 lg:grid-cols-3 lg:items-stretch">
         {/* Tagesring */}
-        <Card className="flex flex-col p-5 lg:col-span-2">
+        <Card className="flex min-w-0 flex-col p-5 lg:col-span-2">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
@@ -422,7 +422,7 @@ export default function FoodPage() {
         </Card>
 
         {/* Woche */}
-        <Card className="flex flex-col p-5">
+        <Card className="flex min-w-0 flex-col p-5">
           <SectionTitle action={<GhostButton onClick={() => setDate(todayYmd())}>Heute</GhostButton>}>
             Woche
           </SectionTitle>
@@ -630,15 +630,20 @@ export default function FoodPage() {
 
       {/* Verlauf */}
       <div className="grid gap-4 lg:grid-cols-3 lg:items-stretch">
-        <Card className="flex flex-col p-5 lg:col-span-2">
+        <Card className="flex min-w-0 flex-col p-5 lg:col-span-2">
           <SectionTitle
-            action={<span className="text-[11px] text-[var(--text-muted)]">Ziel {Math.round(Number(goals.dailyCalories) || 2400)}</span>}
+            action={
+              <span className="text-[11px] text-[var(--text-muted)]">
+                Ziel {goalKcal} kcal
+                {verbrauch?.aktiv ? ` (inkl. ${verbrauch.aktiv} aktiv)` : ''}
+              </span>
+            }
           >
             Kalorien · 14 Tage
           </SectionTitle>
           {hatVerlauf ? (
             <>
-              <Sparkline values={verlauf.map((v) => v.kcal)} goal={Number(goals.dailyCalories) || 2400} height={64} einheit="kcal" minY={0} />
+              <Sparkline values={verlauf.map((v) => v.kcal)} goal={goalKcal} height={64} einheit="kcal" minY={0} />
               {/* Tag antippen, um ihn zu laden */}
               <div className="mt-1 flex gap-1 text-[9.5px] text-[var(--text-muted)]">
                 {verlauf.map((v, i) => (

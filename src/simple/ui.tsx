@@ -5,7 +5,12 @@ import type { CSSProperties, ReactNode } from 'react';
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
     <section
-      className={`rounded-2xl border border-[var(--border-muted)] bg-[var(--card-bg)] shadow-[0_1px_2px_rgb(15_23_42/0.04)] ${className}`}
+      /*
+       * `min-w-0` ist Pflicht: ohne das kann eine Karte in einem Grid nicht
+       * schrumpfen. Breite Inhalte (28-Tage-Leiste, Makro-Balken) ziehen die
+       * Spalte dann auf mehrere hundert Pixel und die Mobilansicht läuft über.
+       */
+      className={`min-w-0 rounded-2xl border border-[var(--border-muted)] bg-[var(--card-bg)] shadow-[0_1px_2px_rgb(15_23_42/0.04)] ${className}`}
     >
       {children}
     </section>
