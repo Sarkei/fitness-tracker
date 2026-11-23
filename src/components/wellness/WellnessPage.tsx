@@ -11,7 +11,7 @@
  */
 
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import { Activity, BarChart3, Footprints, Heart, LayoutGrid, Moon } from 'lucide-react';
+import { Activity, BarChart3, ChevronLeft, Footprints, Heart, LayoutGrid, Moon } from 'lucide-react';
 import { PageHeader } from '@/src/simple/ui';
 import { WellnessProvider } from './WellnessProvider';
 import WellnessUebersicht from './WellnessUebersicht';
@@ -42,26 +42,17 @@ export default function WellnessPage() {
         hint="Schlaf, Bewegung, Herz und Trainingsform — automatisch über Intervals.icu."
       />
 
-      <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {UNTERSEITEN.map(({ pfad, label, icon: Icon }) => {
-          const aktiv = location.pathname === pfad;
-          return (
-            <button
-              key={pfad}
-              type="button"
-              onClick={() => navigate(pfad)}
-              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-[12px] font-semibold transition ${
-                aktiv
-                  ? 'border-[var(--simple-accent)] bg-[var(--simple-accent)] text-white'
-                  : 'border-[var(--border-muted)] text-[var(--text-muted)] hover:border-[var(--simple-accent)] hover:text-[var(--simple-accent)]'
-              }`}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {label}
-            </button>
-          );
-        })}
-      </div>
+      {/* Zurück-Leiste: nur auf Unterseiten, damit man aus einem Bereich herauskommt.
+          Die Auswahl der Bereiche läuft über die Kacheln der Übersicht. */}
+      {location.pathname !== '/wellness' && (
+        <button
+          type="button"
+          onClick={() => navigate('/wellness')}
+          className="inline-flex w-fit items-center gap-1.5 rounded-xl border border-[var(--border-muted)] px-3 py-1.5 text-[11.5px] font-semibold text-[var(--text-muted)] transition hover:border-[var(--simple-accent)] hover:text-[var(--simple-accent)]"
+        >
+          <ChevronLeft className="h-3.5 w-3.5" /> Übersicht
+        </button>
+      )}
 
       <WellnessProvider>
         <Routes>

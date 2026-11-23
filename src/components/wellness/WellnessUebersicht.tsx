@@ -5,9 +5,9 @@
 
 import { useState } from 'react';
 import { Moon, Footprints, Heart, Activity, ChevronRight, AlertCircle } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Card } from '@/src/simple/ui';
-import { useWellness, WellnessToolbar } from './WellnessProvider';
+import { useWellness, WellnessAktualisieren } from './WellnessProvider';
 import { KennzahlSheet, KlickKachel, type KennzahlDef, type KennzahlPunkt } from './KennzahlSheet';
 import { Tagesdetail } from './Tagesdetail';
 import { formLabel, letzter, mittel, schlafBewertung, schlafStunden } from '@/src/lib/wellness';
@@ -16,6 +16,7 @@ type Kennzahl = { def: KennzahlDef; punkte: KennzahlPunkt[] };
 
 export default function WellnessUebersicht() {
   const { daten } = useWellness();
+  const navigate = useNavigate();
   const tage = daten.tage;
   const [offen, setOffen] = useState<string | null>(null);
   const [tagOffen, setTagOffen] = useState<string | null>(null);
@@ -70,7 +71,13 @@ export default function WellnessUebersicht() {
 
   return (
     <div className="space-y-4">
-      <WellnessToolbar />
+      {/* Tageslage: Kopf links, Aktualisieren rechts */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+          Heute
+        </p>
+        <WellnessAktualisieren />
+      </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KlickKachel
@@ -78,34 +85,34 @@ export default function WellnessUebersicht() {
           value={schlafLetzte ?? '—'}
           unit="h"
           hint={schlafScore != null ? `Score ${Math.round(schlafScore)} · ${schlafBewertung(schlafScore)}` : 'kein Score'}
-          onClick={() => setOffen('schlaf')}
+          onClick={() => navigate('/wellness/schlaf')}
         />
         <KlickKachel
           label="Schritte"
           value={schritte != null ? Math.round(schritte).toLocaleString('de-DE') : '—'}
           hint={`Ø ${Math.round(mittel(tage.map((t) => t.steps)) ?? 0).toLocaleString('de-DE')}`}
-          onClick={() => setOffen('schritte')}
+          onClick={() => navigate('/wellness/bewegung')}
         />
         <KlickKachel
           label="HRV"
           value={hrv != null ? Math.round(hrv) : '—'}
           unit="ms"
           hint={`Ø ${Math.round(mittel(tage.map((t) => t.hrv)) ?? 0)}`}
-          onClick={() => setOffen('hrv')}
+          onClick={() => navigate('/wellness/koerper')}
         />
         <KlickKachel
           label="Ruhepuls"
           value={puls != null ? Math.round(puls) : '—'}
           unit="bpm"
           hint={`Ø ${Math.round(mittel(tage.map((t) => t.restingHr)) ?? 0)}`}
-          onClick={() => setOffen('puls')}
+          onClick={() => navigate('/wellness/koerper')}
         />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <button
           type="button"
-          onClick={() => setOffen('form')}
+          onClick={() => navigate('/wellness/form')}
           className="rounded-2xl border border-[var(--border-muted)] bg-[var(--card-bg)] px-4 py-3 text-left transition hover:border-[var(--simple-accent)]"
         >
           <p className="text-[9.5px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">

@@ -131,10 +131,48 @@ export function useWellness(): Kontext {
 }
 
 /** Zeitraum-Umschalter + Aktualisieren, auf jeder Unterseite oben. */
+/**
+ * Aktualisieren-Knopf mit Zeitstempel.
+ *
+ * Steht in der Kopfzeile der Übersicht rechts auf Höhe der Kachel-Überschriften.
+ * Eine Zeitraum-Auswahl gibt es hier nicht mehr: die Übersicht zeigt die Tageslage,
+ * die Zeiträume gehören in die einzelnen Bereiche.
+ */
+export function WellnessAktualisieren() {
+  const { laedt, daten, syncJetzt, synct } = useWellness();
+  return (
+    <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
+      {daten.fetchedAt && (
+        <span>
+          Stand{' '}
+          {new Date(daten.fetchedAt).toLocaleString('de-DE', {
+            day: '2-digit',
+            month: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+          })}
+        </span>
+      )}
+      <button
+        type="button"
+        onClick={() => void syncJetzt()}
+        disabled={laedt || synct}
+        className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-muted)] px-2.5 py-1.5 font-semibold transition hover:border-[var(--simple-accent)] hover:text-[var(--simple-accent)] disabled:opacity-50"
+        title="Daten jetzt neu abholen (kommen sonst automatisch)"
+      >
+        {synct ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Aktualisieren
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Zeitraum-Auswahl plus Aktualisieren — für die Unterseiten (Schlaf, Bewegung …).
+ * Die Übersicht nutzt nur `WellnessAktualisieren`, weil sie die Tageslage zeigt.
+ */
 export function WellnessToolbar() {
   const { zeitraum, setZeitraum, laedt, daten, syncJetzt, synct } = useWellness();
   return (
-    <div className="space-y-2">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div className="flex gap-1.5">
         {ZEITRAEUME.map((z) => (
@@ -152,29 +190,7 @@ export function WellnessToolbar() {
           </button>
         ))}
       </div>
-      <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
-        {daten.fetchedAt && (
-          <span>
-            Stand{' '}
-            {new Date(daten.fetchedAt).toLocaleString('de-DE', {
-              day: '2-digit',
-              month: '2-digit',
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </span>
-        )}
-        <button
-          type="button"
-          onClick={() => void syncJetzt()}
-          disabled={laedt || synct}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-muted)] px-2.5 py-1.5 font-semibold transition hover:border-[var(--simple-accent)] hover:text-[var(--simple-accent)] disabled:opacity-50"
-          title="Daten jetzt neu abholen (kommen sonst automatisch)"
-        >
-          {synct ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Aktualisieren
-        </button>
-      </div>
-    </div>
+      <WellnessAktualisieren />
     </div>
   );
 }
