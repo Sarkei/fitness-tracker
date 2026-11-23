@@ -23,8 +23,13 @@ export type GarminTag = {
   sleepSecs?: number;
   sleepScore?: number;
   sleepQuality?: number;
+  deepSecs?: number;
+  lightSecs?: number;
+  remSecs?: number;
+  awakeSecs?: number;
   /** Herz */
   hrv?: number;
+  hrvStatus?: string;
   restingHr?: number;
   minHr?: number;
   maxHr?: number;
@@ -39,10 +44,14 @@ export type GarminTag = {
   bodyBatteryMax?: number;
   stressAvg?: number;
   stressMax?: number;
-  /** Sauerstoff */
+  /** Sauerstoff & Atmung */
   spo2Avg?: number;
-  /** Atmung */
   respirationAvg?: number;
+  /** Körper */
+  vo2max?: number;
+  fitnessAge?: number;
+  weightKg?: number;
+  bodyFat?: number;
 };
 
 export type GarminCache = {
@@ -62,15 +71,37 @@ export async function garminToken(apiKey: string): Promise<GarminToken> {
   if (!res.ok) {
     throw new Error(
       res.status === 401 || res.status === 403
-        ? 'Der Garmin-API-Key wurde abgelehnt. Bitte in Garmin Connect neu erzeugen.'
+        ? 'Der Garmin-API-Key wurde abgelehnt. Bitte in Garmin Connect neu erzeugen (er wird nur einmal angezeigt).'
         : `Garmin-Token fehlgeschlagen (HTTP ${res.status}).`,
     );
   }
-  const j = (await res.json()) as { access_token?: string; expires_in?: number };
-  if (!j.access_token) throw new Error('Garmin lieferte kein Token.');
+
+  // Garmin antwortet je nach Endpunkt-Stand entweder mit JSON
+  // ({"access_token":"…"}) oder mit dem nackten JWT als Text ("eyJ…").
+  // Beides muss funktionieren — sonst scheitert ein gültiger Key an JSON.parse.
+  const roh = (await res.text()).trim();
+  if (!roh) throw new Error('Garmin lieferte ein leeres Token.');
+
+  let token = '';
+  let expiresIn = 0;
+  if (roh.startsWith('{')) {
+    try {
+      const j = JSON.parse(roh) as { access_token?: string; expires_in?: number };
+      token = String(j.access_token ?? '');
+      expiresIn = Number(j.expires_in) || 0;
+    } catch {
+      throw new Error('Garmin-Token war nicht lesbar (ungültige JSON-Antwort).');
+    }
+  } else {
+    // Nackter JWT — oft in Anführungszeichen, die entfernt werden müssen.
+    token = roh.replace(/^"|"$/g, '');
+  }
+
+  if (!token) throw new Error('Garmin lieferte kein Token.');
+
   return {
-    token: j.access_token,
-    expiresAt: Date.now() + (Number(j.expires_in) || 86_400) * 1000,
+    token,
+    expiresAt: Date.now() + (expiresIn || 86_400) * 1000,
   };
 }
 
@@ -132,7 +163,7 @@ export async function syncGarmin(apiKey: string, tage = 30): Promise<GarminCache
     return proTag.get(key)!;
   };
 
-  const [profil, schlaf, hrv, steps, stress, bodyBattery, spo2, herz, summary] = await Promise.all([
+  const [profil, schlaf, hrv, steps, stress, bodyBattery, spo2, herz, summary, gewicht] = await Promise.all([
     hole<{ displayName?: string; fullName?: string }>(token, '/userprofile-service/userprofile/settings'),
     hole<unknown>(token, `/sleep-service/sleep/dailySleepSummariesByDate?fromDate=${von}&toDate=${bis}`),
     hole<unknown>(token, `/hrv-service/hrv/daily/${von}/${bis}`),
@@ -142,7 +173,22 @@ export async function syncGarmin(apiKey: string, tage = 30): Promise<GarminCache
     hole<unknown>(token, `/wellness-service/wellness/daily/spo2acclimation/${heute}`),
     hole<unknown>(token, '/wellness-service/wellness/dailyHeartRate'),
     hole<unknown>(token, `/usersummary-service/v2/dailysummaries?fromDate=${von}&toDate=${bis}`),
+    hole<unknown>(token, `/weight-service/weight/range/${von}/${bis}`),
   ]);
+
+  // VO2max und Fitnessalter je Tag (eigene Endpunkte) — nur für die letzten 30 Tage,
+  // damit der Abruf nicht ausufert.
+  const koerper = await Promise.all(
+    Array.from({ length: Math.min(tage, 30) }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const ymd0 = ymd(d);
+      return Promise.all([
+        hole<unknown>(token, `/metrics-service/metrics/maxmet/daily/${ymd0}/${ymd0}`),
+        hole<unknown>(token, `/fitnessage-service/fitnessage/v2/${ymd0}`),
+      ]).then(([m, f]) => ({ datum: ymd0, maxmet: m, fitness: f }));
+    }),
+  );
 
   /** Liste aus verschiedenen Umschlagformen ziehen. */
   const liste = (roh: unknown): Array<Record<string, unknown>> => {
@@ -170,6 +216,46 @@ export async function syncGarmin(apiKey: string, tage = 30): Promise<GarminCache
     if (score) t.sleepScore = score;
     const q = zahl(s.sleepQuality);
     if (q) t.sleepQuality = q;
+    // Schlafphasen (aus den Detailwerten, wenn vorhanden)
+    const tief = zahl(s.deepSleepSeconds);
+    const leicht = zahl(s.lightSleepSeconds);
+    const rem = zahl(s.remSleepSeconds);
+    const wach = zahl(s.awakeSleepSeconds) ?? zahl(s.awakeDuration);
+    if (tief) t.deepSecs = tief;
+    if (leicht) t.lightSecs = leicht;
+    if (rem) t.remSecs = rem;
+    if (wach) t.awakeSecs = wach;
+  }
+
+  // Gewicht
+  if (gewicht) {
+    for (const w of liste(gewicht)) {
+      const d = String(w.calendarDate ?? w.date ?? w.samplePk ?? '').slice(0, 10);
+      if (!d) continue;
+      const kg = zahl(w.weight) ?? zahl(w.weightInGrams);
+      const t = eintrag(d);
+      // Garmin liefert teils Gramm — auf Kilogramm normalisieren.
+      if (kg) t.weightKg = kg > 1000 ? Math.round((kg / 1000) * 10) / 10 : Math.round(kg * 10) / 10;
+      const fett = zahl(w.bodyFat);
+      if (fett) t.bodyFat = fett;
+    }
+  }
+
+  // VO2max + Fitnessalter (Einzelabrufe je Tag)
+  for (const k of koerper) {
+    const t = eintrag(k.datum);
+    const v = liste(k.maxmet)[0];
+    if (v) {
+      const vo2 = zahl(v.vo2Max) ?? zahl(v.vo2max) ?? zahl(v.value);
+      if (vo2) t.vo2max = vo2;
+    }
+    if (k.fitness && typeof k.fitness === 'object') {
+      const f = k.fitness as Record<string, unknown>;
+      const alter = zahl(f.fitnessAge) ?? zahl(f.age) ?? zahl(f.fitnessAgeValue);
+      if (alter) t.fitnessAge = alter;
+      const vo2b = zahl(f.vo2Max) ?? zahl(f.vo2max);
+      if (vo2b && !t.vo2max) t.vo2max = vo2b;
+    }
   }
 
   // HRV

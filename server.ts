@@ -5732,6 +5732,76 @@ ${JSON.stringify(userCtx, null, 2)}
     );
   };
 
+  /**
+   * Tageswerte dauerhaft ablegen.
+   *
+   * Der Cache in `profile_extras` ist nur der schnelle Zugriff; die Historie liegt in
+   * `garmin_days`, damit Statistiken über Monate möglich sind, ohne jedes Mal die
+   * ganze API abzufragen.
+   */
+  const speichereGarminTage = async (userId: number, tage: GarminCache["tage"]): Promise<void> => {
+    if (!tage.length) return;
+    const werte: unknown[] = [];
+    const platzhalter: string[] = [];
+    let i = 0;
+    for (const t of tage) {
+      i += 1;
+      const b = (i - 1) * 25;
+      platzhalter.push(
+        `($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5},$${b + 6},$${b + 7},$${b + 8},$${b + 9},$${b + 10},` +
+          `$${b + 11},$${b + 12},$${b + 13},$${b + 14},$${b + 15},$${b + 16},$${b + 17},$${b + 18},$${b + 19},` +
+          `$${b + 20},$${b + 21},$${b + 22},$${b + 23},$${b + 24},$${b + 25})`,
+      );
+      werte.push(
+        userId, t.date,
+        t.sleepSecs ?? null, t.sleepScore ?? null, t.sleepQuality ?? null,
+        t.hrv ?? null, t.hrvStatus ?? null,
+        t.restingHr ?? null, t.minHr ?? null, t.maxHr ?? null,
+        t.steps ?? null, t.floorsClimbed ?? null, t.distanceMeters ?? null,
+        t.activeCalories ?? null, t.totalCalories ?? null,
+        t.stressAvg ?? null, t.stressMax ?? null,
+        t.bodyBatteryMin ?? null, t.bodyBatteryMax ?? null,
+        t.spo2Avg ?? null, t.respirationAvg ?? null,
+        t.vo2max ?? null, t.fitnessAge ?? null,
+        t.weightKg ?? null, t.bodyFat ?? null,
+      );
+    }
+    await pool.query(
+      `INSERT INTO garmin_days (
+         user_id, date, sleep_secs, sleep_score, sleep_quality, hrv, hrv_status,
+         resting_hr, min_hr, max_hr, steps, floors, distance_m, active_kcal, total_kcal,
+         stress_avg, stress_max, bb_min, bb_max, spo2_avg, respiration, vo2max, fitness_age,
+         weight_kg, body_fat
+       ) VALUES ${platzhalter.join(",")}
+       ON CONFLICT (user_id, date) DO UPDATE SET
+         sleep_secs = COALESCE(EXCLUDED.sleep_secs, garmin_days.sleep_secs),
+         sleep_score = COALESCE(EXCLUDED.sleep_score, garmin_days.sleep_score),
+         sleep_quality = COALESCE(EXCLUDED.sleep_quality, garmin_days.sleep_quality),
+         hrv = COALESCE(EXCLUDED.hrv, garmin_days.hrv),
+         hrv_status = COALESCE(EXCLUDED.hrv_status, garmin_days.hrv_status),
+         resting_hr = COALESCE(EXCLUDED.resting_hr, garmin_days.resting_hr),
+         min_hr = COALESCE(EXCLUDED.min_hr, garmin_days.min_hr),
+         max_hr = COALESCE(EXCLUDED.max_hr, garmin_days.max_hr),
+         steps = COALESCE(EXCLUDED.steps, garmin_days.steps),
+         floors = COALESCE(EXCLUDED.floors, garmin_days.floors),
+         distance_m = COALESCE(EXCLUDED.distance_m, garmin_days.distance_m),
+         active_kcal = COALESCE(EXCLUDED.active_kcal, garmin_days.active_kcal),
+         total_kcal = COALESCE(EXCLUDED.total_kcal, garmin_days.total_kcal),
+         stress_avg = COALESCE(EXCLUDED.stress_avg, garmin_days.stress_avg),
+         stress_max = COALESCE(EXCLUDED.stress_max, garmin_days.stress_max),
+         bb_min = COALESCE(EXCLUDED.bb_min, garmin_days.bb_min),
+         bb_max = COALESCE(EXCLUDED.bb_max, garmin_days.bb_max),
+         spo2_avg = COALESCE(EXCLUDED.spo2_avg, garmin_days.spo2_avg),
+         respiration = COALESCE(EXCLUDED.respiration, garmin_days.respiration),
+         vo2max = COALESCE(EXCLUDED.vo2max, garmin_days.vo2max),
+         fitness_age = COALESCE(EXCLUDED.fitness_age, garmin_days.fitness_age),
+         weight_kg = COALESCE(EXCLUDED.weight_kg, garmin_days.weight_kg),
+         body_fat = COALESCE(EXCLUDED.body_fat, garmin_days.body_fat),
+         updated_at = NOW()`,
+      werte,
+    );
+  };
+
   app.get("/api/integrations/garmin", requireAuth, async (req: AuthRequest, res) => {
     try {
       const g = await readGarminSettings(req.userId!);
@@ -5752,9 +5822,92 @@ ${JSON.stringify(userCtx, null, 2)}
     }
   });
 
+  /**
+   * Statistik aus der Garmin-Historie.
+   *
+   * Liest aus `garmin_days` (nicht aus der API), damit auch ältere Zeiträume schnell
+   * kommen und die Werte nach einem API-Ausfall erhalten bleiben.
+   */
+  app.get("/api/integrations/garmin/stats", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const tage = Math.min(365, Math.max(7, Number(req.query.days) || 30));
+      const r = await pool.query(
+        `SELECT * FROM garmin_days
+          WHERE user_id = $1 AND date >= CURRENT_DATE - ($2 || ' days')::interval
+          ORDER BY date ASC`,
+        [req.userId, tage],
+      );
+      const rows = r.rows as Array<Record<string, unknown>>;
+
+      /** Durchschnitt über die vorhandenen Werte einer Spalte. */
+      const mittel = (feld: string): number | null => {
+        const werte = rows
+          .map((x) => Number(x[feld]))
+          .filter((v) => Number.isFinite(v) && v !== 0);
+        if (!werte.length) return null;
+        return Math.round((werte.reduce((a, b) => a + b, 0) / werte.length) * 10) / 10;
+      };
+      const summe = (feld: string): number =>
+        rows.reduce((a, x) => a + (Number(x[feld]) || 0), 0);
+
+      res.json({
+        tage: rows.length,
+        zeitraum: tage,
+        reihe: rows.map((x) => ({
+          date: x.date,
+          schlafStunden: x.sleep_secs ? Math.round((Number(x.sleep_secs) / 3600) * 10) / 10 : null,
+          schlafScore: x.sleep_score,
+          hrv: x.hrv,
+          ruhepuls: x.resting_hr,
+          schritte: x.steps,
+          etagen: x.floors,
+          stress: x.stress_avg,
+          bodyBatteryMin: x.bb_min,
+          bodyBatteryMax: x.bb_max,
+          spo2: x.spo2_avg,
+          atemfrequenz: x.respiration,
+          vo2max: x.vo2max,
+          fitnessalter: x.fitness_age,
+          gewicht: x.weight_kg,
+          koerperfett: x.body_fat,
+        })),
+        schnitt: {
+          schlafStunden: mittel("sleep_secs") ? Math.round((Number(mittel("sleep_secs")) / 3600) * 10) / 10 : null,
+          schlafScore: mittel("sleep_score"),
+          hrv: mittel("hrv"),
+          ruhepuls: mittel("resting_hr"),
+          schritte: mittel("steps"),
+          etagen: mittel("floors"),
+          stress: mittel("stress_avg"),
+          bodyBatteryMin: mittel("bb_min"),
+          bodyBatteryMax: mittel("bb_max"),
+          spo2: mittel("spo2_avg"),
+          atemfrequenz: mittel("respiration"),
+          vo2max: mittel("vo2max"),
+          fitnessalter: mittel("fitness_age"),
+          gewicht: mittel("weight_kg"),
+        },
+        gesamt: {
+          schritte: summe("steps"),
+          etagen: summe("floors"),
+          streckeKm: Math.round((summe("distance_m") / 1000) * 10) / 10,
+          aktiveKcal: summe("active_kcal"),
+        },
+      });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "stats failed" });
+    }
+  });
+
   app.post("/api/integrations/garmin/connect", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const apiKey = String(req.body?.apiKey ?? "").trim();
+      // Eingabe säubern: Anführungszeichen, "ApiKey "-Vorsatz und Zeilenumbrüche
+      // passieren beim Kopieren leicht — Garmin lehnt den Key dann mit 401 ab.
+      const roh = String(req.body?.apiKey ?? "").trim();
+      const apiKey = roh
+        .replace(/^["']|["']$/g, "")
+        .replace(/^ApiKey\s+/i, "")
+        .replace(/\s+/g, "");
       if (!apiKey) {
         res.status(400).json({ error: "Garmin-API-Key fehlt." });
         return;
@@ -5768,6 +5921,9 @@ ${JSON.stringify(userCtx, null, 2)}
         cache,
         lastAutoSyncAt: new Date().toISOString(),
       });
+      await speichereGarminTage(req.userId!, cache.tage).catch((e) =>
+        console.warn("[garmin] Historie:", e),
+      );
       res.json({
         ok: true,
         displayName: cache.displayName ?? null,
@@ -5802,6 +5958,9 @@ ${JSON.stringify(userCtx, null, 2)}
         lastError: undefined,
         lastAutoSyncAt: new Date().toISOString(),
       });
+      await speichereGarminTage(req.userId!, cache.tage).catch((e) =>
+        console.warn("[garmin] Historie:", e),
+      );
       res.json({
         ok: true,
         ms: Date.now() - t0,
@@ -5973,37 +6132,119 @@ ${JSON.stringify(userCtx, null, 2)}
   app.get("/api/integrations/intervals/wellness", requireAuth, async (req: AuthRequest, res) => {
     try {
       const tage = Math.min(180, Math.max(7, Number(req.query.days) || 60));
-      let s = await readIntervalsSettings(req.userId!);
-      if (!s.apiKey) {
-        res.status(400).json({ error: "Intervals.icu ist nicht verbunden." });
-        return;
-      }
 
-      // Veraltete Daten nachziehen, damit die Ansicht aktuell ist.
-      if (syncFaellig(s)) {
+      /*
+       * Datenquelle ist Garmin (direkt), nicht Intervals.
+       *
+       * Tims Vorgabe: „lesen nur aus der Garmin API, über Intervals nur schreiben".
+       * Garmin liefert Schlaf, HRV, Stress, Body Battery, SpO₂ tagesaktuell;
+       * Intervals trägt nur noch die Trainingslast (CTL/ATL/TSB) und die Einheiten
+       * bei, weil die Personal API die nicht in dieser Form hergibt.
+       */
+      const g = await readGarminSettings(req.userId!);
+      let garminTage: GarminCache["tage"] = g.cache?.tage ?? [];
+      let garminNichtVerfuegbar = g.cache?.nichtVerfuegbar ?? [];
+      let garminFehler: string | null = g.lastError ?? null;
+
+      // Garmin bei Bedarf nachziehen (der 5-Minuten-Takt erledigt das im Hintergrund).
+      const letzterGarmin = Date.parse(g.cache?.fetchedAt ?? "");
+      if (g.apiKey && (!Number.isFinite(letzterGarmin) || Date.now() - letzterGarmin > 5 * 60_000)) {
         try {
-          const cache = await syncIntervals(s.apiKey, s.athleteId ?? "0", tage);
-          s = { ...s, cache, lastAutoSyncAt: new Date().toISOString(), lastError: undefined };
-          await writeIntervalsSettings(req.userId!, s);
+          const cache = await syncGarmin(g.apiKey, Math.max(30, tage));
+          garminTage = cache.tage;
+          garminNichtVerfuegbar = cache.nichtVerfuegbar;
+          garminFehler = null;
+          await writeGarminSettings(req.userId!, {
+            ...g,
+            cache,
+            displayName: cache.displayName ?? g.displayName,
+            lastError: undefined,
+            lastAutoSyncAt: new Date().toISOString(),
+          });
         } catch (e) {
-          s = { ...s, lastAutoSyncAt: new Date().toISOString(), lastError: e instanceof Error ? e.message : "Sync fehlgeschlagen." };
-          await writeIntervalsSettings(req.userId!, s).catch(() => {});
+          garminFehler = e instanceof Error ? e.message : "Garmin-Sync fehlgeschlagen.";
+          await writeGarminSettings(req.userId!, { ...g, lastError: garminFehler }).catch(() => {});
         }
       }
 
-      const cache = s.cache;
-      const alle = (cache?.wellness ?? []).slice(-tage);
-      const hat = (feld: keyof typeof alle[number]) => alle.some((w) => typeof w[feld] === "number");
+      // Trainingslast aus Intervals — nur lesen, wenn verbunden.
+      let intervals = await readIntervalsSettings(req.userId!);
+      if (intervals.apiKey && syncFaellig(intervals)) {
+        try {
+          const cache = await syncIntervals(intervals.apiKey, intervals.athleteId ?? "0", tage);
+          intervals = { ...intervals, cache, lastAutoSyncAt: new Date().toISOString(), lastError: undefined };
+          await writeIntervalsSettings(req.userId!, intervals);
+        } catch (e) {
+          intervals = {
+            ...intervals,
+            lastAutoSyncAt: new Date().toISOString(),
+            lastError: e instanceof Error ? e.message : "Sync fehlgeschlagen.",
+          };
+          await writeIntervalsSettings(req.userId!, intervals).catch(() => {});
+        }
+      }
 
-      // Stress/Body Battery/SpO2 liefert Intervals aus Garmin nicht - offen benennen.
+      /** Trainingslast je Datum (Intervals). Wird auf die Garmin-Tage gelegt. */
+      const lastProTag = new Map<string, { ctl?: number; atl?: number; tsb?: number }>();
+      for (const w of intervals.cache?.wellness ?? []) {
+        lastProTag.set(String(w.date), { ctl: w.ctl, atl: w.atl, tsb: w.tsb });
+      }
+
+      // Beide Quellen zu einer Tagesreihe verbinden: Garmin führt, Intervals ergänzt.
+      const proTag = new Map<string, Record<string, unknown>>();
+      const eintrag = (datum: string): Record<string, unknown> => {
+        const k = String(datum ?? "").slice(0, 10);
+        if (!proTag.has(k)) {
+          const last = lastProTag.get(k) ?? {};
+          proTag.set(k, {
+            date: k,
+            ctl: last.ctl ?? null,
+            atl: last.atl ?? null,
+            tsb: last.tsb ?? null,
+          });
+        }
+        return proTag.get(k)!;
+      };
+
+      // Auch reine Intervals-Tage anlegen (Trainingslast ohne Garmin-Werte).
+      for (const datum of lastProTag.keys()) eintrag(datum);
+
+      for (const t of garminTage) {
+        const e = eintrag(t.date);
+        if (t.sleepSecs != null) e.sleepSecs = t.sleepSecs;
+        if (t.sleepScore != null) e.sleepScore = t.sleepScore;
+        if (t.sleepQuality != null) e.sleepQuality = t.sleepQuality;
+        if (t.hrv != null) e.hrv = t.hrv;
+        if (t.restingHr != null) e.restingHr = t.restingHr;
+        if (t.steps != null) e.steps = t.steps;
+        if (t.floorsClimbed != null) e.floors = t.floorsClimbed;
+        if (t.distanceMeters != null) e.distanceMeters = t.distanceMeters;
+        if (t.activeCalories != null) e.activeCalories = t.activeCalories;
+        if (t.totalCalories != null) e.totalCalories = t.totalCalories;
+        if (t.stressAvg != null) e.stress = t.stressAvg;
+        if (t.bodyBatteryMin != null) e.bodyBatteryMin = t.bodyBatteryMin;
+        if (t.bodyBatteryMax != null) e.bodyBatteryMax = t.bodyBatteryMax;
+        if (t.spo2Avg != null) e.spo2 = t.spo2Avg;
+        if (t.respirationAvg != null) e.respiration = t.respirationAvg;
+      }
+
+      const alle = [...proTag.values()]
+        .sort((a, b) => String(a.date).localeCompare(String(b.date)))
+        .slice(-tage);
+
+      const hat = (feld: string) => alle.some((w) => typeof w[feld] === "number");
+
+      // Was fehlt, offen benennen — getrennt nach Quelle.
       const nichtVerfuegbar: string[] = [];
-      if (!alle.some((w) => (w as Record<string, unknown>).stress != null)) nichtVerfuegbar.push("Stress");
-      nichtVerfuegbar.push("Body Battery", "SpO2", "Atemfrequenz");
+      if (!hat("stress")) nichtVerfuegbar.push("Stress");
+      if (!hat("bodyBatteryMax")) nichtVerfuegbar.push("Body Battery");
+      if (!hat("spo2")) nichtVerfuegbar.push("SpO2");
+      if (!hat("respiration")) nichtVerfuegbar.push("Atemfrequenz");
 
       res.json({
-        fetchedAt: cache?.fetchedAt ?? null,
+        fetchedAt: g.cache?.fetchedAt ?? intervals.cache?.fetchedAt ?? null,
         tage: alle,
-        aktivitaeten: (cache?.activities ?? []).slice(0, 50),
+        aktivitaeten: (intervals.cache?.activities ?? []).slice(0, 50),
         verfuegbar: {
           schlaf: hat("sleepSecs"),
           schritte: hat("steps"),
@@ -6013,7 +6254,9 @@ ${JSON.stringify(userCtx, null, 2)}
           fitness: hat("ctl"),
         },
         nichtVerfuegbar,
-        lastError: s.lastError ?? null,
+        garminNichtVerfuegbar,
+        quelle: g.apiKey ? "garmin" : "intervals",
+        lastError: garminFehler ?? intervals.lastError ?? null,
       });
     } catch (err) {
       res.status(500).json({ error: err instanceof Error ? err.message : "Wellness-Daten konnten nicht geladen werden." });
@@ -6117,6 +6360,7 @@ ${JSON.stringify(userCtx, null, 2)}
             lastError: undefined,
             lastAutoSyncAt: new Date().toISOString(),
           });
+          await speichereGarminTage(Number(row.id), cache.tage).catch(() => {});
         } catch (e) {
           await writeGarminSettings(Number(row.id), {
             ...g,

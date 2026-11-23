@@ -25,13 +25,30 @@ type GarminTag = {
   date: string;
   sleepSecs?: number;
   sleepScore?: number;
+  sleepQuality?: number;
+  deepSecs?: number;
+  lightSecs?: number;
+  remSecs?: number;
+  awakeSecs?: number;
   hrv?: number;
   restingHr?: number;
+  minHr?: number;
+  maxHr?: number;
   steps?: number;
+  floorsClimbed?: number;
+  distanceMeters?: number;
+  activeCalories?: number;
+  totalCalories?: number;
   stressAvg?: number;
+  stressMax?: number;
   bodyBatteryMin?: number;
   bodyBatteryMax?: number;
   spo2Avg?: number;
+  respirationAvg?: number;
+  vo2max?: number;
+  fitnessAge?: number;
+  weightKg?: number;
+  bodyFat?: number;
 };
 
 type Status = {
@@ -69,11 +86,32 @@ export default function GarminConnect() {
   const [erfolg, setErfolg] = useState<string | null>(null);
   const [offen, setOffen] = useState(false);
   const [key, setKey] = useState('');
+  const [stats, setStats] = useState<{
+    tage: number;
+    schnitt: Record<string, number | null>;
+    gesamt: { schritte: number; etagen: number; streckeKm: number; aktiveKcal: number };
+  } | null>(null);
 
   const laden = useCallback(async () => {
     setLaedt(true);
     try {
-      setStatus(await api<Status>('/api/integrations/garmin'));
+      const st = await api<Status>('/api/integrations/garmin');
+      setStatus(st);
+      if (st.connected) {
+        try {
+          setStats(
+            await api<{
+              tage: number;
+              schnitt: Record<string, number | null>;
+              gesamt: { schritte: number; etagen: number; streckeKm: number; aktiveKcal: number };
+            }>('/api/integrations/garmin/stats?days=30'),
+          );
+        } catch {
+          setStats(null);
+        }
+      } else {
+        setStats(null);
+      }
     } catch (e) {
       setFehler(e instanceof Error ? e.message : 'Status konnte nicht geladen werden.');
     } finally {
@@ -248,7 +286,7 @@ export default function GarminConnect() {
 
       {/* Heutige Werte direkt von der Uhr */}
       {status?.connected && heute && (
-        <div className="mt-3 grid grid-cols-3 gap-2 border-t border-[var(--border-muted)] pt-3">
+        <div className="mt-3 grid grid-cols-2 gap-2 border-t border-[var(--border-muted)] pt-3 sm:grid-cols-4">
           <div className="rounded-xl bg-[var(--background)] px-2.5 py-2">
             <p className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
               <Moon className="h-3 w-3" /> Schlaf
@@ -280,6 +318,51 @@ export default function GarminConnect() {
               {heute.bodyBatteryMax != null ? `Akku ${Math.round(heute.bodyBatteryMax)}` : 'kein Akku'}
             </p>
           </div>
+          <div className="rounded-xl bg-[var(--background)] px-2.5 py-2">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">Schritte</p>
+            <p className="mt-0.5 text-[13px] font-semibold tabular-nums">
+              {heute.steps != null ? heute.steps.toLocaleString('de-DE') : '—'}
+            </p>
+            <p className="text-[10px] text-[var(--text-muted)]">
+              {heute.floorsClimbed != null ? `${heute.floorsClimbed} Etagen` : 'keine Etagen'}
+            </p>
+          </div>
+          <div className="rounded-xl bg-[var(--background)] px-2.5 py-2">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">Body Battery</p>
+            <p className="mt-0.5 text-[13px] font-semibold tabular-nums">
+              {heute.bodyBatteryMax != null ? Math.round(heute.bodyBatteryMax) : '—'}
+            </p>
+            <p className="text-[10px] text-[var(--text-muted)]">
+              {heute.bodyBatteryMin != null ? `Tief ${Math.round(heute.bodyBatteryMin)}` : 'kein Tief'}
+            </p>
+          </div>
+          <div className="rounded-xl bg-[var(--background)] px-2.5 py-2">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">SpO₂</p>
+            <p className="mt-0.5 text-[13px] font-semibold tabular-nums">
+              {heute.spo2Avg != null ? `${Math.round(heute.spo2Avg)} %` : '—'}
+            </p>
+            <p className="text-[10px] text-[var(--text-muted)]">
+              {heute.respirationAvg != null ? `${Math.round(heute.respirationAvg)}/min` : 'keine Atmung'}
+            </p>
+          </div>
+          <div className="rounded-xl bg-[var(--background)] px-2.5 py-2">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">Fitness</p>
+            <p className="mt-0.5 text-[13px] font-semibold tabular-nums">
+              {heute.vo2max != null ? `VO₂ ${Math.round(heute.vo2max)}` : '—'}
+            </p>
+            <p className="text-[10px] text-[var(--text-muted)]">
+              {heute.fitnessAge != null ? `Alter ${Math.round(heute.fitnessAge)}` : 'kein Alter'}
+            </p>
+          </div>
+          <div className="rounded-xl bg-[var(--background)] px-2.5 py-2">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">Gewicht</p>
+            <p className="mt-0.5 text-[13px] font-semibold tabular-nums">
+              {heute.weightKg != null ? `${heute.weightKg} kg` : '—'}
+            </p>
+            <p className="text-[10px] text-[var(--text-muted)]">
+              {heute.bodyFat != null ? `${Math.round(heute.bodyFat)} % Fett` : 'kein Fettanteil'}
+            </p>
+          </div>
         </div>
       )}
 
@@ -296,6 +379,37 @@ export default function GarminConnect() {
         <p className="mt-2 rounded-lg bg-[var(--simple-accent-soft)] px-3 py-2 text-[11px] font-semibold text-[var(--simple-accent)]">
           {erfolg}
         </p>
+      )}
+
+      {status?.connected && stats && stats.tage > 0 && (
+        <div className="mt-3 border-t border-[var(--border-muted)] pt-3">
+          <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+            Letzte {stats.tage} Tage im Schnitt
+          </p>
+          <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1 text-[11.5px] sm:grid-cols-3">
+            {[
+              ['Schlaf', stats.schnitt.schlafStunden != null ? `${stats.schnitt.schlafStunden} h` : '—'],
+              ['Score', stats.schnitt.schlafScore != null ? String(stats.schnitt.schlafScore) : '—'],
+              ['HRV', stats.schnitt.hrv != null ? `${stats.schnitt.hrv} ms` : '—'],
+              ['Ruhepuls', stats.schnitt.ruhepuls != null ? `${stats.schnitt.ruhepuls}` : '—'],
+              ['Schritte', stats.schnitt.schritte != null ? Math.round(Number(stats.schnitt.schritte)).toLocaleString('de-DE') : '—'],
+              ['Stress', stats.schnitt.stress != null ? String(stats.schnitt.stress) : '—'],
+              ['Body Battery', stats.schnitt.bodyBatteryMax != null ? String(stats.schnitt.bodyBatteryMax) : '—'],
+              ['SpO₂', stats.schnitt.spo2 != null ? `${stats.schnitt.spo2} %` : '—'],
+              ['Vo₂max', stats.schnitt.vo2max != null ? String(stats.schnitt.vo2max) : '—'],
+              ['Gewicht', stats.schnitt.gewicht != null ? `${stats.schnitt.gewicht} kg` : '—'],
+            ].map(([label, wert]) => (
+              <div key={label} className="flex justify-between gap-2">
+                <span className="text-[var(--text-muted)]">{label}</span>
+                <span className="font-semibold tabular-nums">{wert}</span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-1.5 text-[10px] text-[var(--text-muted)]">
+            Gesamt: {stats.gesamt.schritte.toLocaleString('de-DE')} Schritte ·{' '}
+            {stats.gesamt.streckeKm} km · {stats.gesamt.aktiveKcal.toLocaleString('de-DE')} kcal aktiv
+          </p>
+        </div>
       )}
 
       {status?.connected && (

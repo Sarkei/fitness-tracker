@@ -25,6 +25,10 @@ export type WellnessDaten = {
     fitness: boolean;
   };
   nichtVerfuegbar: string[];
+  /** Was Garmin selbst nicht liefert (z. B. wenn die Uhr kein SpO2 misst). */
+  garminNichtVerfuegbar?: string[];
+  /** Woher die Tageswerte kommen. */
+  quelle?: 'garmin' | 'intervals';
   lastError: string | null;
 };
 
