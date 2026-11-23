@@ -10,7 +10,7 @@ import { Card } from '@/src/simple/ui';
 import { useWellness, WellnessAktualisieren } from './WellnessProvider';
 import { KennzahlSheet, KlickKachel, type KennzahlDef, type KennzahlPunkt } from './KennzahlSheet';
 import { Tagesdetail } from './Tagesdetail';
-import { formLabel, letzter, mittel, schlafBewertung, schlafStunden } from '@/src/lib/wellness';
+import { formLabel, heuteWert, juengsterTag, schlafBewertung, schlafStunden } from '@/src/lib/wellness';
 
 type Kennzahl = { def: KennzahlDef; punkte: KennzahlPunkt[] };
 
@@ -21,12 +21,13 @@ export default function WellnessUebersicht() {
   const [offen, setOffen] = useState<string | null>(null);
   const [tagOffen, setTagOffen] = useState<string | null>(null);
 
-  const schlafLetzte = schlafStunden(letzter(tage, 'sleepSecs'));
-  const schlafScore = letzter(tage, 'sleepScore');
-  const schritte = letzter(tage, 'steps');
-  const hrv = letzter(tage, 'hrv');
-  const puls = letzter(tage, 'restingHr');
-  const tsb = letzter(tage, 'tsb');
+  // Bewusst nur der heutige Tag: fehlt ein Wert, steht „—" statt eines alten Stands.
+  const schlafLetzte = schlafStunden(heuteWert(tage, 'sleepSecs'));
+  const schlafScore = heuteWert(tage, 'sleepScore');
+  const schritte = heuteWert(tage, 'steps');
+  const hrv = heuteWert(tage, 'hrv');
+  const puls = heuteWert(tage, 'restingHr');
+  const tsb = heuteWert(tage, 'tsb');
   const form = formLabel(tsb);
 
   const formFarbe =
@@ -39,6 +40,20 @@ export default function WellnessUebersicht() {
           : 'var(--text-muted)';
 
   const naechsteEinheit = daten.aktivitaeten[0];
+
+  /**
+   * Kommen die Werte wirklich von heute? Wenn die Quelle seit Tagen nichts liefert,
+   * steht in den Kacheln „—". Dann muss hier stehen, warum — sonst wirkt es wie ein Fehler.
+   */
+  const letzterTag = juengsterTag(tage);
+  const heuteIso = new Date().toISOString().slice(0, 10);
+  // Entscheidend ist nicht, ob es einen heutigen Eintrag gibt (Schritte kommen oft
+  // allein), sondern ob die Körperwerte von heute fehlen.
+  const koerperWerteFehlen = hrv == null && schlafLetzte == null && puls == null;
+  const werteVeraltet = Boolean(letzterTag);
+  // Letzter Tag, an dem es wirklich Körperwerte gab.
+  const letzterKoerperTag =
+    [...tage].reverse().find((t) => t.hrv != null || t.sleepSecs != null || t.restingHr != null)?.date ?? null;
 
   // Jede Kachel ist anklickbar und oeffnet den Verlauf dazu.
   const kennzahlen: Record<string, Kennzahl> = {
@@ -90,21 +105,18 @@ export default function WellnessUebersicht() {
         <KlickKachel
           label="Schritte"
           value={schritte != null ? Math.round(schritte).toLocaleString('de-DE') : '—'}
-          hint={`Ø ${Math.round(mittel(tage.map((t) => t.steps)) ?? 0).toLocaleString('de-DE')}`}
           onClick={() => navigate('/wellness/bewegung')}
         />
         <KlickKachel
           label="HRV"
           value={hrv != null ? Math.round(hrv) : '—'}
           unit="ms"
-          hint={`Ø ${Math.round(mittel(tage.map((t) => t.hrv)) ?? 0)}`}
           onClick={() => navigate('/wellness/koerper')}
         />
         <KlickKachel
           label="Ruhepuls"
           value={puls != null ? Math.round(puls) : '—'}
           unit="bpm"
-          hint={`Ø ${Math.round(mittel(tage.map((t) => t.restingHr)) ?? 0)}`}
           onClick={() => navigate('/wellness/koerper')}
         />
       </div>
@@ -192,6 +204,17 @@ export default function WellnessUebersicht() {
           <Tagesdetail tag={t} aktivitaeten={daten.aktivitaeten} onClose={() => setTagOffen(null)} />
         ) : null;
       })()}
+
+      {koerperWerteFehlen && werteVeraltet && (
+        <div className="flex items-start gap-2 rounded-xl bg-[#fbbf24]/10 px-3 py-2.5">
+          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#a16207]" />
+          <p className="text-[11px] leading-relaxed text-[#a16207]">
+            Für heute liegen noch keine Schlaf-, HRV- oder Pulsdaten vor. Letzter Stand:{' '}
+            {letzterKoerperTag ? letzterKoerperTag.split('-').reverse().slice(0, 2).join('.') : 'unbekannt'}.
+            Sobald deine Uhr die Nacht synchronisiert hat, erscheinen sie hier.
+          </p>
+        </div>
+      )}
 
       {daten.nichtVerfuegbar.length > 0 && (
         <div className="flex items-start gap-2 rounded-xl bg-[var(--surface-gray)] px-3 py-2.5">

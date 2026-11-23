@@ -123,3 +123,23 @@ export function letzter<T extends keyof WellnessTag>(tage: WellnessTag[], feld: 
   }
   return null;
 }
+
+/**
+ * Wert von HEUTE — ohne Rückfall auf ältere Tage.
+ *
+ * `letzter()` sucht rückwärts den letzten vorhandenen Wert. Für die Tageslage ist
+ * das falsch: fehlt der Wert heute, zeigt die Kachel sonst einen Tage alten Stand
+ * und wirkt aktuell. Hier gibt es bewusst `null`, damit die Oberfläche „—" zeigt.
+ */
+export function heuteWert<T extends keyof WellnessTag>(tage: WellnessTag[], feld: T): number | null {
+  if (!tage.length) return null;
+  const heute = tage[tage.length - 1];
+  const v = heute[feld];
+  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
+/** Datum des jüngsten Tages im Bestand (YYYY-MM-DD). */
+export function juengsterTag(tage: WellnessTag[]): string | null {
+  return tage.length ? tage[tage.length - 1].date : null;
+}
+
