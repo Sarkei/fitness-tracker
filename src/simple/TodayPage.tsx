@@ -126,20 +126,6 @@ export default function TodayPage() {
   const maxBilanz = Math.max(1, ...bilanz.map((t) => Math.abs(t.bilanz)));
   const hatBilanz = bilanz.some((t) => t.hatDaten);
 
-  /** Der Tag in einer Zeile. */
-  const naechsterSchritt = useMemo(() => {
-    if (trainingToday) return { text: `Training erledigt: ${trainingToday.name}`, tone: 'done' as const };
-    if (planDay && !planDay.isRest) {
-      return {
-        text: `Heute geplant: ${planDay.title || DAY_LABELS[planDay.day] || 'Training'}`,
-        tone: 'open' as const,
-      };
-    }
-    if (planDay?.isRest) return { text: 'Ruhetag — Erholung ist eingeplant', tone: 'rest' as const };
-    if (entries.length === 0) return { text: 'Noch nichts gegessen eingetragen', tone: 'open' as const };
-    return { text: 'Kein Training für heute geplant', tone: 'rest' as const };
-  }, [trainingToday, planDay, entries.length]);
-
   return (
     <div className="space-y-4 lg:space-y-5">
       <PageHeader
@@ -170,34 +156,6 @@ export default function TodayPage() {
 
       {/* Fasten läuft dauerhaft mit */}
       <FastingCard />
-
-      {/* Der Tag in einer Zeile */}
-      <Card className="flex items-center gap-3 p-4">
-        <span
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-          style={{
-            background:
-              naechsterSchritt.tone === 'rest' ? 'var(--border-muted)' : 'var(--simple-accent-soft)',
-            color: naechsterSchritt.tone === 'rest' ? 'var(--text-muted)' : 'var(--simple-accent)',
-          }}
-        >
-          {naechsterSchritt.tone === 'rest' ? (
-            <Moon className="h-4 w-4" />
-          ) : naechsterSchritt.tone === 'done' ? (
-            <Flame className="h-4 w-4" />
-          ) : (
-            <Target className="h-4 w-4" />
-          )}
-        </span>
-        <p className="min-w-0 flex-1 text-sm font-medium">{naechsterSchritt.text}</p>
-        <button
-          type="button"
-          onClick={() => navigate('/training')}
-          className="shrink-0 text-[11px] font-semibold text-[var(--simple-accent)]"
-        >
-          Woche
-        </button>
-      </Card>
 
       {/* Serien auf einen Blick */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -249,9 +207,9 @@ export default function TodayPage() {
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-5 lg:items-start">
+      <div className="grid gap-4 lg:grid-cols-5 lg:items-stretch">
         {/* Gegessen: nur die Tabelle */}
-        <Card className="flex flex-col p-5 lg:col-span-3">
+        <Card className="flex h-full flex-col p-5 lg:col-span-3">
           <SectionTitle
             action={
               <GhostButton onClick={() => navigate('/foods')}>
@@ -309,13 +267,13 @@ export default function TodayPage() {
         </Card>
 
         {/* Training: eine Box mit der heutigen Einheit */}
-        <Card className="flex flex-col p-5 lg:col-span-2">
+        <Card className="flex h-full flex-col p-5 lg:col-span-2">
           <SectionTitle action={<GhostButton onClick={() => navigate('/training')}>Plan</GhostButton>}>
             Heutiges Training
           </SectionTitle>
 
           {trainingToday ? (
-            <div className="rounded-xl border border-[color-mix(in_srgb,var(--simple-accent)_40%,transparent)] bg-[var(--simple-accent-soft)]/50 p-4">
+            <div className="flex-1 rounded-xl border border-[color-mix(in_srgb,var(--simple-accent)_40%,transparent)] bg-[var(--simple-accent-soft)]/50 p-4">
               <div className="flex items-start gap-3">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--simple-accent)] text-[var(--simple-accent-ink)]">
                   <Dumbbell className="h-5 w-5" />
@@ -332,7 +290,7 @@ export default function TodayPage() {
           ) : planDay && !planDay.isRest ? (
             <button
               type="button"
-              className="w-full rounded-xl border border-[var(--border-muted)] bg-[var(--card-bg)] p-4 text-left transition hover:border-[var(--simple-accent)]/50"
+              className="flex-1 w-full rounded-xl border border-[var(--border-muted)] bg-[var(--card-bg)] p-4 text-left transition hover:border-[var(--simple-accent)]/50"
               onClick={() => setShowSession(true)}
             >
               <div className="flex items-start gap-3">
@@ -364,7 +322,7 @@ export default function TodayPage() {
               </div>
             </button>
           ) : (
-            <div className="rounded-xl border border-[var(--border-muted)] bg-[var(--card-bg)] p-4">
+            <div className="flex-1 rounded-xl border border-[var(--border-muted)] bg-[var(--card-bg)] p-4">
               <div className="flex items-start gap-3">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--border-muted)]/60 text-[var(--text-muted)]">
                   <Moon className="h-5 w-5" />
