@@ -17,6 +17,7 @@ import type { Post } from '@/src/lib/useSocial';
 import { cn } from '@/src/lib/utils';
 import ReportHistoryView from './ReportHistoryView';
 import IntervalsConnect from './IntervalsConnect';
+import MealplannerConnect from './MealplannerConnect';
 import { PageHeader } from '@/src/simple/ui';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
@@ -1014,6 +1015,7 @@ export default function ProfilePage() {
       <div className="space-y-3">
         <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--text-muted)] px-4">Verbindungen</h3>
         <IntervalsConnect />
+        <MealplannerConnect />
         <Link
           to="/wellness"
           className="flex items-center gap-2 rounded-2xl border border-[var(--border-muted)] bg-[var(--card-bg)] px-4 py-3 text-[12.5px] font-semibold text-[var(--foreground)] transition hover:border-[var(--simple-accent)]"

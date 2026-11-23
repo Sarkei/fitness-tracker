@@ -5299,6 +5299,138 @@ ${JSON.stringify(userCtx, null, 2)}
   });
 
   // ── Intervals.icu: Garmin-Daten fuer den Coach ────────────────────────────
+  /**
+   * Mealplanner-Verbindung.
+   *
+   * Beide Apps haben getrennte Nutzerkonten. Statt fremder Zugangsdaten wird im
+   * Mealplanner ein Kopplungscode erzeugt und hier eingetragen; der Server holt damit
+   * Wochenplan und Rezepte über die Mealplanner-API. Der Code liegt in
+   * `profile_extras.mealplanner` und geht nie an den Browser zurück.
+   */
+  app.get("/api/integrations/mealplanner", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const r = await pool.query("SELECT profile_extras FROM users WHERE id=$1", [req.userId]);
+      const extras = (r.rows[0]?.profile_extras || {}) as Record<string, unknown>;
+      const mp = (extras.mealplanner || {}) as {
+        baseUrl?: string;
+        code?: string;
+        connectedAt?: string;
+        householdName?: string;
+        lastError?: string;
+      };
+      res.json({
+        connected: Boolean(mp.code && mp.baseUrl),
+        baseUrl: mp.baseUrl ?? "https://meal-planner.nas-timgreen.com",
+        householdName: mp.householdName ?? null,
+        connectedAt: mp.connectedAt ?? null,
+        lastError: mp.lastError ?? null,
+        // Der Code selbst wird nie ausgeliefert — nur ob einer gesetzt ist.
+        hasCode: Boolean(mp.code),
+      });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "load failed" });
+    }
+  });
+
+  app.post("/api/integrations/mealplanner/connect", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const code = String(req.body?.code ?? "").trim();
+      const baseUrl = String(req.body?.baseUrl ?? "https://meal-planner.nas-timgreen.com")
+        .trim()
+        .replace(/\/$/, "");
+      if (!code) {
+        res.status(400).json({ error: "Kopplungscode fehlt." });
+        return;
+      }
+      if (!/^https?:\/\//.test(baseUrl)) {
+        res.status(400).json({ error: "Adresse muss mit http:// oder https:// beginnen." });
+        return;
+      }
+
+      // Erst prüfen, dann speichern — ein falscher Code landet nicht in der DB.
+      const pruefung = await fetch(`${baseUrl}/api/connect/${encodeURIComponent(code)}`, {
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!pruefung.ok) {
+        const text = await pruefung.text().catch(() => "");
+        let meldung = `Mealplanner antwortete mit ${pruefung.status}.`;
+        try {
+          const j = JSON.parse(text) as { message?: string };
+          if (j.message) meldung = j.message;
+        } catch {
+          /* Klartext-Antwort */
+        }
+        res.status(400).json({ error: meldung });
+        return;
+      }
+      const daten = (await pruefung.json()) as { householdName?: string; code?: string };
+
+      await pool.query(
+        `UPDATE users
+            SET profile_extras = COALESCE(profile_extras,'{}'::jsonb)
+                || jsonb_build_object('mealplanner', $2::jsonb),
+                updated_at = NOW()
+          WHERE id=$1`,
+        [
+          req.userId,
+          JSON.stringify({
+            baseUrl,
+            code,
+            connectedAt: new Date().toISOString(),
+            householdName: daten.householdName ?? null,
+          }),
+        ],
+      );
+      res.json({ ok: true, householdName: daten.householdName ?? null });
+    } catch (err: unknown) {
+      res.status(500).json({
+        error:
+          err instanceof Error && err.name === "TimeoutError"
+            ? "Der Mealplanner hat nicht rechtzeitig geantwortet."
+            : err instanceof Error
+              ? err.message
+              : "Verbindung fehlgeschlagen.",
+      });
+    }
+  });
+
+  app.delete("/api/integrations/mealplanner", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      await pool.query(
+        `UPDATE users SET profile_extras = profile_extras - 'mealplanner', updated_at=NOW() WHERE id=$1`,
+        [req.userId],
+      );
+      res.json({ ok: true });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "disconnect failed" });
+    }
+  });
+
+  /** Wochenplan aus dem Mealplanner für die Coach-Ansicht. */
+  app.get("/api/integrations/mealplanner/week", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const r = await pool.query("SELECT profile_extras FROM users WHERE id=$1", [req.userId]);
+      const extras = (r.rows[0]?.profile_extras || {}) as Record<string, unknown>;
+      const mp = (extras.mealplanner || {}) as { baseUrl?: string; code?: string };
+      if (!mp.code || !mp.baseUrl) {
+        res.status(400).json({ error: "Mealplanner ist nicht verbunden." });
+        return;
+      }
+      const antwort = await fetch(
+        `${mp.baseUrl}/api/connect/${encodeURIComponent(mp.code)}/week`,
+        { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(20_000) },
+      );
+      if (!antwort.ok) {
+        res.status(antwort.status).json({ error: "Mealplanner lieferte keine Wochendaten." });
+        return;
+      }
+      res.json(await antwort.json());
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "week failed" });
+    }
+  });
+
   const readIntervalsSettings = async (userId: number): Promise<IntervalsSettings> => {
     const r = await pool.query("SELECT profile_extras FROM users WHERE id=$1", [userId]);
     const extras = (r.rows[0]?.profile_extras || {}) as Record<string, unknown>;

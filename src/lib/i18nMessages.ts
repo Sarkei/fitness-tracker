@@ -615,7 +615,7 @@ export const MESSAGES: Record<string, { de: string; en: string }> = {
   'profile.tab.overview': { de: 'Übersicht', en: 'Overview' },
   'profile.tab.body': { de: 'Körper', en: 'Body' },
   'profile.tab.goals': { de: 'Ziele', en: 'Goals' },
-  'profile.tab.data': { de: 'Daten & Sync', en: 'Data & sync' },
+  'profile.tab.data': { de: 'Integrationen', en: 'Integrations' },
   'profile.tab.account': { de: 'Konto', en: 'Account' },
   'profile.tabHint': { de: 'Profil, Körperdaten, Ziele und Verbindungen.', en: 'Profile, body data, goals and connections.' },
   'profile.kgCurrent': { de: 'kg aktuell', en: 'kg current' },
