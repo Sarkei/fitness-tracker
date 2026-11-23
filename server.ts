@@ -1166,6 +1166,117 @@ async function startServer(): Promise<void> {
     }
   });
 
+  /**
+   * Übungs-Historie: frühere Sätze zu einer Übung.
+   *
+   * Grundlage ist das JSONB-Feld `workouts.exercises` — dort liegt je Übung
+   * `exerciseKey` und ein `sets`-Array mit `reps`, `weight`, `completed`.
+   * Damit lässt sich zeigen, mit wie viel Gewicht man zuletzt trainiert hat,
+   * ohne eine eigene Tabelle zu brauchen.
+   */
+  app.get("/api/exercises/history", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const key = String(req.query.key ?? "").trim();
+      const name = String(req.query.name ?? "").trim().toLowerCase();
+      const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 12));
+      if (!key && !name) {
+        res.status(400).json({ error: "key oder name angeben." });
+        return;
+      }
+
+      const r = await pool.query(
+        `SELECT id, name AS workout_name, date, exercises
+           FROM workouts
+          WHERE user_id = $1
+          ORDER BY date DESC, created_at DESC
+          LIMIT 300`,
+        [req.userId],
+      );
+
+      type Satz = { reps?: number | string; weight?: number | string; completed?: boolean };
+      type Eintrag = {
+        date: string;
+        workout: string;
+        workoutId: string;
+        saetze: Array<{ reps: number | null; weight: number | null }>;
+        bestesGewicht: number | null;
+        volumen: number;
+        estimiertesMax: number | null;
+      };
+
+      const verlauf: Eintrag[] = [];
+
+      for (const row of r.rows as Array<{
+        id: string;
+        workout_name: string;
+        date: string;
+        exercises: unknown;
+      }>) {
+        const liste = Array.isArray(row.exercises) ? row.exercises : [];
+        for (const roh of liste as Array<Record<string, unknown>>) {
+          const eKey = String(roh.exerciseKey ?? "").trim();
+          const eName = String(roh.name ?? "").trim().toLowerCase();
+          const passt = key ? eKey === key : eName === name;
+          if (!passt) continue;
+
+          const sets = Array.isArray(roh.sets) ? (roh.sets as Satz[]) : [];
+          const saetze = sets
+            .map((s) => ({
+              reps: s.reps != null ? Number(s.reps) : null,
+              weight: s.weight != null ? Number(s.weight) : null,
+            }))
+            .filter((s) => Number.isFinite(s.reps) && (s.reps ?? 0) > 0);
+
+          if (!saetze.length) continue;
+
+          const gewichte = saetze.map((s) => s.weight ?? 0);
+          const volumen = saetze.reduce((a, s) => a + (s.weight ?? 0) * (s.reps ?? 0), 0);
+          // Epley-Formel als Vergleichswert: geschätztes Ein-Wiederholungs-Maximum.
+          const bestes = saetze
+            .map((s) => ((s.weight ?? 0) * (1 + (s.reps ?? 0) / 30)))
+            .reduce((a, b) => Math.max(a, b), 0);
+
+          // date kommt als JS-Date-String ("Fri Nov 20 2026…") — auf ISO kuerzen.
+          const alsDatum = new Date(row.date);
+          const isoDatum = Number.isNaN(alsDatum.getTime())
+            ? String(row.date).slice(0, 10)
+            : alsDatum.toISOString().slice(0, 10);
+
+          verlauf.push({
+            date: isoDatum,
+            workout: row.workout_name,
+            workoutId: row.id,
+            saetze,
+            bestesGewicht: Math.max(...gewichte) || null,
+            volumen: Math.round(volumen * 10) / 10,
+            estimiertesMax: bestes > 0 ? Math.round(bestes * 10) / 10 : null,
+          });
+          break; // pro Workout nur ein Eintrag je Übung
+        }
+        if (verlauf.length >= limit) break;
+      }
+
+      res.json({
+        key: key || null,
+        name: name || null,
+        anzahl: verlauf.length,
+        verlauf,
+        /** Höchstes Gewicht über den ganzen Verlauf. */
+        rekord: verlauf.reduce<number | null>(
+          (a, e) => (e.bestesGewicht != null && (a == null || e.bestesGewicht > a) ? e.bestesGewicht : a),
+          null,
+        ),
+        /** Bestes geschätztes Maximum. */
+        rekordMax: verlauf.reduce<number | null>(
+          (a, e) => (e.estimiertesMax != null && (a == null || e.estimiertesMax > a) ? e.estimiertesMax : a),
+          null,
+        ),
+      });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "history failed" });
+    }
+  });
+
   app.get("/api/exercises/:id", requireAuth, async (req, res) => {
     if (!isExerciseDbConfigured()) {
       res.status(503).json({ error: "exercisedb-not-configured" });
@@ -6238,13 +6349,25 @@ ${JSON.stringify(userCtx, null, 2)}
         if (t.sleepScore != null) e.sleepScore = t.sleepScore;
         if (t.sleepQuality != null) e.sleepQuality = t.sleepQuality;
         if (t.hrv != null) e.hrv = t.hrv;
+        if (t.hrvStatus != null) e.hrvStatus = t.hrvStatus;
         if (t.restingHr != null) e.restingHr = t.restingHr;
+        if (t.minHr != null) e.minHr = t.minHr;
+        if (t.maxHr != null) e.maxHr = t.maxHr;
         if (t.steps != null) e.steps = t.steps;
         if (t.floorsClimbed != null) e.floors = t.floorsClimbed;
         if (t.distanceMeters != null) e.distanceMeters = t.distanceMeters;
+        if (t.vo2max != null) e.vo2max = t.vo2max;
+        if (t.fitnessAge != null) e.fitnessAge = t.fitnessAge;
+        if (t.weightKg != null) e.weight = t.weightKg;
+        if (t.bodyFat != null) e.bodyFat = t.bodyFat;
+        if (t.deepSecs != null) e.deepSecs = t.deepSecs;
+        if (t.remSecs != null) e.remSecs = t.remSecs;
+        if (t.lightSecs != null) e.lightSecs = t.lightSecs;
+        if (t.awakeSecs != null) e.awakeSecs = t.awakeSecs;
         if (t.activeCalories != null) e.activeCalories = t.activeCalories;
         if (t.totalCalories != null) e.totalCalories = t.totalCalories;
         if (t.stressAvg != null) e.stress = t.stressAvg;
+        if (t.stressMax != null) e.stressMax = t.stressMax;
         if (t.bodyBatteryMin != null) e.bodyBatteryMin = t.bodyBatteryMin;
         if (t.bodyBatteryMax != null) e.bodyBatteryMax = t.bodyBatteryMax;
         if (t.spo2Avg != null) e.spo2 = t.spo2Avg;

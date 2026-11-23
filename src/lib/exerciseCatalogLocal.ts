@@ -142,3 +142,68 @@ export function katalogFuerPrompt(limitProBereich = 6): string {
   }
   return zeilen.join('\n');
 }
+
+/**
+ * Deutsche Uebungsnamen auf die englischen Katalognamen abbilden.
+ *
+ * Der Katalog (harshvishu/free-exercise-db) ist englisch; der Coach und die
+ * Trainingsplaene nennen Uebungen deutsch ("Bankdruecken"). Ohne diese Bruecke
+ * findet die Suche nichts und die Detailansicht bleibt leer.
+ */
+const DEUTSCH_ZU_ENGLISCH: Array<[RegExp, string]> = [
+  [/bankdr(ü|ue)cken/i, 'bench press'],
+  [/schr(ä|ae)gbank/i, 'incline bench press'],
+  [/negativbank/i, 'decline bench press'],
+  [/kniebeuge|kniebeugen/i, 'squat'],
+  [/kreuzheben/i, 'deadlift'],
+  [/schulterdr(ü|ue)cken|(ü|ue)berkopfdr(ü|ue)cken/i, 'overhead press'],
+  [/rudern/i, 'row'],
+  [/klimmzug|klimmz(ü|ue)ge/i, 'pull-up'],
+  [/liegest(ü|ue)tz/i, 'push-up'],
+  [/dips?$/i, 'dip'],
+  [/(ü|ue)berzug/i, 'pulldown'],
+  [/seitheben/i, 'lateral raise'],
+  [/facepull/i, 'face pull'],
+  [/latzug/i, 'lat pulldown'],
+  [/beinpresse/i, 'leg press'],
+  [/beinstrecker/i, 'leg extension'],
+  [/beinbeuger|beincurl|hamstringcurl/i, 'leg curl'],
+  [/wadenheben/i, 'calf raise'],
+  [/beinbeuger|beincurl|hamstringcurl/i, 'leg curl'],
+  [/bizepscurl|bizeps.*curl|bizeps/i, 'biceps curl'],
+  [/skull ?crusher/i, 'skull crusher'],
+  [/trizepsdr(ü|ue)cken|trizepsstrecken|trizeps/i, 'triceps extension'],
+  [/hammercurl|hammer/i, 'hammer curl'],
+  [/ausfallschritt/i, 'lunge'],
+  [/plank|unterarmst(ü|ue)tz/i, 'plank'],
+  [/crunches?|bauchpresse/i, 'crunch'],
+  [/russian twist|seitliche bauchmuskeln/i, 'twist'],
+  [/hiptrust|h(ü|ue)ftheben/i, 'hip thrust'],
+  [/good ?morning/i, 'good morning'],
+  [/dackel|hyperextension/i, 'hyperextension'],
+  [/shrug|schulterheben/i, 'shrug'],
+  [/rack ?pull/i, 'rack pull'],
+  [/pike/i, 'pike push'],
+  [/diamond/i, 'diamond push'],
+  [/sumo/i, 'sumo'],
+  [/front ?squat/i, 'front squat'],
+  [/goblet/i, 'goblet squat'],
+  [/bulgarian|bulgarisch/i, 'bulgarian split'],
+];
+
+/** Uebersetzt einen deutschen Uebungsnamen in einen englischen Suchbegriff. */
+function uebersetzeUebung(name: string): string | null {
+  for (const [muster, englisch] of DEUTSCH_ZU_ENGLISCH) {
+    if (muster.test(name)) return englisch;
+  }
+  return null;
+}
+
+/** Sucht eine Uebung — deutsch zuerst uebersetzen, dann englisch probieren. */
+export function findeLokaleUebungDeutsch(name: string): LokaleUebung | null {
+  const direkt = findeLokaleUebung(name);
+  if (direkt) return direkt;
+  const englisch = uebersetzeUebung(name);
+  if (!englisch) return null;
+  return findeLokaleUebung(englisch) ?? sucheLokaleUebungen(englisch, 1)[0] ?? null;
+}

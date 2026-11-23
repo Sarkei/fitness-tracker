@@ -18,6 +18,9 @@ export type WellnessTag = {
   rampRate?: number | null;
   restingHr?: number | null;
   hrv?: number | null;
+  hrvStatus?: string | null;
+  minHr?: number | null;
+  maxHr?: number | null;
   sleepSecs?: number | null;
   sleepScore?: number | null;
   sleepQuality?: number | null;

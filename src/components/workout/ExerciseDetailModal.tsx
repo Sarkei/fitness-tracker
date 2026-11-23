@@ -10,7 +10,9 @@ import { cn } from '@/src/lib/utils';
 import type { LibraryExercise } from '@/src/lib/exerciseLibrary';
 import ExerciseMediaView from '@/src/components/workout/ExerciseMediaView';
 import { ExerciseResolveError, resolveExerciseForDetail } from '@/src/services/exerciseDbService';
+import { findeLokaleUebung, findeLokaleUebungDeutsch } from '@/src/lib/exerciseCatalogLocal';
 import { useAuth } from '@/src/lib/AuthContext';
+import { api } from '@/src/lib/api';
 import { useI18n } from '@/src/lib/i18n';
 import { formatMuscleSummary, labelBodyPart, labelTargetMuscle } from '@/src/lib/exerciseMuscleLabels';
 import {
@@ -42,6 +44,24 @@ export default function ExerciseDetailModal({
   const [detail, setDetail] = useState<LibraryExercise | null>(exercise);
   const [loading, setLoading] = useState(false);
   const [resolveError, setResolveError] = useState<string | null>(null);
+  /**
+   * Frühere Sätze zu dieser Übung — „mit wie viel Gewicht habe ich das letzte Mal
+   * gedrückt?". Kommt aus den gespeicherten Workouts, nicht aus Garmin.
+   */
+  const [historie, setHistorie] = useState<{
+    anzahl: number;
+    verlauf: Array<{
+      date: string;
+      workout: string;
+      saetze: Array<{ reps: number | null; weight: number | null }>;
+      bestesGewicht: number | null;
+      volumen: number;
+      estimiertesMax: number | null;
+    }>;
+    rekord: number | null;
+    rekordMax: number | null;
+  } | null>(null);
+  const [historieLaedt, setHistorieLaedt] = useState(false);
   useEffect(() => {
     setDetail(exercise);
     setResolveError(null);
@@ -53,6 +73,29 @@ export default function ExerciseDetailModal({
     setResolveError(null);
     setLoading(false);
   }, [open]);
+
+  // Verlauf laden, sobald der Dialog mit einer Übung offen ist.
+  useEffect(() => {
+    if (!open || !exercise?.key) {
+      setHistorie(null);
+      return;
+    }
+    let abgebrochen = false;
+    setHistorieLaedt(true);
+    api<typeof historie>(`/api/exercises/history?key=${encodeURIComponent(exercise.key)}&limit=10`)
+      .then((r) => {
+        if (!abgebrochen) setHistorie(r);
+      })
+      .catch(() => {
+        if (!abgebrochen) setHistorie(null);
+      })
+      .finally(() => {
+        if (!abgebrochen) setHistorieLaedt(false);
+      });
+    return () => {
+      abgebrochen = true;
+    };
+  }, [open, exercise?.key]);
 
   useEffect(() => {
     if (!open || !exercise) return;
@@ -71,7 +114,40 @@ export default function ExerciseDetailModal({
         }
       })
       .catch(err => {
-        if (!cancelled) {
+        if (cancelled) return;
+        /*
+         * ExerciseDB ist nicht konfiguriert (kein RapidAPI-Key). Statt „Details
+         * nicht verfügbar" greift der lokale Katalog mit 317 Übungen — inklusive
+         * Videos, Schrittfolge, Formhinweisen und typischen Fehlern.
+         */
+        const lokal =
+          findeLokaleUebungDeutsch(exercise.name) ??
+          findeLokaleUebungDeutsch(exercise.key) ??
+          findeLokaleUebung(exercise.name);
+        if (lokal) {
+          setDetail({
+            key: exercise.key,
+            exerciseId: lokal.id,
+            name: lokal.name,
+            category: 'strength',
+            source: 'local',
+            bodyPart: lokal.bodyPart,
+            targetMuscle: lokal.target,
+            secondaryMuscles: lokal.secondaryMuscles,
+            equipment: lokal.equipment,
+            difficulty: lokal.difficulty,
+            overview: lokal.shortDescription,
+            instructions: lokal.steps?.length ? lokal.steps : [lokal.instructions].filter(Boolean),
+            exerciseTips: lokal.formCues,
+            variations: [],
+            // Medien muessen als videoUrl/imageUrl stehen — so liest sie ExerciseMediaView.
+            videoUrl: lokal.videos?.male || lokal.videos?.female || undefined,
+            imageUrl: lokal.thumbnails?.male || lokal.thumbnails?.female || undefined,
+            commonMistakes: lokal.commonMistakes,
+            breathing: lokal.breathing,
+          } as unknown as LibraryExercise);
+          setResolveError(null);
+        } else {
           const msg =
             err instanceof ExerciseResolveError
               ? err.message
@@ -246,6 +322,69 @@ export default function ExerciseDetailModal({
                   </p>
                 </div>
               ) : null}
+
+              {/* Verlauf: mit wie viel Gewicht zuletzt trainiert wurde */}
+              {historieLaedt && (
+                <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Verlauf wird geladen …
+                </div>
+              )}
+              {!historieLaedt && historie && historie.anzahl > 0 && (
+                <div>
+                  <div className="mb-2 flex items-baseline justify-between gap-2">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)]">
+                      Dein Verlauf
+                    </p>
+                    {historie.rekord != null && (
+                      <span className="text-[10px] font-semibold text-brand">
+                        Rekord {historie.rekord} kg
+                        {historie.rekordMax != null ? ` · max. ${historie.rekordMax} kg` : ''}
+                      </span>
+                    )}
+                  </div>
+                  <div className="overflow-hidden rounded-xl border border-[var(--border-muted)]">
+                    <table className="w-full text-[11.5px]">
+                      <thead>
+                        <tr className="bg-[var(--background)] text-[9px] uppercase tracking-wider text-[var(--text-muted)]">
+                          <th className="px-2 py-1.5 text-left font-black">Datum</th>
+                          <th className="px-2 py-1.5 text-left font-black">Sätze</th>
+                          <th className="px-2 py-1.5 text-right font-black">Bestes</th>
+                          <th className="px-2 py-1.5 text-right font-black">Volumen</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {historie.verlauf.map((e) => (
+                          <tr key={`${e.date}-${e.workout}`} className="border-t border-[var(--border-muted)]">
+                            <td className="px-2 py-1.5 tabular-nums text-[var(--text-muted)]">
+                              {e.date.slice(8, 10)}.{e.date.slice(5, 7)}.
+                            </td>
+                            <td className="px-2 py-1.5 tabular-nums">
+                              {e.saetze
+                                .map((s) => `${s.weight ?? 0}×${s.reps ?? 0}`)
+                                .join(' · ')}
+                            </td>
+                            <td className="px-2 py-1.5 text-right font-semibold tabular-nums">
+                              {e.bestesGewicht != null ? `${e.bestesGewicht} kg` : '—'}
+                            </td>
+                            <td className="px-2 py-1.5 text-right tabular-nums text-[var(--text-muted)]">
+                              {e.volumen > 0 ? `${e.volumen}` : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="mt-1 text-[10px] text-[var(--text-muted)]">
+                    Sätze als Gewicht × Wiederholungen. Volumen = Gewicht × Wiederholungen gesamt.
+                  </p>
+                </div>
+              )}
+              {!historieLaedt && historie && historie.anzahl === 0 && (
+                <p className="rounded-xl border border-[var(--border-muted)] bg-[var(--background)] px-3 py-2 text-[11.5px] text-[var(--text-muted)]">
+                  Noch kein Verlauf — sobald du diese Übung einmal abgeschlossen hast, steht hier,
+                  mit wie viel Gewicht du trainiert hast.
+                </p>
+              )}
 
               {ex.variations && ex.variations.length > 0 && (
                 <div>

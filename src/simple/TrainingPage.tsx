@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useExerciseDetailOptional } from '@/src/lib/exerciseDetailContext';
 import { Link } from 'react-router-dom';
 import {
   BarChart3,
@@ -86,6 +87,8 @@ function dateOfDayKey(key: string, weekMonday: string = ymdOf(mondayOfYmd(todayY
 }
 
 export default function TrainingPage() {
+  // Uebungen antippbar machen: Erklaerung, Video und eigener Verlauf.
+  const exerciseDetail = useExerciseDetailOptional();
   const today = todayYmd();
   const [week, setWeek] = useState<CoachWeek>(null);
   /** Alle Wochen des aktiven Plans (mit Startdatum) — Grundlage für die Wochenansicht. */
@@ -436,18 +439,30 @@ export default function TrainingPage() {
           {(planDay?.exercises ?? []).length > 0 && (
             <ul className="mt-4 divide-y divide-[var(--border-muted)] border-t border-[var(--border-muted)]">
               {(planDay?.exercises ?? []).map((exercise, index) => (
-                <li key={`${exercise.name}-${index}`} className="flex items-baseline justify-between gap-3 py-2.5">
-                  <span className="flex min-w-0 flex-1 items-baseline gap-2">
-                    <span className="w-4 shrink-0 text-[10px] font-semibold tabular-nums text-[var(--text-muted)]">
-                      {index + 1}
+                <li key={`${exercise.name}-${index}`}>
+                  {/* Anklickbar: oeffnet Erklaerung, Video, haeufige Fehler und den eigenen Verlauf. */}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      exerciseDetail?.openExerciseDetail({
+                        exerciseKey: (exercise as { exerciseKey?: string }).exerciseKey,
+                        name: exercise.name,
+                      })
+                    }
+                    className="flex w-full items-baseline justify-between gap-3 py-2.5 text-left transition hover:text-[var(--simple-accent)]"
+                  >
+                    <span className="flex min-w-0 flex-1 items-baseline gap-2">
+                      <span className="w-4 shrink-0 text-[10px] font-semibold tabular-nums text-[var(--text-muted)]">
+                        {index + 1}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-sm">{exercise.name}</span>
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-sm">{exercise.name}</span>
-                  </span>
-                  <span className="shrink-0 text-xs tabular-nums text-[var(--text-muted)]">
-                    {[exercise.sets && `${exercise.sets}×`, exercise.reps && `${exercise.reps}`, exercise.weight]
-                      .filter(Boolean)
-                      .join(' ')}
-                  </span>
+                    <span className="shrink-0 text-xs tabular-nums text-[var(--text-muted)]">
+                      {[exercise.sets && `${exercise.sets}×`, exercise.reps && `${exercise.reps}`, exercise.weight]
+                        .filter(Boolean)
+                        .join(' ')}
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>

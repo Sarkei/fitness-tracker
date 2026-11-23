@@ -14,6 +14,14 @@ import { letzter, mittel } from '@/src/lib/wellness';
 export default function WellnessKoerper() {
   const { daten } = useWellness();
   const tage = daten.tage;
+
+  // Garmin-Werte, die Intervals nicht liefert.
+  const spo2Reihe = tage.filter((t) => t.spo2 != null).map((t) => t.spo2 as number);
+  const spo2Jetzt = [...tage].reverse().find((t) => t.spo2 != null)?.spo2 ?? null;
+  const spo2Schnitt = spo2Reihe.length ? mittel(spo2Reihe) : null;
+  const vo2Jetzt = [...tage].reverse().find((t) => t.vo2max != null)?.vo2max ?? null;
+  const alterJetzt = [...tage].reverse().find((t) => t.fitnessAge != null)?.fitnessAge ?? null;
+  const hrvStatus = [...tage].reverse().find((t) => t.hrvStatus)?.hrvStatus ?? null;
   const [detail, setDetail] = useState<'hrv' | 'puls' | 'gewicht' | null>(null);
   const [tagOffen, setTagOffen] = useState<string | null>(null);
 
@@ -69,6 +77,31 @@ export default function WellnessKoerper() {
           hint={gewicht.length ? `${gewicht.length} Messungen` : 'keine Daten'}
           onClick={() => setDetail('gewicht')}
         />
+        {spo2Jetzt != null && (
+          <KlickKachel
+            label="Sauerstoff"
+            value={Math.round(spo2Jetzt)}
+            unit="%"
+            hint={spo2Schnitt != null ? `Ø ${Math.round(spo2Schnitt)}` : 'nur Garmin'}
+            onClick={() => setDetail('hrv')}
+          />
+        )}
+        {vo2Jetzt != null && (
+          <KlickKachel
+            label="VO₂max"
+            value={Math.round(vo2Jetzt)}
+            hint={alterJetzt != null ? `Alter ${Math.round(alterJetzt)}` : 'nur Garmin'}
+            onClick={() => setDetail('puls')}
+          />
+        )}
+        {hrvStatus && (
+          <KlickKachel
+            label="HRV-Status"
+            value={hrvStatus === 'BALANCED' ? 'Balance' : hrvStatus === 'LOW' ? 'Tief' : hrvStatus === 'HIGH' ? 'Hoch' : hrvStatus}
+            hint="nur Garmin"
+            onClick={() => setDetail('hrv')}
+          />
+        )}
       </div>
 
       <MapCard
@@ -108,6 +141,7 @@ export default function WellnessKoerper() {
                 <th className="py-1.5 text-left font-semibold">Datum</th>
                 <th className="py-1.5 text-right font-semibold">HRV</th>
                 <th className="py-1.5 text-right font-semibold">Puls</th>
+                <th className="py-1.5 text-right font-semibold">SpO₂</th>
                 <th className="py-1.5 text-right font-semibold">Gewicht</th>
               </tr>
             </thead>
@@ -119,6 +153,7 @@ export default function WellnessKoerper() {
                   <td className="py-1.5 text-right tabular-nums">
                     {t.restingHr != null ? Math.round(t.restingHr) : '—'}
                   </td>
+                  <td className="py-1.5 text-right tabular-nums">{t.spo2 != null ? Math.round(t.spo2) : '—'}</td>
                   <td className="py-1.5 text-right tabular-nums">
                     {t.weight != null && t.weight > 0 ? t.weight.toFixed(1) : '—'}
                   </td>

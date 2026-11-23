@@ -102,6 +102,19 @@ export function Tagesdetail({
                 label="Bewertung"
                 wert={tag.sleepScore != null ? schlafBewertung(tag.sleepScore) : null}
               />
+              {/* Schlafphasen — nur Garmin liefert sie */}
+              {tag.deepSecs != null && (
+                <Zeile label="Tiefschlaf" wert={(tag.deepSecs / 3600).toFixed(1)} einheit="h" />
+              )}
+              {tag.remSecs != null && (
+                <Zeile label="REM" wert={(tag.remSecs / 3600).toFixed(1)} einheit="h" />
+              )}
+              {tag.lightSecs != null && (
+                <Zeile label="Leichtschlaf" wert={(tag.lightSecs / 3600).toFixed(1)} einheit="h" />
+              )}
+              {tag.awakeSecs != null && (
+                <Zeile label="Wach" wert={Math.round(tag.awakeSecs / 60)} einheit="min" />
+              )}
             </Block>
           )}
 
@@ -109,15 +122,52 @@ export function Tagesdetail({
             <Block titel="Bewegung">
               <Zeile label="Schritte" wert={tag.steps != null ? Math.round(tag.steps).toLocaleString('de-DE') : null} />
               <Zeile label="Etagen" wert={tag.floors != null ? Math.round(tag.floors) : null} />
+              {tag.distanceMeters != null && (
+                <Zeile label="Strecke" wert={(tag.distanceMeters / 1000).toFixed(2)} einheit="km" />
+              )}
+              {tag.activeCalories != null && (
+                <Zeile label="Aktiv verbrannt" wert={Math.round(tag.activeCalories)} einheit="kcal" />
+              )}
+              {tag.totalCalories != null && (
+                <Zeile label="Gesamtverbrauch" wert={Math.round(tag.totalCalories)} einheit="kcal" />
+              )}
             </Block>
           )}
 
           {zeigeKoerper && (tag.hrv != null || tag.restingHr != null || (tag.weight != null && tag.weight > 0)) && (
             <Block titel="Herz & Körper">
               <Zeile label="HRV" wert={tag.hrv != null ? Math.round(tag.hrv) : null} einheit="ms" />
+              {tag.hrvStatus && <Zeile label="HRV-Status" wert={tag.hrvStatus} />}
               <Zeile label="Ruhepuls" wert={tag.restingHr != null ? Math.round(tag.restingHr) : null} einheit="bpm" />
+              {tag.minHr != null && <Zeile label="Puls min." wert={Math.round(tag.minHr)} einheit="bpm" />}
+              {tag.maxHr != null && <Zeile label="Puls max." wert={Math.round(tag.maxHr)} einheit="bpm" />}
+              {tag.spo2 != null && <Zeile label="Sauerstoff" wert={Math.round(tag.spo2)} einheit="%" />}
+              {tag.respiration != null && (
+                <Zeile label="Atemfrequenz" wert={Math.round(tag.respiration)} einheit="/min" />
+              )}
+              {tag.vo2max != null && <Zeile label="VO₂max" wert={Math.round(tag.vo2max)} />}
+              {tag.fitnessAge != null && (
+                <Zeile label="Fitnessalter" wert={Math.round(tag.fitnessAge)} einheit="Jahre" />
+              )}
               {tag.weight != null && tag.weight > 0 && (
                 <Zeile label="Gewicht" wert={tag.weight.toFixed(1)} einheit="kg" />
+              )}
+              {tag.bodyFat != null && (
+                <Zeile label="Körperfett" wert={tag.bodyFat.toFixed(1)} einheit="%" />
+              )}
+            </Block>
+          )}
+
+          {/* Erholung: Stress und Body Battery liefert nur Garmin */}
+          {(tag.stress != null || tag.bodyBatteryMin != null || tag.bodyBatteryMax != null) && (
+            <Block titel="Erholung">
+              {tag.stress != null && <Zeile label="Stress Ø" wert={Math.round(tag.stress)} />}
+              {tag.stressMax != null && <Zeile label="Stress max." wert={Math.round(tag.stressMax)} />}
+              {tag.bodyBatteryMax != null && (
+                <Zeile label="Body Battery hoch" wert={Math.round(tag.bodyBatteryMax)} />
+              )}
+              {tag.bodyBatteryMin != null && (
+                <Zeile label="Body Battery tief" wert={Math.round(tag.bodyBatteryMin)} />
               )}
             </Block>
           )}

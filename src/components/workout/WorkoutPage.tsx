@@ -1697,6 +1697,39 @@ export default function WorkoutPage() {
                         {workoutTypeUi(t, workout.type)} • {format(new Date(workout.date), 'd. MMM yyyy', { locale: dfLoc })}
                       </p>
                       <h4 className="text-lg font-bold uppercase tracking-tight text-[var(--text-primary)]">{workout.name}</h4>
+                      {/* Uebungen einzeln antippbar: Erklaerung, Video, eigener Verlauf */}
+                      {Array.isArray(workout.exercises) && workout.exercises.length > 0 && (
+                        <ul className="mt-3 space-y-1">
+                          {(workout.exercises as unknown as Array<Record<string, unknown>>).slice(0, 12).map((ue, i) => {
+                            const saetze = Array.isArray(ue.sets) ? (ue.sets as Array<Record<string, unknown>>) : [];
+                            const zusammenfassung = saetze
+                              .map((x) => `${x.weight ?? 0}×${x.reps ?? 0}`)
+                              .filter((x) => !x.startsWith('0×'))
+                              .join(' · ');
+                            return (
+                              <li key={`${String(ue.name)}-${i}`}>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    openExerciseDetail({
+                                      exerciseKey: String(ue.exerciseKey ?? '') || undefined,
+                                      name: String(ue.name ?? ''),
+                                    })
+                                  }
+                                  className="flex w-full items-baseline justify-between gap-2 rounded-lg px-1.5 py-1 text-left text-[11.5px] transition hover:bg-[var(--background)] hover:text-brand"
+                                >
+                                  <span className="min-w-0 flex-1 truncate">{String(ue.name ?? 'Übung')}</span>
+                                  {zusammenfassung && (
+                                    <span className="shrink-0 tabular-nums text-[10.5px] text-[var(--text-muted)]">
+                                      {zusammenfassung}
+                                    </span>
+                                  )}
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
                     </div>
                     <div className="w-10 h-10 rounded-xl bg-[var(--background)] flex items-center justify-center text-[var(--text-muted)]">
                       {workout.type === 'Cardio' ? <Zap size={18} /> : <Dumbbell size={18} />}
