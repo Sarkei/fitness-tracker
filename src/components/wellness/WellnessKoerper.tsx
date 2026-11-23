@@ -82,7 +82,7 @@ export default function WellnessKoerper() {
             label="Sauerstoff"
             value={Math.round(spo2Jetzt)}
             unit="%"
-            hint={spo2Schnitt != null ? `Ø ${Math.round(spo2Schnitt)}` : 'nur Garmin'}
+            hint={spo2Schnitt != null ? `Ø ${Math.round(spo2Schnitt)}` : undefined}
             onClick={() => setDetail('hrv')}
           />
         )}
@@ -90,7 +90,7 @@ export default function WellnessKoerper() {
           <KlickKachel
             label="VO₂max"
             value={Math.round(vo2Jetzt)}
-            hint={alterJetzt != null ? `Alter ${Math.round(alterJetzt)}` : 'nur Garmin'}
+            hint={alterJetzt != null ? `Alter ${Math.round(alterJetzt)}` : undefined}
             onClick={() => setDetail('puls')}
           />
         )}
@@ -98,7 +98,7 @@ export default function WellnessKoerper() {
           <KlickKachel
             label="HRV-Status"
             value={hrvStatus === 'BALANCED' ? 'Balance' : hrvStatus === 'LOW' ? 'Tief' : hrvStatus === 'HIGH' ? 'Hoch' : hrvStatus}
-            hint="nur Garmin"
+            
             onClick={() => setDetail('hrv')}
           />
         )}

@@ -23,6 +23,24 @@ export default function WellnessSchlaf() {
   const scores = tage.map((t) => t.sleepScore).filter((s): s is number => s != null);
   const scoreSchnitt = mittel(scores);
 
+  /*
+   * Schlafphasen: Garmin teilt die Nacht in Tief-, REM-, Leichtschlaf und Wachzeit.
+   * Intervals liefert sie nicht — fehlen sie, bleibt der Block ausgeblendet.
+   */
+  const phasenReihe = tage.map((t) => ({
+    datum: t.date,
+    tief: t.deepSecs != null ? t.deepSecs / 3600 : null,
+    rem: t.remSecs != null ? t.remSecs / 3600 : null,
+    leicht: t.lightSecs != null ? t.lightSecs / 3600 : null,
+    wach: t.awakeSecs != null ? t.awakeSecs / 60 : null,
+  }));
+  const letztePhasen = [...phasenReihe].reverse().find((p) => p.tief != null || p.rem != null) ?? null;
+  const hatPhasen = letztePhasen != null;
+  const phaseSchnitt = (feld: 'tief' | 'rem' | 'leicht') => {
+    const werte = phasenReihe.map((p) => p[feld]).filter((v): v is number => v != null && v > 0);
+    return werte.length ? werte.reduce((a, b) => a + b, 0) / werte.length : null;
+  };
+
   const gut = reihe.filter((v) => v >= 7 && v > 0).length;
   const mittelWert = reihe.filter((v) => v >= 6 && v < 7).length;
   const schlecht = reihe.filter((v) => v > 0 && v < 6).length;
@@ -59,6 +77,122 @@ export default function WellnessSchlaf() {
         />
         <KlickKachel label="Nächte ≥ 7 h" value={gut} unit={`von ${reihe.filter((v) => v > 0).length}`} hint="ausreichend" onClick={() => setDetail('dauer')} />
       </div>
+
+      {/* Schlafphasen der letzten Nacht — Kacheln oben, Balken darunter */}
+      {hatPhasen && (
+        <>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <KlickKachel
+              label="Tiefschlaf"
+              value={letztePhasen?.tief != null ? letztePhasen.tief.toFixed(1) : '—'}
+              unit="h"
+              onClick={() => setDetail('dauer')}
+            />
+            <KlickKachel
+              label="REM-Schlaf"
+              value={letztePhasen?.rem != null ? letztePhasen.rem.toFixed(1) : '—'}
+              unit="h"
+              onClick={() => setDetail('dauer')}
+            />
+            <KlickKachel
+              label="Leichtschlaf"
+              value={letztePhasen?.leicht != null ? letztePhasen.leicht.toFixed(1) : '—'}
+              unit="h"
+              onClick={() => setDetail('dauer')}
+            />
+            <KlickKachel
+              label="Wach"
+              value={letztePhasen?.wach != null ? Math.round(letztePhasen.wach) : '—'}
+              unit="min"
+              onClick={() => setDetail('dauer')}
+            />
+          </div>
+
+          <Card className="space-y-3 p-5">
+            <div className="flex items-center gap-2">
+              <Moon className="h-3.5 w-3.5 text-[var(--simple-accent)]" />
+              <p className="text-[12.5px] font-semibold text-[var(--foreground)]">
+                Schlafphasen der letzten Nacht
+              </p>
+            </div>
+            {(() => {
+              const p = letztePhasen;
+              if (!p) return null;
+              const teile = [
+                { label: 'Tief', wert: p.tief ?? 0, farbe: '#1f6b4a' },
+                { label: 'REM', wert: p.rem ?? 0, farbe: '#4d9f6b' },
+                { label: 'Leicht', wert: p.leicht ?? 0, farbe: '#9cc7ae' },
+              ];
+              const gesamt = teile.reduce((a, t) => a + t.wert, 0) || 1;
+              return (
+                <>
+                  {/* Gestapelter Balken: Anteile auf einen Blick */}
+                  <div className="flex h-7 w-full overflow-hidden rounded-lg">
+                    {teile.map((t) => (
+                      <div
+                        key={t.label}
+                        style={{ width: `${(t.wert / gesamt) * 100}%`, background: t.farbe }}
+                        title={`${t.label}: ${t.wert.toFixed(1)} h`}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
+                    {teile.map((t) => (
+                      <span key={t.label} className="inline-flex items-center gap-1.5">
+                        <span
+                          className="inline-block h-2 w-2 rounded-full"
+                          style={{ background: t.farbe }}
+                        />
+                        <span className="text-[var(--text-muted)]">{t.label}</span>
+                        <span className="font-semibold tabular-nums">
+                          {t.wert.toFixed(1)} h · {Math.round((t.wert / gesamt) * 100)} %
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-[10.5px] leading-relaxed text-[var(--text-muted)]">
+                    Richtwerte: Tiefschlaf 15–25 %, REM 20–25 %, Leichtschlaf 45–60 % der Nacht.
+                  </p>
+                </>
+              );
+            })()}
+          </Card>
+
+          {/* Verlauf je Phase über den gewählten Zeitraum */}
+          <Card className="space-y-3 p-5">
+            <p className="text-[12.5px] font-semibold text-[var(--foreground)]">
+              Phasen im Verlauf
+            </p>
+            <div className="space-y-2">
+              {[
+                { label: 'Tiefschlaf', feld: 'tief' as const, farbe: '#1f6b4a' },
+                { label: 'REM', feld: 'rem' as const, farbe: '#4d9f6b' },
+                { label: 'Leichtschlaf', feld: 'leicht' as const, farbe: '#9cc7ae' },
+              ].map(({ label, feld, farbe }) => {
+                const schnittPhase = phaseSchnitt(feld);
+                return (
+                  <div key={feld} className="flex items-center gap-3">
+                    <span className="w-24 shrink-0 text-[11px] text-[var(--text-muted)]">{label}</span>
+                    <div className="min-w-0 flex-1">
+                      <Sparkline
+                        values={phasenReihe.map((p) => p[feld] ?? 0)}
+                        height={36}
+                        color={farbe}
+                      />
+                    </div>
+                    <span className="w-14 shrink-0 text-right text-[11px] font-semibold tabular-nums">
+                      {schnittPhase != null ? `${schnittPhase.toFixed(1)} h` : '—'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-[10.5px] text-[var(--text-muted)]">
+              Ø über die Nächte mit Messung. Leere Nächte zählen nicht mit.
+            </p>
+          </Card>
+        </>
+      )}
 
       <Card className="space-y-2 p-5">
         <div className="flex items-center gap-2">

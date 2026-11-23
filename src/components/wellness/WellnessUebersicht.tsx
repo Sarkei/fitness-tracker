@@ -105,19 +105,31 @@ export default function WellnessUebersicht() {
         <WellnessAktualisieren />
       </div>
 
-      {/* Kacheln: Grundwerte immer, Garmin-Werte zusaetzlich, wenn vorhanden. */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {/*
+       * Alle Kacheln gleich aufgebaut: oben die Beschreibung, darunter der Wert.
+       * Früher hingen Etagen, Fitnessalter, Schlafscore und Atemfrequenz als
+       * Untertext an einer anderen Kachel — jetzt hat jeder Wert sein eigenes Feld.
+       */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         <KlickKachel
           label="Schlaf"
           value={schlafLetzte ?? '—'}
           unit="h"
-          hint={schlafScore != null ? `Score ${Math.round(schlafScore)} · ${schlafBewertung(schlafScore)}` : 'kein Score'}
+          onClick={() => navigate('/wellness/schlaf')}
+        />
+        <KlickKachel
+          label="Schlafscore"
+          value={schlafScore != null ? Math.round(schlafScore) : '—'}
           onClick={() => navigate('/wellness/schlaf')}
         />
         <KlickKachel
           label="Schritte"
           value={schritte != null ? Math.round(schritte).toLocaleString('de-DE') : '—'}
-          hint={etagen != null ? `${Math.round(etagen)} Etagen` : undefined}
+          onClick={() => navigate('/wellness/bewegung')}
+        />
+        <KlickKachel
+          label="Etagen"
+          value={etagen != null ? Math.round(etagen) : '—'}
           onClick={() => navigate('/wellness/bewegung')}
         />
         <KlickKachel
@@ -132,46 +144,41 @@ export default function WellnessUebersicht() {
           unit="bpm"
           onClick={() => navigate('/wellness/koerper')}
         />
-        {stress != null && (
-          <KlickKachel
-            label="Stress"
-            value={Math.round(stress)}
-            hint="nur Garmin"
-            onClick={() => navigate('/wellness/koerper')}
-          />
-        )}
-        {bodyBattery != null && (
-          <KlickKachel
-            label="Body Battery"
-            value={Math.round(bodyBattery)}
-            hint="nur Garmin"
-            onClick={() => navigate('/wellness/koerper')}
-          />
-        )}
-        {spo2 != null && (
-          <KlickKachel
-            label="SpO₂"
-            value={Math.round(spo2)}
-            unit="%"
-            hint={atem != null ? `${Math.round(atem)}/min` : undefined}
-            onClick={() => navigate('/wellness/koerper')}
-          />
-        )}
-        {vo2 != null && (
-          <KlickKachel
-            label="VO₂max"
-            value={Math.round(vo2)}
-            hint={fitnessAlter != null ? `Alter ${Math.round(fitnessAlter)}` : undefined}
-            onClick={() => navigate('/wellness/form')}
-          />
-        )}
+        <KlickKachel
+          label="Stress"
+          value={stress != null ? Math.round(stress) : '—'}
+          onClick={() => navigate('/wellness/koerper')}
+        />
+        <KlickKachel
+          label="Body Battery"
+          value={bodyBattery != null ? Math.round(bodyBattery) : '—'}
+          onClick={() => navigate('/wellness/koerper')}
+        />
+        <KlickKachel
+          label="Sauerstoff"
+          value={spo2 != null ? Math.round(spo2) : '—'}
+          unit="%"
+          onClick={() => navigate('/wellness/koerper')}
+        />
+        <KlickKachel
+          label="Atemfrequenz"
+          value={atem != null ? Math.round(atem) : '—'}
+          unit="/min"
+          onClick={() => navigate('/wellness/koerper')}
+        />
+        <KlickKachel
+          label="VO₂max"
+          value={vo2 != null ? Math.round(vo2) : '—'}
+          onClick={() => navigate('/wellness/form')}
+        />
+        <KlickKachel
+          label="Fitnessalter"
+          value={fitnessAlter != null ? Math.round(fitnessAlter) : '—'}
+          unit="Jahre"
+          onClick={() => navigate('/wellness/form')}
+        />
         {gewicht != null && (
-          <KlickKachel
-            label="Gewicht"
-            value={gewicht}
-            unit="kg"
-            onClick={() => navigate('/wellness/koerper')}
-          />
+          <KlickKachel label="Gewicht" value={gewicht} unit="kg" onClick={() => navigate('/wellness/koerper')} />
         )}
       </div>
 

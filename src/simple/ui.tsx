@@ -361,10 +361,13 @@ export function Sparkline({
   values,
   height = 42,
   goal,
+  color,
 }: {
   values: number[];
   height?: number;
   goal?: number;
+  /** Linienfarbe (CSS-Farbe oder Variable). Standard nutzt die Akzentfarbe. */
+  color?: string;
 }) {
   if (values.length < 2) return <div style={{ height }} />;
 
@@ -380,11 +383,11 @@ export function Sparkline({
 
   return (
     <svg viewBox={`0 0 ${w} ${height}`} preserveAspectRatio="none" className="w-full" style={{ height }}>
-      <polygon points={flaeche} fill="var(--simple-accent)" opacity={0.12} />
+      <polygon points={flaeche} fill={color ?? 'var(--simple-accent)'} opacity={0.12} />
       <polyline
         points={punkte}
         fill="none"
-        stroke="var(--simple-accent)"
+        stroke={color ?? 'var(--simple-accent)'}
         strokeWidth={1.6}
         vectorEffect="non-scaling-stroke"
         strokeLinejoin="round"
