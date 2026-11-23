@@ -135,8 +135,10 @@ export function computeWeeklyEnergyBalance(
     intake: number;
     burned: number;
     net: number;
-    /** Tagesbilanz vs. Kalorienziel: Aufnahme − Trainingsverbrauch − Tagesziel (Summe über die Woche = weeklyNetKcal). */
-    balanceVsTarget: number;
+    /** Tagesbilanz vs. Kalorienziel: Aufnahme − Trainingsverbrauch − Tagesziel (Summe über die Woche = weeklyNetKcal). `null` = nichts erfasst. */
+    balanceVsTarget: number | null;
+    /** An diesem Tag wurde überhaupt etwas erfasst. */
+    hatDaten: boolean;
   }[];
   totalIntake: number;
   totalBurned: number;
@@ -165,12 +167,17 @@ export function computeWeeklyEnergyBalance(
           (typeof w.date === 'string' ? w.date.split('T')[0] : format(new Date(w.date), 'yyyy-MM-dd')) === ds
       )
       .reduce((s, w) => s + (w.caloriesBurned || 0), 0);
+    const hatDaten = intake > 0;
     return {
       label: format(d, 'EEE'),
       intake,
       burned,
       net: intake - burned,
-      balanceVsTarget: intake - burned - dailyTargetKcal,
+      // Ohne erfasste Aufnahme ist die Bilanz nicht „Ziel-Unterbietung", sondern unbekannt.
+      // Vorher stand hier −Tagesziel (z. B. −2300), was wie ein riesiges Defizit aussah.
+      // `null` bricht die Linie im Diagramm, statt einen erfundenen Wert zu zeichnen.
+      balanceVsTarget: hatDaten ? intake - burned - dailyTargetKcal : null,
+      hatDaten,
     };
   });
 

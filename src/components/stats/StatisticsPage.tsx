@@ -314,6 +314,21 @@ export default function StatisticsPage() {
     }));
   }, [weightHistory, dfLocale]);
 
+  /**
+   * Y-Achse des Gewichts: bei einem einzigen Wert ±2 kg um die Wiegung, bei mehreren
+   * ein sinnvoller Puffer. Vorher zeigte die Autoskalierung eines einzelnen Punktes
+   * 113–115 kg und täuschte einen starken Verlauf vor.
+   */
+  const weightDomain = useMemo<[number, number]>(() => {
+    const werte = weightSeries.map((w) => Number(w.value)).filter((v) => Number.isFinite(v));
+    if (!werte.length) return [0, 1];
+    if (werte.length === 1) return [Math.round(werte[0]) - 2, Math.round(werte[0]) + 2];
+    const min = Math.min(...werte);
+    const max = Math.max(...werte);
+    const puffer = Math.max(0.5, (max - min) * 0.25);
+    return [Math.floor(min - puffer), Math.ceil(max + puffer)];
+  }, [weightSeries]);
+
   const weightDelta = useMemo(() => {
     const sorted = [...weightHistory].sort(
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
@@ -590,8 +605,18 @@ export default function StatisticsPage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={nutritionByDay} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-muted)" />
-                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text-muted)', fontWeight: 700 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} width={44} />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fontSize: 10, fill: 'var(--text-muted)', fontWeight: 700 }}
+                      axisLine={false}
+                      tickLine={false}
+                      label={{ value: t('stats.axis.day'), position: 'insideBottom', offset: -2, fontSize: 10, fill: 'var(--text-muted)' }}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
+                      width={44}
+                      label={{ value: 'kcal', angle: -90, position: 'insideLeft', fontSize: 10, fill: 'var(--text-muted)' }}
+                    />
                     <Tooltip content={props => <NutritionStatsTooltip {...props} t={t} dfLocale={dfLocale} />} />
                     <Legend wrapperStyle={{ fontSize: 10, fontWeight: 800, paddingTop: 12 }} />
                     <Bar dataKey="calories" name={t('stats.chart.kcal')} fill="#14b8a6" radius={[6, 6, 0, 0]} maxBarSize={28} />
@@ -624,8 +649,18 @@ export default function StatisticsPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={energyWeek.days} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-muted)" />
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text-muted)', fontWeight: 700 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} width={44} />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 10, fill: 'var(--text-muted)', fontWeight: 700 }}
+                    axisLine={false}
+                    tickLine={false}
+                    label={{ value: t('stats.axis.day'), position: 'insideBottom', offset: -2, fontSize: 10, fill: 'var(--text-muted)' }}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
+                    width={52}
+                    label={{ value: 'kcal', angle: -90, position: 'insideLeft', fontSize: 10, fill: 'var(--text-muted)' }}
+                  />
                   <Tooltip
                     contentStyle={TT}
                     formatter={(value: number | string) => {
@@ -642,6 +677,7 @@ export default function StatisticsPage() {
                     name={t('stats.energy.balanceLine')}
                     stroke="#14b8a6"
                     strokeWidth={2.5}
+                    connectNulls={false}
                     dot={{ r: 3, fill: '#14b8a6', stroke: 'var(--card-bg)', strokeWidth: 2 }}
                     activeDot={{ r: 5 }}
                   />
@@ -709,9 +745,27 @@ export default function StatisticsPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={trainingSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-muted)" />
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text-muted)', fontWeight: 700 }} axisLine={false} tickLine={false} />
-                  <YAxis yAxisId="left" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} width={36} allowDecimals={false} />
-                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} width={44} />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 10, fill: 'var(--text-muted)', fontWeight: 700 }}
+                    axisLine={false}
+                    tickLine={false}
+                    label={{ value: t('stats.axis.day'), position: 'insideBottom', offset: -2, fontSize: 10, fill: 'var(--text-muted)' }}
+                  />
+                  <YAxis
+                    yAxisId="left"
+                    tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
+                    width={40}
+                    allowDecimals={false}
+                    label={{ value: t('stats.axis.sessions'), angle: -90, position: 'insideLeft', fontSize: 10, fill: 'var(--text-muted)' }}
+                  />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
+                    width={52}
+                    label={{ value: t('stats.axis.volume'), angle: 90, position: 'insideRight', fontSize: 10, fill: 'var(--text-muted)' }}
+                  />
                   <Tooltip contentStyle={TT} />
                   <Legend wrapperStyle={{ fontSize: 10, fontWeight: 800, paddingTop: 12 }} />
                   <Bar yAxisId="left" dataKey="sessions" name={t('stats.chart.sessions')} fill="var(--brand, #14b8a6)" radius={[6, 6, 0, 0]} maxBarSize={28} />
@@ -790,10 +844,32 @@ export default function StatisticsPage() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-muted)" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text-muted)', fontWeight: 700 }} axisLine={false} tickLine={false} />
-                  <YAxis domain={['auto', 'auto']} tick={{ fontSize: 10, fill: 'var(--text-muted)' }} width={36} />
-                  <Tooltip contentStyle={TT} />
-                  <Area type="monotone" dataKey="value" stroke="var(--brand, #14b8a6)" fill="url(#wgrad)" strokeWidth={2} />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 10, fill: 'var(--text-muted)', fontWeight: 700 }}
+                    axisLine={false}
+                    tickLine={false}
+                    label={{ value: t('stats.axis.date'), position: 'insideBottom', offset: -2, fontSize: 10, fill: 'var(--text-muted)' }}
+                  />
+                  <YAxis
+                    domain={weightDomain}
+                    tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
+                    width={46}
+                    tickFormatter={(v: number) => String(Math.round(Number(v)))}
+                    label={{ value: 'kg', angle: -90, position: 'insideLeft', fontSize: 10, fill: 'var(--text-muted)' }}
+                  />
+                  <Tooltip
+                    contentStyle={TT}
+                    formatter={(value: number | string) => [`${Number(value).toFixed(1)} kg`, t('stats.section.weight')]}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="value"
+                    stroke="var(--brand, #14b8a6)"
+                    fill="url(#wgrad)"
+                    strokeWidth={2}
+                    dot={weightSeries.length === 1 ? { r: 4, fill: 'var(--brand, #14b8a6)' } : false}
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </div>

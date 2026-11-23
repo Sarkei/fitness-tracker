@@ -1442,6 +1442,10 @@ export const MESSAGES: Record<string, { de: string; en: string }> = {
   'stats.chart.volume': { de: 'Volumen', en: 'Volume' },
   'stats.chart.kcal': { de: 'Kalorien', en: 'Calories' },
   'stats.chart.target': { de: 'Ziel', en: 'Target' },
+  'stats.axis.day': { de: 'Tag', en: 'Day' },
+  'stats.axis.date': { de: 'Datum', en: 'Date' },
+  'stats.axis.sessions': { de: 'Einheiten', en: 'Sessions' },
+  'stats.axis.volume': { de: 'Volumen (kg)', en: 'Volume (kg)' },
   'stats.section.weight': { de: 'Gewicht', en: 'Weight' },
   'stats.section.weightSub': { de: 'Verlauf aus dem Profil', en: 'Trend from profile' },
   'stats.empty.weight': {

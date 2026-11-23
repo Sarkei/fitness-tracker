@@ -34,13 +34,15 @@ import {
   type WorkoutEntry,
 } from './simpleApi';
 import { toYmd } from './analytics';
+import BilanzChart from './BilanzChart';
 import {
   bilanzDurchschnitt,
   fastenSerie,
   kcalBilanz,
   trainingsSerie,
   verschiebeTage,
-  wochentagKurz,
+  zielTypAusProfil,
+  bilanzImZiel,
 } from './serien';
 
 /**
@@ -113,11 +115,14 @@ export default function TodayPage() {
     macros?: { protein?: number; carbs?: number; fat?: number };
     fasting?: unknown;
     fastingSince?: string;
+    type?: string;
   };
   const goalKcal = Number(goals.dailyCalories) || 2400;
   const goalProtein = Number(goals.macros?.protein) || 180;
   const goalCarbs = Number(goals.macros?.carbs) || 240;
   const goalFat = Number(goals.macros?.fat) || 80;
+  /** Zielrichtung aus dem Profil — bestimmt die Farbzonen der Bilanzgrafik. */
+  const zielTyp = zielTypAusProfil(goals.type);
   const koerpergewicht = Number(
     (profile as unknown as { measurements?: { weight?: number } } | null)?.measurements?.weight,
   );
@@ -153,7 +158,6 @@ export default function TodayPage() {
     [monatEntries, workouts, goalKcal, date, koerpergewicht],
   );
   const oBilanz = useMemo(() => bilanzDurchschnitt(bilanz), [bilanz]);
-  const maxBilanz = Math.max(1, ...bilanz.map((t) => Math.abs(t.bilanz)));
   const hatBilanz = bilanz.some((t) => t.hatDaten);
 
   return (
@@ -426,89 +430,34 @@ export default function TodayPage() {
           Kalorienbilanz
         </SectionTitle>
 
-        {hatBilanz ? (
-          <>
-            <div className="relative flex items-stretch gap-1.5" style={{ height: 116 }}>
-              {/* Nulllinie */}
-              <div
-                className="pointer-events-none absolute inset-x-0 border-t border-dashed border-[var(--border-muted)]"
-                style={{ top: '50%' }}
-              />
-              {bilanz.map((tag) => {
-                const anteil = Math.min(1, Math.abs(tag.bilanz) / maxBilanz);
-                const defizit = tag.bilanz < 0;
-                const hoehe = tag.hatDaten ? Math.max(3, anteil * 50) : 0;
-                return (
-                  <div
-                    key={tag.ymd}
-                    className="relative flex-1"
-                    title={
-                      tag.hatDaten
-                        ? `${fmtDatum(tag.ymd)}: ${tag.kcal} gegessen · ${tag.verbrannt} Training · Bilanz ${
-                            tag.bilanz > 0 ? '+' : ''
-                          }${tag.bilanz} kcal`
-                        : `${fmtDatum(tag.ymd)}: nichts erfasst`
-                    }
-                  >
-                    {hoehe > 0 && (
-                      <div
-                        className="absolute inset-x-0 rounded-sm transition-[height] duration-500"
-                        style={{
-                          height: `${hoehe}%`,
-                          [defizit ? 'bottom' : 'top']: '50%',
-                          background: defizit
-                            ? 'color-mix(in srgb, var(--simple-accent) 75%, transparent)'
-                            : 'color-mix(in srgb, #f87171 70%, transparent)',
-                        }}
-                      />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            <div className="mt-1 flex gap-1.5">
-              {bilanz.map((tag) => (
-                <span
-                  key={tag.ymd}
-                  className={`flex-1 text-center text-[9px] font-semibold uppercase tracking-[0.08em] ${
-                    tag.ymd === date ? 'text-[var(--simple-accent)]' : 'text-[var(--text-muted)]'
-                  }`}
-                >
-                  {wochentagKurz(tag.ymd)}
-                </span>
-              ))}
-            </div>
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-muted)] pt-2.5 text-[11px] text-[var(--text-muted)]">
-              <span className="flex items-center gap-3">
-                <span className="flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-sm" style={{ background: 'var(--simple-accent)' }} /> Defizit
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-sm" style={{ background: '#f87171' }} /> Überschuss
-                </span>
-              </span>
-              <span className="tabular-nums">
-                Ø{' '}
-                <span
-                  className="font-semibold"
-                  style={{ color: (oBilanz ?? 0) > 0 ? '#f87171' : 'var(--foreground)' }}
-                >
-                  {oBilanz === null ? '—' : `${oBilanz > 0 ? '+' : ''}${oBilanz}`}
-                </span>{' '}
-                kcal
-              </span>
-            </div>
-            <p className="mt-1.5 text-[10.5px] leading-relaxed text-[var(--text-muted)]">
-              Bilanz = Gegessen − Tagesziel − geschätzter Trainingsverbrauch (7 kcal/min bei 80 kg, anteilig
-              zum Körpergewicht). Der Durchschnitt zählt nur Tage, an denen mindestens die Hälfte des Ziels
-              erfasst wurde — sonst wirkt jeder halb dokumentierte Tag wie ein riesiges Defizit.
-            </p>
-          </>
-        ) : (
-          <p className="py-6 text-center text-[11.5px] text-[var(--text-muted)]">
-            Sobald du ein paar Tage Essen erfasst hast, siehst du hier Defizit und Überschuss.
-          </p>
+        <BilanzChart bilanz={bilanz} zielTyp={zielTyp} heute={date} />
+
+        {hatBilanz && (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-muted)] pt-2.5 text-[11px] text-[var(--text-muted)]">
+            <span className="tabular-nums">
+              Ø{' '}
+              <span
+                className="font-semibold"
+                style={{
+                  color:
+                    oBilanz === null ? 'var(--foreground)' : bilanzImZiel(oBilanz, zielTyp) ? '#22c55e' : '#ef4444',
+                }}
+              >
+                {oBilanz === null ? '—' : `${oBilanz > 0 ? '+' : ''}${oBilanz}`}
+              </span>{' '}
+              kcal
+            </span>
+            <span className="text-[10px]">
+              {zielTyp === 'lose' ? 'Ziel: abnehmen' : zielTyp === 'gain' ? 'Ziel: zunehmen' : 'Ziel: halten'}
+            </span>
+          </div>
         )}
+        <p className="mt-1.5 text-[10.5px] leading-relaxed text-[var(--text-muted)]">
+          Bilanz = Gegessen − Tagesziel − geschätzter Trainingsverbrauch (7 kcal/min bei 80 kg, anteilig
+          zum Körpergewicht). Balken unter der Nulllinie sind Defizit, darüber Überschuss. Der Durchschnitt
+          zählt nur Tage, an denen mindestens die Hälfte des Ziels erfasst wurde — sonst wirkt jeder halb
+          dokumentierte Tag wie ein riesiges Defizit.
+        </p>
       </Card>
 
       {showPhoto && (

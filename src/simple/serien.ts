@@ -218,3 +218,37 @@ export function bilanzDurchschnitt(reihe: BilanzTag[]): number | null {
   if (!brauchbar.length) return null;
   return Math.round(brauchbar.reduce((s, t) => s + t.bilanz, 0) / brauchbar.length);
 }
+
+/** Zielrichtung aus dem Profil; bestimmt, welche Bilanz zielführend ist. */
+export type ZielTyp = 'lose' | 'maintain' | 'gain';
+
+/** Toleranz um die Nulllinie beim Halten. */
+export const HALTEN_TOLERANZ_KCAL = 500;
+
+/** Zieltyp aus den Profilzielen lesen — unbekannt heißt „halten". */
+export function zielTypAusProfil(raw: unknown): ZielTyp {
+  const s = String(raw ?? '').toLowerCase();
+  if (s === 'lose' || s === 'abnehmen') return 'lose';
+  if (s === 'gain' || s === 'zunehmen') return 'gain';
+  return 'maintain';
+}
+
+/**
+ * Ist diese Bilanz zielführend?
+ * abnehmen: negativ (Defizit) · halten: ±500 kcal · zunehmen: positiv (Überschuss).
+ */
+export function bilanzImZiel(bilanz: number, typ: ZielTyp): boolean {
+  if (typ === 'lose') return bilanz < 0;
+  if (typ === 'gain') return bilanz > 0;
+  return Math.abs(bilanz) <= HALTEN_TOLERANZ_KCAL;
+}
+
+/**
+ * Grenzen der grünen Zone in kcal (untere, obere), passend zum Zieltyp.
+ * `null` heißt „nach unten offen".
+ */
+export function zielZone(typ: ZielTyp): { von: number | null; bis: number | null } {
+  if (typ === 'lose') return { von: null, bis: 0 };
+  if (typ === 'gain') return { von: 0, bis: null };
+  return { von: -HALTEN_TOLERANZ_KCAL, bis: HALTEN_TOLERANZ_KCAL };
+}
