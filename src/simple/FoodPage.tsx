@@ -440,17 +440,7 @@ export default function FoodPage() {
               const active = ymd === date;
               const kcal = map.get(ymd) ?? 0;
               const anteil = Math.min(1, kcal / Math.max(1, Number(goals.dailyCalories) || 2400));
-              // Gewählten Tag in den sichtbaren Bereich holen — auch wenn er weit hinten liegt.
-  useEffect(() => {
-    const leiste = tageLeiste.current;
-    if (!leiste) return;
-    const aktiv = leiste.querySelector<HTMLElement>('[data-aktiv="1"]');
-    if (aktiv) {
-      aktiv.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
-    }
-  }, [date]);
-
-  const istHeute = ymd === todayYmd();
+              const istHeute = ymd === todayYmd();
               return (
                 <button
                   key={ymd}
