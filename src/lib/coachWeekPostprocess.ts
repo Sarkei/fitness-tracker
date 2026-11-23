@@ -192,7 +192,16 @@ export function repairEquipmentAndInjuryWithSubstitutes(
           }
         }
         if (replaced) continue;
+        // Lieber behalten und markieren als löschen: eine gestrichene Übung kostet die
+        // ganze Einheit (leerer Plan), eine markierte kann der Nutzer selbst tauschen.
+        r.notes = [
+          String(r.notes || '').trim(),
+          `Hinweis: benötigt ${blocked}, das in deinem Equipment fehlt — passendes Gerät wählen oder Übung tauschen.`,
+        ]
+          .filter(Boolean)
+          .join(' · ');
         stripped += 1;
+        nextEx.push(r as (typeof day.exercises)[number]);
         continue;
       }
 

@@ -3369,9 +3369,10 @@ ${exerciseCatalog}
             }
           }
         }
-        if (typeof row.exerciseKey === "string" && row.exerciseKey.trim()) {
-          mainExercises.push(row);
-        }
+        // Übung immer behalten. Ohne Katalog-Key bleibt sie als reine Namenszeile stehen:
+        // fehlt der ExerciseDB-Zugang (oder ist der Name nicht im Katalog), darf das
+        // nicht die ganze Einheit leeren — sonst bekommt der Nutzer einen Plan ohne Inhalt.
+        mainExercises.push(row);
       }
       nextDay.exercises = mainExercises;
 

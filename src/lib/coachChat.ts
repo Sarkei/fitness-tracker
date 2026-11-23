@@ -39,7 +39,9 @@ export function sinnvollerPlanName(
     DISCIPLINE_LABEL[String(discipline ?? '').toLowerCase()] ??
     (planType === 'workout' ? 'Trainingsplan' : 'Ernährungsplan');
   const teile = [basis];
-  if (opts.weeks && opts.weeks > 0) teile.push(`${opts.weeks} Wochen`);
+  if (opts.weeks && opts.weeks > 0) {
+    teile.push(opts.weeks === 1 ? '1 Woche' : `${opts.weeks} Wochen`);
+  }
   if (opts.startYmd) {
     const [, m, d] = opts.startYmd.split('-');
     if (m && d) teile.push(`ab ${d}.${m}.`);
