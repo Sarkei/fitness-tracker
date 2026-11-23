@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Coffee,
   Dumbbell,
+  Loader2,
   Moon,
   Pencil,
   Plus,
@@ -32,15 +33,18 @@ import {
 import PhotoMealSheet from './PhotoMealSheet';
 import MealEditRow from './EditRows';
 import {
+  addFoodEntry,
   dayKeyOf,
   deleteFood,
   fetchActivePlan,
+  fetchMealplannerGerichte,
   fetchMonth,
   formatDay,
   shiftYmd,
   todayYmd,
   totals,
   type FoodEntry,
+  type MealplanerGericht,
 } from './simpleApi';
 import {
   dayLabelShort,
@@ -86,14 +90,22 @@ export default function FoodPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [laedt, setLaedt] = useState(true);
+  /** Gerichte aus dem verbundenen Mealplanner für die Schnellerfassung. */
+  const [gerichte, setGerichte] = useState<MealplanerGericht[]>([]);
+  const [schnellBusy, setSchnellBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLaedt(true);
     try {
       // Ein Aufruf fuer 30 Tage statt 30 einzelne
-      const [month, plan] = await Promise.all([fetchMonth(), fetchActivePlan().catch(() => null)]);
+      const [month, plan, mp] = await Promise.all([
+        fetchMonth(),
+        fetchActivePlan().catch(() => null),
+        fetchMealplannerGerichte(),
+      ]);
       setMonat(month);
       setEntries(month.filter((e) => toYmd(e.date) === date));
+      setGerichte(mp);
       const key = dayKeyOf(date);
       const day = (plan?.week?.schedule ?? []).find((d) => d.day === key);
       setTrainingDay(Boolean(day && !day.isRest));
@@ -403,6 +415,69 @@ export default function FoodPage() {
           );
         })}
       </div>
+
+      {/* Schnellerfassung: Gerichte aus dem verbundenen Mealplanner */}
+      {gerichte.length > 0 && (
+        <Card className="p-5">
+          <SectionTitle
+            action={
+              <span className="text-[11px] text-[var(--text-muted)]">aus dem Mealplanner</span>
+            }
+          >
+            Schnell hinzufügen
+          </SectionTitle>
+          <p className="-mt-1 mb-3 text-[11px] leading-relaxed text-[var(--text-muted)]">
+            Antippen trägt das Gericht mit seinen Nährwerten für heute ein.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {gerichte.slice(0, 8).map((g) => {
+              const schluessel = `${g.tag}-${g.titel}`;
+              const laeuft = schnellBusy === schluessel;
+              return (
+                <button
+                  key={schluessel}
+                  type="button"
+                  disabled={Boolean(schnellBusy)}
+                  onClick={() => {
+                    void (async () => {
+                      setSchnellBusy(schluessel);
+                      try {
+                        await addFoodEntry({
+                          meal: g.titel,
+                          category: 'lunch',
+                          calories: Number(g.kcal) || 0,
+                          protein: Number(g.protein) || 0,
+                          carbs: 0,
+                          fat: 0,
+                          date,
+                        });
+                        await load();
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : 'Eintragen fehlgeschlagen.');
+                      } finally {
+                        setSchnellBusy(null);
+                      }
+                    })();
+                  }}
+                  className="flex items-center gap-2 rounded-xl border border-[var(--border-muted)] px-3 py-2 text-left transition hover:border-[var(--simple-accent)] disabled:opacity-50"
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--simple-accent-soft)] text-[var(--simple-accent)]">
+                    {laeuft ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[12.5px] font-semibold">{g.titel}</span>
+                    <span className="block text-[11px] text-[var(--text-muted)]">
+                      {g.tag}
+                      {g.kcal ? ` · ${g.kcal} kcal` : ''}
+                      {g.protein ? ` · ${Math.round(g.protein)} g Protein` : ''}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </Card>
+      )}
 
       {/* Verlauf */}
       <div className="grid gap-4 lg:grid-cols-3 lg:items-stretch">

@@ -203,6 +203,42 @@ export async function deleteWorkout(id: string): Promise<void> {
   await api(`/api/workouts/${id}`, { method: 'DELETE' });
 }
 
+/** Mahlzeit direkt eintragen (Schnellerfassung aus dem Mealplanner). */
+export async function addFoodEntry(entry: {
+  meal: string;
+  category: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  date: string;
+}): Promise<void> {
+  await api('/api/nutrition', {
+    method: 'POST',
+    body: JSON.stringify({ ...entry, inputType: 'manual' }),
+  });
+}
+
+/** Gerichte aus dem verbundenen Mealplanner (für die Schnellerfassung). */
+export type MealplanerGericht = {
+  tag: string;
+  titel: string;
+  kcal: number | null;
+  protein: number | null;
+  portionen: number | null;
+};
+
+export async function fetchMealplannerGerichte(): Promise<MealplanerGericht[]> {
+  try {
+    const r = await api<{ anzahl: number; eintraege: MealplanerGericht[] }>(
+      '/api/integrations/mealplanner/week',
+    );
+    return Array.isArray(r.eintraege) ? r.eintraege : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function deleteFood(id: string): Promise<void> {
   await api(`/api/nutrition/${id}`, { method: 'DELETE' });
 }

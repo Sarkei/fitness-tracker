@@ -81,9 +81,15 @@ export default function MealplannerConnect() {
     setFehler(null);
     setErfolg(null);
     try {
+      // Eigene Adresse mitgeben: der Mealplanner meldet Planänderungen sofort hierher.
+      const eigeneAdresse = `${window.location.origin}/api/integrations/mealplanner/webhook`;
       const res = await api<{ householdName: string | null }>('/api/integrations/mealplanner/connect', {
         method: 'POST',
-        body: JSON.stringify({ code: code.trim(), baseUrl: baseUrl.trim() }),
+        body: JSON.stringify({
+          code: code.trim(),
+          baseUrl: baseUrl.trim(),
+          callbackUrl: eigeneAdresse,
+        }),
       });
       setCode('');
       setOffen(false);
@@ -91,6 +97,29 @@ export default function MealplannerConnect() {
       await laden();
     } catch (e) {
       setFehler(e instanceof Error ? e.message : 'Verbindung fehlgeschlagen.');
+    } finally {
+      setArbeitet(false);
+    }
+  };
+
+  /** Echter Sync: fragt den Mealplanner nach dem aktuellen Wochenplan. */
+  const synchronisieren = async () => {
+    setArbeitet(true);
+    setFehler(null);
+    setErfolg(null);
+    try {
+      const r = await api<{ ms: number; anzahl: number; kcalSumme: number }>(
+        '/api/integrations/mealplanner/sync',
+        { method: 'POST' },
+      );
+      setErfolg(
+        r.anzahl > 0
+          ? `${r.anzahl} Mahlzeiten · ${r.kcalSumme} kcal — in ${r.ms} ms abgeglichen.`
+          : 'Abgeglichen — für diese Woche ist nichts geplant.',
+      );
+      await laden();
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : 'Sync fehlgeschlagen.');
     } finally {
       setArbeitet(false);
     }
@@ -138,12 +167,13 @@ export default function MealplannerConnect() {
             <>
               <button
                 type="button"
-                onClick={() => void laden()}
+                onClick={() => void synchronisieren()}
                 disabled={arbeitet}
-                className="rounded-lg p-1.5 text-[var(--text-muted)] transition hover:text-[var(--foreground)]"
-                title="Neu laden"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-muted)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-muted)] transition hover:text-[var(--foreground)]"
+                title="Jetzt mit dem Mealplanner abgleichen"
               >
-                {laedt ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                {arbeitet ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                Sync
               </button>
               <button
                 type="button"
@@ -166,6 +196,13 @@ export default function MealplannerConnect() {
           )}
         </div>
       </div>
+
+      {status?.connected && (
+        <p className="mt-2 text-[10.5px] leading-relaxed text-[var(--text-muted)]">
+          Änderungen an der Woche kommen sofort an — die App meldet jede Planänderung. Der
+          Sync-Knopf ist nur für den manuellen Abgleich nötig.
+        </p>
+      )}
 
       {offen && !status?.connected && (
         <div className="mt-3 space-y-2 border-t border-[var(--border-muted)] pt-3">

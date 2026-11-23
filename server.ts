@@ -5348,7 +5348,14 @@ ${JSON.stringify(userCtx, null, 2)}
       }
 
       // Erst prüfen, dann speichern — ein falscher Code landet nicht in der DB.
-      const pruefung = await fetch(`${baseUrl}/api/connect/${encodeURIComponent(code)}`, {
+      // Die eigene Adresse geht mit: der Mealplanner meldet Planänderungen dorthin.
+      const callbackUrl = String(req.body?.callbackUrl ?? "").trim();
+      const pruefUrl = new URL(`${baseUrl}/api/connect/${encodeURIComponent(code)}`);
+      if (callbackUrl && /^https?:\/\//.test(callbackUrl)) {
+        pruefUrl.searchParams.set("callback", callbackUrl);
+        pruefUrl.searchParams.set("app", "Fitness-Tracker");
+      }
+      const pruefung = await fetch(pruefUrl, {
         headers: { Accept: "application/json" },
         signal: AbortSignal.timeout(15_000),
       });
@@ -5428,6 +5435,129 @@ ${JSON.stringify(userCtx, null, 2)}
       res.json(await antwort.json());
     } catch (err: unknown) {
       res.status(500).json({ error: err instanceof Error ? err.message : "week failed" });
+    }
+  });
+
+  /**
+   * Sofort-Abgleich: der Mealplanner ruft diesen Endpunkt bei jeder Planänderung.
+   *
+   * Öffentlich erreichbar, weil der Mealplanner kein Fitness-Tracker-Token hat.
+   * Missbrauch ist begrenzt: die Antwort enthält keine Daten, es wird nur der
+   * Wochenplan des betroffenen Codes neu geholt und zwischengespeichert.
+   */
+  app.post("/api/integrations/mealplanner/webhook", async (req, res) => {
+    try {
+      const code = String((req.body as { code?: string })?.code ?? "").trim();
+      if (!code) {
+        res.status(400).json({ error: "Code fehlt." });
+        return;
+      }
+      const r = await pool.query(
+        `SELECT id, profile_extras FROM users
+          WHERE profile_extras->'mealplanner'->>'code' = $1 LIMIT 1`,
+        [code],
+      );
+      if (!r.rows.length) {
+        res.json({ ok: true, matched: false });
+        return;
+      }
+      const userId = Number(r.rows[0].id);
+      const mp = ((r.rows[0].profile_extras || {}) as Record<string, unknown>).mealplanner as {
+        baseUrl?: string;
+        code?: string;
+      };
+      if (mp?.baseUrl && mp?.code) {
+        // Wochenplan vorwärmen: der nächste Aufruf in der App ist damit sofort da.
+        try {
+          const antwort = await fetch(
+            `${mp.baseUrl}/api/connect/${encodeURIComponent(mp.code)}/week`,
+            { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(15_000) },
+          );
+          if (antwort.ok) {
+            const daten = (await antwort.json()) as unknown;
+            await pool.query(
+              `UPDATE users SET profile_extras = jsonb_set(
+                 COALESCE(profile_extras,'{}'::jsonb), '{mealplanner,cache}', $2::jsonb, true
+               ), updated_at = NOW() WHERE id = $1`,
+              [userId, JSON.stringify({ at: new Date().toISOString(), daten })],
+            );
+          }
+        } catch {
+          /* Vorwärmen ist optional. */
+        }
+      }
+      res.json({ ok: true, matched: true });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "webhook failed" });
+    }
+  });
+
+  /**
+   * Echter Sync: prüft die Verbindung nach und liefert den aktuellen Wochenplan.
+   * Wird vom „Synchronisieren"-Knopf im Profil aufgerufen.
+   */
+  app.post("/api/integrations/mealplanner/sync", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const r = await pool.query("SELECT profile_extras FROM users WHERE id=$1", [req.userId]);
+      const extras = (r.rows[0]?.profile_extras || {}) as Record<string, unknown>;
+      const mp = (extras.mealplanner || {}) as { baseUrl?: string; code?: string };
+      if (!mp.code || !mp.baseUrl) {
+        res.status(400).json({ error: "Mealplanner ist nicht verbunden." });
+        return;
+      }
+      const t0 = Date.now();
+      const antwort = await fetch(
+        `${mp.baseUrl}/api/connect/${encodeURIComponent(mp.code)}/week`,
+        { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(20_000) },
+      );
+      if (!antwort.ok) {
+        const meldung =
+          antwort.status === 404
+            ? "Der Kopplungscode ist ungültig oder wurde im Mealplanner widerrufen."
+            : `Mealplanner antwortete mit ${antwort.status}.`;
+        // Fehler am Profil festhalten, damit die Karte ihn zeigen kann.
+        await pool.query(
+          `UPDATE users SET profile_extras = jsonb_set(
+             COALESCE(profile_extras,'{}'::jsonb), '{mealplanner,lastError}', to_jsonb($2::text), true
+           ) WHERE id=$1`,
+          [req.userId, meldung],
+        );
+        res.status(400).json({ error: meldung });
+        return;
+      }
+      const daten = (await antwort.json()) as {
+        woche?: string;
+        anzahl?: number;
+        kcalSumme?: number;
+      };
+      await pool.query(
+        `UPDATE users
+            SET profile_extras = jsonb_set(
+                  jsonb_set(
+                    COALESCE(profile_extras,'{}'::jsonb),
+                    '{mealplanner,lastSync}', to_jsonb($2::text), true
+                  ),
+                  '{mealplanner,lastError}', 'null'::jsonb, true
+                ),
+                updated_at = NOW()
+          WHERE id=$1`,
+        [req.userId, new Date().toISOString()],
+      );
+      res.json({
+        ok: true,
+        ms: Date.now() - t0,
+        woche: daten.woche ?? null,
+        anzahl: daten.anzahl ?? 0,
+        kcalSumme: daten.kcalSumme ?? 0,
+      });
+    } catch (err: unknown) {
+      const meldung =
+        err instanceof Error && err.name === "TimeoutError"
+          ? "Der Mealplanner hat nicht rechtzeitig geantwortet."
+          : err instanceof Error
+            ? err.message
+            : "Sync fehlgeschlagen.";
+      res.status(500).json({ error: meldung });
     }
   });
 
