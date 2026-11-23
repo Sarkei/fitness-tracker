@@ -156,10 +156,15 @@ export default function WellnessSchlaf() {
                   title={`${tagNr}.${monat}. · ${schlafStunden(t.sleepSecs)?.toFixed(1)} h · Score ${
                     t.sleepScore != null ? Math.round(t.sleepScore) : '—'
                   }`}
-                  className={`flex h-9 w-9 flex-col items-center justify-center rounded-md border text-[9.5px] font-semibold leading-none transition hover:opacity-80 ${f.bg} ${f.text} ${f.rand}`}
+                  className="flex flex-col items-center gap-1 transition hover:opacity-80"
                 >
-                  <span>{tagNr}</span>
-                  <span className="mt-0.5 text-[9px] tabular-nums">
+                  {/* Datum ausserhalb der Box — sonst stehen zwei nackte Zahlen uebereinander. */}
+                  <span className="text-[9px] tabular-nums text-[var(--text-muted)]">
+                    {tagNr}.{monat}.
+                  </span>
+                  <span
+                    className={`flex h-8 w-11 items-center justify-center rounded-md border text-[12px] font-semibold tabular-nums ${f.bg} ${f.text} ${f.rand}`}
+                  >
                     {t.sleepScore != null ? Math.round(t.sleepScore) : '—'}
                   </span>
                 </button>
