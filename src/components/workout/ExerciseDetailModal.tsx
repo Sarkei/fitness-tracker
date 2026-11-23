@@ -220,6 +220,33 @@ export default function ExerciseDetailModal({
                 </div>
               )}
 
+              {(ex as { commonMistakes?: string[] }).commonMistakes?.length ? (
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)] mb-2">
+                    Häufige Fehler
+                  </p>
+                  <ul className="space-y-1.5 text-sm text-[var(--text-primary)]">
+                    {((ex as { commonMistakes?: string[] }).commonMistakes ?? []).map((fehler, i) => (
+                      <li key={i} className="flex gap-2">
+                        <span className="shrink-0 text-orange-500">×</span>
+                        <span>{fehler}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {(ex as { breathing?: string }).breathing ? (
+                <div className="rounded-xl border border-[var(--border-muted)] bg-[var(--background)] p-3">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)] mb-1">
+                    Atmung
+                  </p>
+                  <p className="text-sm leading-relaxed text-[var(--text-primary)]">
+                    {(ex as { breathing?: string }).breathing}
+                  </p>
+                </div>
+              ) : null}
+
               {ex.variations && ex.variations.length > 0 && (
                 <div>
                   <p className="text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)] mb-2">
