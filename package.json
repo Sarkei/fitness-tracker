@@ -21,7 +21,7 @@
     "test:coach-dashboard": "tsx scripts/coach-dashboard-selftest.ts",
     "test:coach-flow": "tsx scripts/coach-flow-selftest.ts",
     "test:coach-ops": "tsx scripts/coach-ops-evaluate-selftest.ts",
-    "test:coach:all": "npm run test:coach-engine && npm run test:coach-match && npm run test:coach-nutrition-pp && npm run test:coach-dashboard && npm run test:coach-flow && npm run test:coach-ops",
+    "test:coach:all": "npm run test:coach-engine && npm run test:coach-match && npm run test:coach-nutrition-pp && npm run test:coach-dashboard && npm run test:coach-flow && npm run test:coach-ops && npm run test:coach-strength-repair",
     "test:meal-portion": "tsx scripts/meal-portion-selftest.ts",
     "test:exercise-resolve": "tsx scripts/exercise-resolve-selftest.ts",
     "test:coach-warmup": "tsx scripts/coach-warmup-selftest.ts",
@@ -59,7 +59,8 @@
     "ci:coach": "npm run test:coach:all && npm run test:e2e:coach",
     "test:analytics": "tsx scripts/analytics-selftest.ts",
     "test:chat-format": "tsx scripts/chat-format-selftest.ts",
-    "test:intervals": "tsx scripts/intervals-selftest.ts"
+    "test:intervals": "tsx scripts/intervals-selftest.ts",
+    "test:coach-strength-repair": "tsx scripts/coach-strength-repair-selftest.ts"
   },
   "dependencies": {
     "@google/genai": "^1.51.0",

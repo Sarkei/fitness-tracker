@@ -9,6 +9,7 @@ import { alignScheduleToCustomAssignments } from './coachCustomScheduleAlign';
 import {
   repairUnknownExerciseKeys,
   repairWorkoutScheduleConstraints,
+  repairStrengthExerciseCount,
   validateWorkoutConstraints,
   type WorkoutConstraintInput,
 } from './coachConstraints';
@@ -179,6 +180,8 @@ export async function generateCoachWorkoutWeekWithPipeline(args: {
     let week = z.data;
     week = repairUnknownExerciseKeys(week);
     week = repairWorkoutScheduleConstraints(week, args.constraints);
+    // Kraft-Einheiten mit zu wenigen Hauptübungen auffüllen, statt die Antwort zu verwerfen.
+    week = repairStrengthExerciseCount(week, args.constraints);
     if (args.constraints.sessionAssignments?.length) {
       week = alignScheduleToCustomAssignments(week, args.constraints.sessionAssignments);
     }

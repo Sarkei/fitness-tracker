@@ -225,6 +225,134 @@ function minMainExercisesForDuration(min: number): number {
   return m ? parseInt(m[1], 10) : 4;
 }
 
+/**
+ * Mindestzahl Hauptübungen einer Kraft-Einheit.
+ * Eine Quelle für Prüfung UND Repair, damit beide nicht auseinanderlaufen.
+ */
+function requiredMainExercises(durationMin: number, input: WorkoutConstraintInput): number {
+  const minExBase = minMainExercisesForDuration(durationMin);
+  if (input.weekNumber === 1) return Math.max(2, Math.min(minExBase, 4));
+  if (input.strengthDiscoveryWeek) return Math.max(3, Math.min(minExBase, 4));
+  return minExBase;
+}
+
+type ExercisePattern = 'squat' | 'hinge' | 'push' | 'pull' | 'core';
+
+const PATTERN_TESTS: Array<{ pattern: ExercisePattern; re: RegExp }> = [
+  { pattern: 'squat', re: /squat|lunge|leg press|step.?up|split squat/i },
+  { pattern: 'hinge', re: /deadlift|rdl|romanian|hinge|glute bridge|good morning|hip thrust/i },
+  { pattern: 'push', re: /bench|press(?!.*leg)|push.?up|dip\b|fly\b|flye/i },
+  { pattern: 'pull', re: /row\b|pull.?up|chin.?up|pulldown|pull-apart|face pull|pull.?through/i },
+  { pattern: 'core', re: /plank|crunch|dead bug|hollow|ab wheel|knee raise/i },
+];
+
+function exercisePattern(name: string): ExercisePattern | null {
+  for (const t of PATTERN_TESTS) {
+    if (t.re.test(name)) return t.pattern;
+  }
+  return null;
+}
+
+/**
+ * Ergänzungs-Pool, wenn die KI zu wenige Hauptübungen liefert.
+ * Bewusst nur Körpergewicht/Band-taugliche Grundübungen — ob eine Übung wirklich
+ * erlaubt ist, entscheiden danach `exerciseBlockedByEquipment` und die Verletzungs-Chips.
+ */
+const STRENGTH_FILLER_POOL: Array<{ name: string; pattern: ExercisePattern }> = [
+  { name: 'Bodyweight Squat', pattern: 'squat' },
+  { name: 'Walking Lunge', pattern: 'squat' },
+  { name: 'Glute Bridge', pattern: 'hinge' },
+  { name: 'Dumbbell Romanian Deadlift', pattern: 'hinge' },
+  { name: 'Push-Up', pattern: 'push' },
+  { name: 'Incline Push-Up', pattern: 'push' },
+  { name: 'Dumbbell Bench Press', pattern: 'push' },
+  { name: 'Inverted Row', pattern: 'pull' },
+  { name: 'Dumbbell Row', pattern: 'pull' },
+  { name: 'Band Pull-Apart', pattern: 'pull' },
+  { name: 'Plank', pattern: 'core' },
+  { name: 'Dead Bug', pattern: 'core' },
+  { name: 'Side Plank', pattern: 'core' },
+];
+
+/**
+ * Kraft-Einheiten mit zu wenigen Hauptübungen deterministisch auffüllen.
+ *
+ * Warum: das Modell liefert bei 60 Minuten regelmäßig 3 statt 4 Übungen. Bisher hat
+ * die Prüfung das dreimal abgelehnt und die Generierung fiel komplett aus — der Plan
+ * blieb leer. Ergänzen ist hier die richtige Antwort, nicht Ablehnen: die Einheit ist
+ * mit einer weiteren Grundübung fachlich sauber, und der Nutzer bekommt seinen Plan.
+ */
+export function repairStrengthExerciseCount(
+  week: CoachWorkoutWeek,
+  input: WorkoutConstraintInput,
+): CoachWorkoutWeek {
+  const equipment = effectiveCoachEquipmentIds(input.equipmentIds);
+  const inj = String(input.injuriesPlain || '');
+  const activeInjuries = COACH_INJURY_IDS.filter((id) => injuryActive(inj, id));
+  let added = 0;
+
+  const isAllowedFill = (name: string): boolean => {
+    if (exerciseBlockedByEquipment(name, '', equipment)) return false;
+    for (const id of activeInjuries) {
+      if (INJURY_BLOCKED_PATTERNS[id].test(name)) return false;
+    }
+    return true;
+  };
+
+  const schedule = week.schedule.map((raw) => {
+    if (raw.isRest === true) return raw;
+    if (String(raw.sessionType || '') !== 'Strength') return raw;
+
+    const expectedDur = expectedDurationForRow(raw, input.sessionAssignments);
+    if (expectedDur == null || expectedDur < 45) return raw;
+
+    const exercises = Array.isArray(raw.exercises) ? [...raw.exercises] : [];
+    const minEx = requiredMainExercises(expectedDur, input);
+    if (exercises.length >= minEx) return raw;
+
+    const vorhandene = new Set(
+      exercises.map((e) => String((e as Record<string, unknown>).name || '').trim().toLowerCase()),
+    );
+    const vorhandenePatterns = new Set(
+      exercises.map((e) => exercisePattern(String((e as Record<string, unknown>).name || ''))),
+    );
+
+    // Erst Muster abdecken, die in der Einheit fehlen; danach beliebig auffüllen.
+    const kandidaten = [...STRENGTH_FILLER_POOL].sort((a, b) => {
+      const missA = vorhandenePatterns.has(a.pattern) ? 1 : 0;
+      const missB = vorhandenePatterns.has(b.pattern) ? 1 : 0;
+      return missA - missB;
+    });
+
+    for (const k of kandidaten) {
+      if (exercises.length >= minEx) break;
+      if (vorhandene.has(k.name.toLowerCase())) continue;
+      if (!isAllowedFill(k.name)) continue;
+      exercises.push({
+        name: k.name,
+        sets: 3,
+        reps: '8-12',
+        rest: '90s',
+        notes: 'Ergänzt, damit die Einheit zur geplanten Dauer passt.',
+      } as NonNullable<CoachWorkoutWeek['schedule'][number]['exercises']>[number]);
+      vorhandene.add(k.name.toLowerCase());
+      vorhandenePatterns.add(k.pattern);
+      added += 1;
+    }
+
+    return { ...raw, exercises };
+  });
+
+  if (!added) return week;
+  const ac = [...(week.applied_constraints || [])];
+  ac.push(`repaired:added_strength_exercises=${added}`);
+  return {
+    ...week,
+    schedule: schedule as CoachWorkoutWeek['schedule'],
+    applied_constraints: ac.slice(0, 8),
+  };
+}
+
 function expectedDurationForRow(
   d: CoachWorkoutWeek['schedule'][number],
   assignments: SessionAssignment[] | undefined,
@@ -378,13 +506,7 @@ export function validateWorkoutConstraints(
     if (!rest && String(d.sessionType || '') === 'Strength') {
       const expectedDur = expectedDurationForRow(d, input.sessionAssignments);
       if (expectedDur != null && expectedDur >= 45) {
-        const minExBase = minMainExercisesForDuration(expectedDur);
-        const minEx =
-          input.weekNumber === 1
-            ? Math.max(2, Math.min(minExBase, 4))
-            : input.strengthDiscoveryWeek
-              ? Math.max(3, Math.min(minExBase, 4))
-              : minExBase;
+        const minEx = requiredMainExercises(expectedDur, input);
         if (ex.length < minEx) {
           violations.push({
             code: 'strength_exercise_count_low',
