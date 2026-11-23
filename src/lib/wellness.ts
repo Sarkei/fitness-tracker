@@ -143,3 +143,32 @@ export function juengsterTag(tage: WellnessTag[]): string | null {
   return tage.length ? tage[tage.length - 1].date : null;
 }
 
+/**
+ * Farbstufe einer Schlafbewertung: 3 = sehr gut (grün), 2 = gut, 1 = mäßig,
+ * 0 = schlecht (rot), -1 = keine Daten. Damit lassen sich Tagesboxen einfärben,
+ * ohne die Grenzen an mehreren Stellen zu pflegen.
+ */
+export function schlafStufe(score?: number | null): -1 | 0 | 1 | 2 | 3 {
+  if (score == null || !Number.isFinite(score)) return -1;
+  if (score >= 80) return 3;
+  if (score >= 60) return 2;
+  if (score >= 40) return 1;
+  return 0;
+}
+
+/** Tailwind-Klassen für eine Schlafstufe (Hintergrund + Text). */
+export function schlafFarben(stufe: -1 | 0 | 1 | 2 | 3): { bg: string; text: string; rand: string } {
+  switch (stufe) {
+    case 3:
+      return { bg: 'bg-[#15803d]/15', text: 'text-[#15803d]', rand: 'border-[#15803d]/40' };
+    case 2:
+      return { bg: 'bg-[#4d9f6b]/15', text: 'text-[#2f7d5a]', rand: 'border-[#4d9f6b]/40' };
+    case 1:
+      return { bg: 'bg-[#d98a2b]/15', text: 'text-[#a16207]', rand: 'border-[#d98a2b]/40' };
+    case 0:
+      return { bg: 'bg-[#dc5a4a]/15', text: 'text-[#b4453a]', rand: 'border-[#dc5a4a]/40' };
+    default:
+      return { bg: 'bg-[var(--border-muted)]/30', text: 'text-[var(--text-muted)]', rand: 'border-[var(--border-muted)]' };
+  }
+}
+

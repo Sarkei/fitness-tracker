@@ -8,7 +8,7 @@ import { Card, Sparkline } from '@/src/simple/ui';
 import { WellnessToolbar, useWellness } from './WellnessProvider';
 import { KennzahlSheet, KlickKachel } from './KennzahlSheet';
 import { Tagesdetail, TagesZeile } from './Tagesdetail';
-import { mittel, schlafBewertung, schlafStunden } from '@/src/lib/wellness';
+import { mittel, schlafBewertung, schlafFarben, schlafStufe, schlafStunden } from '@/src/lib/wellness';
 
 export default function WellnessSchlaf() {
   const { daten } = useWellness();
@@ -124,11 +124,56 @@ export default function WellnessSchlaf() {
         />
       )}
 
+      {/* Auf einen Blick: jede Nacht als farbige Box, grün = gut, rot = schlecht */}
+      <Card className="p-5">
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+            Letzte Nächte
+          </p>
+          <div className="flex items-center gap-2 text-[9px] text-[var(--text-muted)]">
+            {[3, 2, 1, 0].map((stufe) => {
+              const f = schlafFarben(stufe as 0 | 1 | 2 | 3);
+              return (
+                <span key={stufe} className={`inline-block h-2.5 w-2.5 rounded-sm ${f.bg} border ${f.rand}`} />
+              );
+            })}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {[...tage]
+            .reverse()
+            .filter((t) => schlafStunden(t.sleepSecs) != null)
+            .slice(0, 28)
+            .map((t) => {
+              const stufe = schlafStufe(t.sleepScore);
+              const f = schlafFarben(stufe);
+              const [, monat, tagNr] = t.date.split('-');
+              return (
+                <button
+                  key={t.date}
+                  type="button"
+                  onClick={() => setTagOffen(t.date)}
+                  title={`${tagNr}.${monat}. · ${schlafStunden(t.sleepSecs)?.toFixed(1)} h · Score ${
+                    t.sleepScore != null ? Math.round(t.sleepScore) : '—'
+                  }`}
+                  className={`flex h-9 w-9 flex-col items-center justify-center rounded-md border text-[9.5px] font-semibold leading-none transition hover:opacity-80 ${f.bg} ${f.text} ${f.rand}`}
+                >
+                  <span>{tagNr}</span>
+                  <span className="mt-0.5 text-[9px] tabular-nums">
+                    {t.sleepScore != null ? Math.round(t.sleepScore) : '—'}
+                  </span>
+                </button>
+              );
+            })}
+        </div>
+      </Card>
+
       <Card className="p-5">
         <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
           Nacht für Nacht
         </p>
-        <div className="max-h-80 overflow-y-auto">
+        {/* Scrollbar unsichtbar: sie lag über der rechten Spalte (Bewertung). */}
+        <div className="max-h-80 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <table className="w-full text-[12px]">
             <thead className="sticky top-0 bg-[var(--card-bg)] text-[10px] uppercase tracking-[0.1em] text-[var(--text-muted)]">
               <tr>
@@ -149,8 +194,18 @@ export default function WellnessSchlaf() {
                     <td className="py-1.5 text-right tabular-nums">
                       {t.sleepScore != null ? Math.round(t.sleepScore) : '—'}
                     </td>
-                    <td className="py-1.5 text-right text-[11px] text-[var(--text-muted)]">
-                      {schlafBewertung(t.sleepScore)}
+                    <td className="py-1.5 text-right">
+                      {(() => {
+                        const stufe = schlafStufe(t.sleepScore);
+                        const f = schlafFarben(stufe);
+                        return (
+                          <span
+                            className={`inline-block rounded-md border px-2 py-0.5 text-[10.5px] font-semibold capitalize ${f.bg} ${f.text} ${f.rand}`}
+                          >
+                            {schlafBewertung(t.sleepScore)}
+                          </span>
+                        );
+                      })()}
                     </td>
                   </TagesZeile>
                 );
