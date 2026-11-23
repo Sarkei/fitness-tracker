@@ -238,9 +238,18 @@ export async function sendeAnAbos(
 
   for (const abo of abos) {
     try {
+      /*
+       * `icon` und `badge` mitgeben.
+       *
+       * `badge` ist die einfarbige Silhouette in der Statusleiste. Ohne sie
+       * nimmt Android das App-Icon und schrumpft es zu einem weißen Quadrat.
+       * `icon` ist das große Bild in der ausgeklappten Benachrichtigung.
+       */
       const payload = JSON.stringify({
         title: nachricht.titel,
         body: nachricht.text,
+        icon: '/icon-192.png',
+        badge: '/badge-96.png',
         ...(nachricht.url ? { url: nachricht.url } : {}),
         ...(nachricht.tag ? { tag: nachricht.tag } : {}),
       });
@@ -257,7 +266,8 @@ export async function sendeAnAbos(
           Urgency: 'high',
           Authorization: `vapid t=${jwt}, k=${k.publicKey}`,
         },
-        body,
+        // Als Uint8Array, damit der Typ zu fetch passt (Buffer ist zu eng typisiert).
+        body: new Uint8Array(body),
         signal: AbortSignal.timeout(12_000),
       });
 
@@ -365,4 +375,71 @@ function vapidJwt(endpunkt: string, k: { privateKey: string; subject: string }):
   const priv = createPrivateKey({ key: b64u(k.privateKey), format: 'der', type: 'pkcs8' });
   const sig = sign('sha256', daten, { key: priv, dsaEncoding: 'ieee-p1363' });
   return `${kopf}.${nutz}.${zuB64u(sig)}`;
+}
+
+/* --------------------------------------------- Versand an einen Nutzer */
+
+/**
+ * Nachricht an alle Geräte eines Nutzers — für Ereignisse ausserhalb der
+ * Endpunkte (Tor gefallen, Wochenplan fertig, Fahrt eingetragen …).
+ *
+ * Holt die Abos selbst aus der Datenbank, damit jede App nur eine Zeile
+ * braucht: `sendePushAnNutzer(pool, nutzerId, { titel, text, url })`.
+ *
+ * **Ruhezeit:** Zwischen 22 und 8 Uhr werden normale Nachrichten verworfen.
+ * Spielereignisse (`dringend: true`) gehen immer durch — ein Tor um 21:45 will
+ * man sehen, eine Einkaufserinnerung um 3 Uhr nicht.
+ *
+ * Fehler werden geschluckt: Ein fehlgeschlagener Push darf nie einen
+ * Spielstand, einen Plan oder eine Buchung blockieren.
+ */
+export async function sendePushAnNutzer(
+  pool: Pool,
+  nutzerId: number | string | null,
+  nachricht: { titel: string; text: string; url?: string; tag?: string; dringend?: boolean },
+): Promise<boolean> {
+  if (nutzerId == null) return false;
+
+  // Ruhezeit prüfen (deutsche Zeit, nicht UTC)
+  if (!nachricht.dringend) {
+    const stunde = Number(
+      new Intl.DateTimeFormat('de-DE', { hour: 'numeric', hour12: false, timeZone: 'Europe/Berlin' }).format(new Date()),
+    );
+    if (stunde >= 22 || stunde < 8) return false;
+  }
+
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS push_abos (
+        id BIGSERIAL PRIMARY KEY,
+        nutzer_id TEXT NOT NULL,
+        endpunkt TEXT NOT NULL,
+        p256dh TEXT NOT NULL,
+        auth TEXT NOT NULL,
+        geraet TEXT,
+        angelegt_am TIMESTAMPTZ NOT NULL DEFAULT now(),
+        letzter_fehler TEXT,
+        UNIQUE (nutzer_id, endpunkt)
+      )
+    `);
+
+    const r = await pool.query(
+      'SELECT id, endpunkt, p256dh, auth FROM push_abos WHERE nutzer_id = $1',
+      [String(nutzerId)],
+    );
+    if (!r.rowCount) return false;
+
+    const abos: Abo[] = r.rows.map((x) => ({
+      id: Number(x.id),
+      endpunkt: String(x.endpunkt),
+      p256dh: String(x.p256dh),
+      auth: String(x.auth),
+    }));
+
+    const ergebnis = await sendeAnAbos(pool, abos, nachricht);
+    return ergebnis.gesendet > 0;
+  } catch (e) {
+    console.error('[push] Versand an Nutzer fehlgeschlagen:', e);
+    return false;
+  }
 }

@@ -195,7 +195,7 @@ import {
 } from "./src/lib/server/migrateUserData";
 import type { BatchMigrationResult } from "./src/lib/server/migrateUserData";
 import { pushoverRouter } from "./src/lib/server/pushover-route.ts";
-import { pushRouter } from "./server/push-route";
+import { pushRouter, sendePushAnNutzer } from "./server/push-route";
 const { Pool } = pg;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -7114,6 +7114,107 @@ ${JSON.stringify(userCtx, null, 2)}
   hintergrundTimer.unref?.();
   // Einmal kurz nach dem Start, damit nach einem Neustart nichts alt bleibt.
   setTimeout(() => void hintergrundTick(), 20_000).unref?.();
+
+  /**
+   * Tägliche Erinnerung an eine offene Trainingseinheit.
+   *
+   * Läuft einmal pro Tag gegen 18 Uhr: Wer eine geplante Einheit heute noch
+   * nicht absolviert hat, bekommt einen Hinweis. Kein Spam — pro Nutzer und Tag
+   * höchstens eine Nachricht, gemerkt in `push_erinnert`.
+   *
+   * Der Hinweis kommt nur, wenn heute laut Plan überhaupt etwas vorgesehen ist
+   * und weder eine eigene Einheit noch eine Garmin-Aktivität vorliegt.
+   */
+  let erinnerungLaeuft = false;
+  const erinnerungTick = async () => {
+    if (erinnerungLaeuft) return;
+    const jetzt = new Date();
+    // Nur zwischen 18 und 19 Uhr (deutsche Zeit)
+    const stunde = Number(
+      new Intl.DateTimeFormat("de-DE", { hour: "numeric", hour12: false, timeZone: "Europe/Berlin" }).format(jetzt),
+    );
+    if (stunde !== 18) return;
+
+    erinnerungLaeuft = true;
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS push_erinnert (
+          user_id INTEGER NOT NULL,
+          tag DATE NOT NULL,
+          art TEXT NOT NULL,
+          PRIMARY KEY (user_id, tag, art)
+        )
+      `);
+
+      const heute = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" });
+      const wochentag = new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "Europe/Berlin" }).format(jetzt);
+
+      /*
+       * Kandidaten: Nutzer mit aktivem Plan, deren heutiger Plantag keine Ruhetag
+       * ist, und die heute noch nichts absolviert haben.
+       */
+      const kandidaten = await pool.query<{ user_id: number; plan_id: string }>(
+        `SELECT DISTINCT p.user_id, p.id AS plan_id
+           FROM coach_plans p
+          WHERE p.status = 'active'`,
+      );
+
+      for (const k of kandidaten.rows) {
+        try {
+          // Heute schon trainiert?
+          const eigene = await pool.query(
+            "SELECT 1 FROM workouts WHERE user_id = $1 AND date = $2 LIMIT 1",
+            [k.user_id, heute],
+          );
+          const garmin = await pool.query(
+            "SELECT 1 FROM garmin_activities WHERE user_id = $1 AND date = $2 LIMIT 1",
+            [k.user_id, heute],
+          );
+          if (eigene.rowCount || garmin.rowCount) continue;
+
+          // Ist heute etwas geplant?
+          const woche = await pool.query<{ schedule: unknown }>(
+            `SELECT schedule FROM coach_plan_weeks
+              WHERE plan_id = $1 AND start_date <= $2 AND start_date + INTERVAL '6 days' >= $2
+              LIMIT 1`,
+            [k.plan_id, heute],
+          );
+          if (!woche.rowCount) continue;
+          const schedule = (woche.rows[0].schedule as { schedule?: Array<{ day: string; isRest?: boolean }> })?.schedule ?? [];
+          const tagPlan = schedule.find((d) => d.day === wochentag);
+          if (!tagPlan || tagPlan.isRest) continue;
+
+          // Heute schon erinnert?
+          const schon = await pool.query(
+            "SELECT 1 FROM push_erinnert WHERE user_id = $1 AND tag = $2 AND art = 'training'",
+            [k.user_id, heute],
+          );
+          if (schon.rowCount) continue;
+
+          await sendePushAnNutzer(pool, k.user_id, {
+            titel: "Training steht noch aus",
+            text: "Für heute ist eine Einheit geplant. Noch ist Zeit.",
+            url: "https://fitness.nas-timgreen.com/",
+            tag: "training-erinnerung",
+          });
+
+          await pool.query(
+            "INSERT INTO push_erinnert (user_id, tag, art) VALUES ($1,$2,'training') ON CONFLICT DO NOTHING",
+            [k.user_id, heute],
+          );
+        } catch {
+          /* ein Nutzer darf den Lauf nicht abbrechen */
+        }
+      }
+    } catch {
+      /* Tabelle fehlt oder Query-Fehler — beim nächsten Takt erneut */
+    } finally {
+      erinnerungLaeuft = false;
+    }
+  };
+
+  const erinnerungTimer = setInterval(() => void erinnerungTick(), 15 * 60_000);
+  erinnerungTimer.unref?.();
 
   /**
    * Fuehrt die eigenen Zeitplaene des Coaches aus.
