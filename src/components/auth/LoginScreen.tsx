@@ -146,12 +146,12 @@ export default function LoginScreen() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-[var(--background)] text-[var(--text-primary)] flex flex-col items-center justify-center p-4 font-sans selection:bg-brand selection:text-white transition-colors duration-300">
+    <div className="auth-seite bg-[var(--background)] text-[var(--text-primary)] font-sans selection:bg-brand selection:text-white transition-colors duration-300">
       <div className="w-full max-w-sm bg-[var(--card-bg)] p-8 rounded-2xl border border-[var(--border-muted)] shadow-sm">
         <div className="flex justify-between items-start gap-3 mb-6">
           <div className="flex justify-center flex-1 min-w-0">
             <h1 className="text-4xl font-black tracking-tighter uppercase italic text-[var(--text-primary)]">
-              VRTX<span className="text-brand">.</span>
+              Fitness<span className="text-brand">.</span>
             </h1>
           </div>
           <div className="flex flex-col items-end gap-2 shrink-0">

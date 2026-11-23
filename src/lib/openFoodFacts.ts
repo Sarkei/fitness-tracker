@@ -7,7 +7,7 @@ import type { Food, NutrientLevelGrade, OffNutritionGrades, Serving } from './fo
 
 /** OFF verlangt einen aussagekräftigen User-Agent (App + Kontakt), kein API-Key. */
 export const OFF_USER_AGENT =
-  'VRTX-FitnessTracker/1.0 (nutrition; contact: reuse@openfoodfacts.org)';
+  'FitnessTracker/1.0 (nutrition; contact: reuse@openfoodfacts.org)';
 
 /**
  * search-a-licious liefert bei Umlauten (z. B. „Hähnchen“) oft Müll-Treffer (Einzelbuchstabe „h“).

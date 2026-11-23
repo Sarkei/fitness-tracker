@@ -253,7 +253,7 @@ export default function Navbar() {
         <div className="p-8 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
             <h1 className="text-3xl font-black tracking-tighter uppercase italic">
-              VRTX<span className="text-brand">.</span>
+              Fitness<span className="text-brand">.</span>
             </h1>
           </Link>
           <button

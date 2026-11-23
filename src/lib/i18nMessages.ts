@@ -7,7 +7,7 @@ export const MESSAGES: Record<string, { de: string; en: string }> = {
   'auth.welcomeBack': { de: 'Willkommen zurück', en: 'Welcome back' },
   'auth.createAccount': { de: 'Konto erstellen', en: 'Create account' },
   'auth.signInSubtitle': { de: 'Melde dich an, um fortzufahren', en: 'Sign in to continue' },
-  'auth.registerSubtitle': { de: 'Starte heute mit VRTX.', en: 'Join VRTX. today' },
+  'auth.registerSubtitle': { de: 'Starte heute mit deinem Fitness-Tracker.', en: 'Get started with your fitness tracker.' },
   'auth.signIn': { de: 'Anmelden', en: 'Sign in' },
   'auth.register': { de: 'Registrieren', en: 'Register' },
   'auth.name': { de: 'Name', en: 'Name' },
@@ -107,7 +107,7 @@ export const MESSAGES: Record<string, { de: string; en: string }> = {
   'nav.primary': { de: 'Hauptnavigation', en: 'Main navigation' },
   'nav.openMenu': { de: 'Menü öffnen', en: 'Open menu' },
   'nav.closeMenu': { de: 'Menü schließen', en: 'Close menu' },
-  'app.name': { de: 'VRTX', en: 'VRTX' },
+  'app.name': { de: 'Fitness', en: 'Fitness' },
   'app.footer': {
     de: 'Training und Ernährung an einem Ort.',
     en: 'Training and nutrition in one place.',
@@ -514,8 +514,8 @@ export const MESSAGES: Record<string, { de: string; en: string }> = {
   'profile.userReport.loading': { de: 'Wochenbericht wird vorbereitet…', en: 'Preparing weekly report…' },
   'profile.userReport.emptyTitle': { de: 'Noch kein Wochenbericht', en: 'No weekly report yet' },
   'profile.userReport.emptyBody': {
-    de: 'Sobald eine Kalenderwoche abgeschlossen ist, erstellt VRTX automatisch deinen persönlichen und Leistungsbericht — unabhängig von Coach-Plänen.',
-    en: 'Once a calendar week is complete, VRTX automatically creates your personal and performance report — regardless of coach plans.',
+    de: 'Sobald eine Kalenderwoche abgeschlossen ist, erstellt die App automatisch deinen persönlichen und Leistungsbericht — unabhängig von Coach-Plänen.',
+    en: 'Once a calendar week is complete, the app automatically creates your personal and performance report — regardless of coach plans.',
   },
   'profile.userReport.checkNow': { de: 'Jetzt prüfen', en: 'Check now' },
   'profile.userReport.historyTitle': { de: 'Deine Wochenberichte', en: 'Your weekly reports' },
@@ -2906,7 +2906,7 @@ export const MESSAGES: Record<string, { de: string; en: string }> = {
   },
   'coach.onb.review.missing': { de: '—', en: '—' },
 
-  'admin.title': { de: 'VRTX Admin', en: 'VRTX admin' },
+  'admin.title': { de: 'Admin', en: 'Admin' },
   'admin.controlPanel': { de: 'Kontrollzentrum', en: 'Control panel' },
   'admin.login.username': { de: 'Benutzername', en: 'Username' },
   'admin.login.password': { de: 'Passwort', en: 'Password' },

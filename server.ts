@@ -1,4 +1,5 @@
 import "./envBootstrap.ts";
+import { readFileSync } from "node:fs";
 import express, { Request, Response, NextFunction } from "express";
 import {
   resolveAiCapabilities,
@@ -193,6 +194,7 @@ import {
   runBatchDataMigrationForAllUsers,
 } from "./src/lib/server/migrateUserData";
 import type { BatchMigrationResult } from "./src/lib/server/migrateUserData";
+import { pushoverRouter } from "./src/lib/server/pushover-route.ts";
 const { Pool } = pg;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -951,6 +953,19 @@ function createAdminMigrationJob(force: boolean): AdminMigrationJob {
 async function startServer(): Promise<void> {
   const app = express();
   app.use(express.json({ limit: "10mb" }));
+
+  /*
+   * Pushover: Zugang hinterlegen, testen, trennen.
+   * Die Werte bleiben serverseitig — GET liefert nur „verbunden".
+   */
+  app.use(
+    "/api/integrations/pushover",
+    requireAuth,
+    pushoverRouter(pool as never, (req: Request) => (req as AuthRequest).userId ?? null, {
+      titel: "Fitness-Tracker",
+      text: "Wenn du das siehst, funktionieren deine Benachrichtigungen.",
+    }),
+  );
 
   // ── Health ────────────────────────────────────────────────────────────────
   app.get("/api/health", async (_req, res) => {
@@ -1838,7 +1853,31 @@ ${exerciseCatalog}
           `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1,$2,NOW() + INTERVAL '1 hour')`,
           [userId, tokenHash],
         );
-        const base = String(process.env.APP_PUBLIC_URL ?? "").replace(/\/$/, "");
+        /*
+         * Basis-URL für den Reset-Link.
+         *
+         * `process.env.APP_PUBLIC_URL` kommt aus der docker-compose.yaml und
+         * zeigt auf die interne NAS-Adresse (http://192.168.178.23:22222) — der
+         * Link wäre damit nur im Heimnetz erreichbar. Die .env-Datei enthält die
+         * öffentliche Domain, wird aber beim Start nicht angewandt, weil sie nur
+         * leere Variablen füllt.
+         *
+         * Deshalb: Datei gewinnt, Prozess-Umgebung ist Rückfall.
+         */
+        const ausDatei = (() => {
+          try {
+            const p = String(process.env.ENV_FILE_PATH ?? "/app/.env");
+            const txt = readFileSync(p, "utf8");
+            for (const zeile of txt.split("\n")) {
+              const m = zeile.match(/^APP_PUBLIC_URL\s*=\s*(.+)$/);
+              if (m) return m[1].trim().replace(/^["']|["']$/g, "");
+            }
+          } catch {
+            /* Datei fehlt oder nicht lesbar — dann gilt die Umgebung. */
+          }
+          return "";
+        })();
+        const base = String(ausDatei || process.env.APP_PUBLIC_URL || "").replace(/\/$/, "");
         if (base) {
           const resetUrl = `${base}/reset-password?token=${token}`;
           const emailed = await sendPasswordResetEmail(normalized, resetUrl);

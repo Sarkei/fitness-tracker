@@ -40,7 +40,7 @@ export type GeplantesEvent = {
   paired_activity_id?: number | null;
 };
 
-/** Bildet eine VRTX-Sportart auf die Intervals-Bezeichnung ab. */
+/** Bildet eine App-Sportart auf die Intervals-Bezeichnung ab. */
 export function intervalsSportart(sport: string | undefined | null): string {
   const s = String(sport ?? "").toLowerCase();
   if (s.includes("lauf") || s.includes("run") || s.includes("jog")) return "Run";

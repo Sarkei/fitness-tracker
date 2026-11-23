@@ -61,7 +61,7 @@ export default function SimpleTabBar() {
             className="text-lg tracking-tight text-[var(--foreground)]"
             style={{ fontFamily: 'var(--simple-serif)' }}
           >
-            VRTX
+            Fitness
           </span>
           <nav className="flex gap-1 rounded-2xl border border-[var(--border-muted)] bg-[var(--card-bg)] p-1">
             {TABS.map(({ to, label, icon: Icon }) => (

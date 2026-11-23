@@ -76,7 +76,7 @@ export class OpenFoodFactsClient {
     const params = new URLSearchParams({ fields: FIELDS, page_size: String(pageSize) });
     const url = `https://world.openfoodfacts.org/category/${encodeURIComponent(category)}/1.json?${params.toString()}`;
     const response = await fetch(url, {
-      headers: { Accept: 'application/json', 'User-Agent': 'VRTX-FitnessTracker/1.0' },
+      headers: { Accept: 'application/json', 'User-Agent': 'FitnessTracker/1.0' },
     });
     if (!response.ok) return [];
     const data = (await response.json()) as CategoryResponse;

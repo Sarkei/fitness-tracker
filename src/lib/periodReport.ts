@@ -97,7 +97,7 @@ export function generatePeriodFitnessReport(opts: {
   }
 
   return printFitnessReport({
-    title: `VRTX Analysebericht · ${label}`,
+    title: `Analysebericht · ${label}`,
     displayName: opts.profile.displayName || 'Athlet',
     htmlSections: sections,
   });

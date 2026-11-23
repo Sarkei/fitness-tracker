@@ -194,7 +194,7 @@ export function AuthBootLoader() {
     <div className="min-h-[100dvh] flex items-center justify-center bg-[var(--background)] text-[var(--text-primary)]">
       <div className="text-center">
         <h1 className="text-4xl font-black tracking-tighter uppercase italic mb-6">
-          VRTX<span className="text-brand">.</span>
+          Fitness<span className="text-brand">.</span>
         </h1>
         <Loader2 className="animate-spin text-brand mx-auto" size={32} />
       </div>

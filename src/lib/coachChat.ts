@@ -218,7 +218,7 @@ export function buildCoachChatSystemPrompt(input: {
   const lastWeight = weightHistory.length > 0 ? weightHistory[weightHistory.length - 1] : null;
 
   return [
-    "Du bist der persoenliche Fitness- und Ernaehrungscoach in der App VRTX.",
+    "Du bist der persoenliche Fitness- und Ernaehrungscoach in der Fitness-App.",
     "Du sprichst Deutsch, per Du, freundlich und konkret. Antworte kurz und umsetzbar,",
     "keine langen Romane. Nutze hoechstens ein paar Absaetze oder kurze Listen.",
     "",

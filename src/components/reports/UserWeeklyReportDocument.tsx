@@ -105,7 +105,7 @@ export default function UserWeeklyReportDocument({ report, className }: Props) {
       <article className="weekly-report-a4-page bg-[var(--card-bg)] border border-[var(--border-muted)] rounded-2xl p-8 md:p-10 shadow-sm print:shadow-none print:border-black/10 print:rounded-none">
         <header className="border-b border-[var(--border-muted)] pb-4 mb-6">
           <p className="text-[9px] font-black uppercase tracking-[0.3em] text-[var(--text-muted)]">
-            VRTX · Persönlicher Wochenbericht
+            Fitness · Persönlicher Wochenbericht
           </p>
           <h2 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter mt-1">
             {p.headline}
@@ -192,7 +192,7 @@ export default function UserWeeklyReportDocument({ report, className }: Props) {
       <article className="weekly-report-a4-page bg-[var(--card-bg)] border border-[var(--border-muted)] rounded-2xl p-8 md:p-10 shadow-sm mt-6 print:shadow-none print:border-black/10 print:rounded-none print:mt-0">
         <header className="border-b border-[var(--border-muted)] pb-4 mb-6">
           <p className="text-[9px] font-black uppercase tracking-[0.3em] text-[var(--text-muted)]">
-            VRTX · Leistungsbericht
+            Fitness · Leistungsbericht
           </p>
           <h2 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter mt-1">
             {perf.headline}

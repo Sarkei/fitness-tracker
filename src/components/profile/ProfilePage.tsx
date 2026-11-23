@@ -33,6 +33,7 @@ import {
   overlayPortal,
   useMobileOverlaySheet,
 } from '@/src/lib/mobileViewport';
+import PushoverKarte from './PushoverKarte';
 
 // ─── TDEE Calculator (Mifflin-St-Jeor) ───────────────────────────────────────
 
@@ -1016,6 +1017,8 @@ export default function ProfilePage() {
       <div className="space-y-3">
         <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--text-muted)] px-4">Verbindungen</h3>
         <GarminConnect />
+        {/* Pushover: Benachrichtigungen aufs Handy */}
+        <PushoverKarte beschreibung="Pushover schickt dir Erinnerungen und Hinweise aufs Handy. Beide Werte stehen in deinem Pushover-Konto." />
         <IntervalsConnect />
         <MealplannerConnect />
         <Link

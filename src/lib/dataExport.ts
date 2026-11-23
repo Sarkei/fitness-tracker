@@ -7,7 +7,7 @@ import { effectiveNutritionTotals } from '@/src/lib/nutritionTotals';
 
 export interface VrtxExportBundle {
   exportedAt: string;
-  app: 'VRTX';
+  app: 'Fitness-Tracker';
   version: 1;
   profile: UserProfile;
   workouts: Workout[];
@@ -21,7 +21,7 @@ export function buildExportBundle(
 ): VrtxExportBundle {
   return {
     exportedAt: new Date().toISOString(),
-    app: 'VRTX',
+    app: 'Fitness-Tracker',
     version: 1,
     profile,
     workouts: [...workouts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),

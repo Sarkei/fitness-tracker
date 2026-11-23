@@ -1,6 +1,6 @@
 {
-  "name": "VRTX",
-  "short_name": "VRTX",
+  "name": "Fitness-Tracker",
+  "short_name": "Fitness",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
