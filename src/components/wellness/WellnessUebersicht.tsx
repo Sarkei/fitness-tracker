@@ -30,6 +30,17 @@ export default function WellnessUebersicht() {
   const tsb = heuteWert(tage, 'tsb');
   const form = formLabel(tsb);
 
+  // Werte, die nur Garmin liefert — Intervals.icu gibt sie nicht her. Die Kacheln
+  // erscheinen deshalb nur, wenn die Quelle sie wirklich hat.
+  const stress = heuteWert(tage, 'stress');
+  const bodyBattery = heuteWert(tage, 'bodyBatteryMax');
+  const spo2 = heuteWert(tage, 'spo2');
+  const atem = heuteWert(tage, 'respiration');
+  const vo2 = heuteWert(tage, 'vo2max');
+  const fitnessAlter = heuteWert(tage, 'fitnessAge');
+  const gewicht = heuteWert(tage, 'weight');
+  const etagen = heuteWert(tage, 'floors');
+
   const formFarbe =
     form.tone === 'gut'
       ? 'var(--simple-accent)'
@@ -94,6 +105,7 @@ export default function WellnessUebersicht() {
         <WellnessAktualisieren />
       </div>
 
+      {/* Kacheln: Grundwerte immer, Garmin-Werte zusaetzlich, wenn vorhanden. */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KlickKachel
           label="Schlaf"
@@ -105,6 +117,7 @@ export default function WellnessUebersicht() {
         <KlickKachel
           label="Schritte"
           value={schritte != null ? Math.round(schritte).toLocaleString('de-DE') : '—'}
+          hint={etagen != null ? `${Math.round(etagen)} Etagen` : undefined}
           onClick={() => navigate('/wellness/bewegung')}
         />
         <KlickKachel
@@ -119,6 +132,47 @@ export default function WellnessUebersicht() {
           unit="bpm"
           onClick={() => navigate('/wellness/koerper')}
         />
+        {stress != null && (
+          <KlickKachel
+            label="Stress"
+            value={Math.round(stress)}
+            hint="nur Garmin"
+            onClick={() => navigate('/wellness/koerper')}
+          />
+        )}
+        {bodyBattery != null && (
+          <KlickKachel
+            label="Body Battery"
+            value={Math.round(bodyBattery)}
+            hint="nur Garmin"
+            onClick={() => navigate('/wellness/koerper')}
+          />
+        )}
+        {spo2 != null && (
+          <KlickKachel
+            label="SpO₂"
+            value={Math.round(spo2)}
+            unit="%"
+            hint={atem != null ? `${Math.round(atem)}/min` : undefined}
+            onClick={() => navigate('/wellness/koerper')}
+          />
+        )}
+        {vo2 != null && (
+          <KlickKachel
+            label="VO₂max"
+            value={Math.round(vo2)}
+            hint={fitnessAlter != null ? `Alter ${Math.round(fitnessAlter)}` : undefined}
+            onClick={() => navigate('/wellness/form')}
+          />
+        )}
+        {gewicht != null && (
+          <KlickKachel
+            label="Gewicht"
+            value={gewicht}
+            unit="kg"
+            onClick={() => navigate('/wellness/koerper')}
+          />
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -220,7 +274,9 @@ export default function WellnessUebersicht() {
         <div className="flex items-start gap-2 rounded-xl bg-[var(--surface-gray)] px-3 py-2.5">
           <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
           <p className="text-[11px] leading-relaxed text-[var(--text-muted)]">
-            Deine Quelle gibt {daten.nichtVerfuegbar.join(', ')} nicht über die Schnittstelle frei.
+            {daten.quelle === 'garmin'
+              ? `Deine Uhr liefert ${daten.nichtVerfuegbar.join(', ')} nicht — für diese Werte misst das Gerät nicht.`
+              : `Intervals.icu gibt ${daten.nichtVerfuegbar.join(', ')} nicht weiter — verbinde Garmin im Profil für diese Werte.`}
           </p>
         </div>
       )}

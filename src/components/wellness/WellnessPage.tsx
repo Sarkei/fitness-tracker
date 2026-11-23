@@ -39,7 +39,7 @@ export default function WellnessPage() {
       <PageHeader
         eyebrow="Wellness"
         title="Wellness"
-        hint="Schlaf, Bewegung, Herz und Trainingsform — automatisch über Intervals.icu."
+        hint="Schlaf, Bewegung, Herz und Garmin-Werte — automatisch von deiner Uhr."
       />
 
       {/* Zurück-Leiste: nur auf Unterseiten, damit man aus einem Bereich herauskommt.

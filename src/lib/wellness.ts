@@ -21,10 +21,25 @@ export type WellnessTag = {
   sleepSecs?: number | null;
   sleepScore?: number | null;
   sleepQuality?: number | null;
+  deepSecs?: number | null;
+  lightSecs?: number | null;
+  remSecs?: number | null;
+  awakeSecs?: number | null;
   steps?: number | null;
   floors?: number | null;
+  distanceMeters?: number | null;
+  activeCalories?: number | null;
+  totalCalories?: number | null;
+  stress?: number | null;
+  stressMax?: number | null;
+  bodyBatteryMin?: number | null;
+  bodyBatteryMax?: number | null;
+  spo2?: number | null;
+  respiration?: number | null;
   vo2max?: number | null;
+  fitnessAge?: number | null;
   weight?: number | null;
+  bodyFat?: number | null;
 };
 
 export type WellnessAktivitaet = {

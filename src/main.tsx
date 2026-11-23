@@ -11,6 +11,38 @@ import { isDemoMode, markDemoMode } from './lib/demoMode.ts';
 applyTheme(getStoredTheme());
 
 /**
+ * Service Worker registrieren: macht die App installierbar (echtes Vollbild, kein
+ * Browser-Rahmen) und laedt gebaute Assets aus dem Cache. API-Aufrufe bleiben
+ * ungecacht, damit Trainings- und Garmin-Daten frisch sind.
+ */
+if ('serviceWorker' in navigator && !location.hostname.startsWith('localhost')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      /* Installation bleibt optional — die App laeuft auch ohne */
+    });
+  });
+}
+
+/**
+ * Statusleiste der installierten App an die Kopfzeile anpassen.
+ *
+ * Ohne das faerbt der Browser die Leiste mit `theme_color` aus dem Manifest
+ * (Gruen) — sichtbar als fremder Balken ueber der App.
+ */
+function syncStatusBarColor(): void {
+  const dunkel = document.documentElement.classList.contains('dark');
+  const farbe = dunkel ? '#101312' : '#f6f7f5';
+  let meta = document.querySelector('meta[name="theme-color"]');
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.setAttribute('name', 'theme-color');
+    document.head.appendChild(meta);
+  }
+  meta.setAttribute('content', farbe);
+}
+syncStatusBarColor();
+
+/**
  * Auf einer Demo-Domain meldet sich die App mit dem Beispielkonto an,
  * bevor gerendert wird — so öffnet der Demo-Link direkt die Anwendung.
  */
