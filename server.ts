@@ -95,12 +95,13 @@ function joinCoachList(value: unknown, fallback = "none"): string {
   return fallback;
 }
 import { formatExerciseDbForCoachPrompt, formatExerciseDbForCoachPromptAsync } from "./src/lib/coachExercisePrompt";
-import { isExerciseDbConfigured, testExerciseDbApiKey } from "./src/lib/exerciseDb";
+import { isExerciseDbConfigured, isExerciseDbCatalogKey, testExerciseDbApiKey } from "./src/lib/exerciseDb";
 import { getExerciseDbEnvDiagnostics } from "./src/lib/server/exerciseDbEnv";
 import {
   fetchExerciseDbById,
   fetchExerciseDbFilterLists,
   findSimilarExercises,
+  searchExerciseDbByName,
   searchExerciseDbCatalog,
 } from "./src/lib/exerciseDbFetch";
 import { buildUserContextForCoach } from "./src/lib/buildUserContextForCoach";
@@ -2396,6 +2397,55 @@ ${exerciseCatalog}
     res.json(result.rows.map(mapWorkout));
   });
 
+  /**
+   * Prüft, ob eine Übung in der ExerciseDB existiert.
+   *
+   * Tims Vorgabe: In ein Training dürfen nur Übungen, die auch in ExerciseDB zu
+   * finden sind — sonst entstehen Einheiten mit Übungen, die es in der Datenbank
+   * nicht gibt und für die es keine Erklärung, kein Video und keinen Verlauf gibt.
+   *
+   * Ist ExerciseDB nicht konfiguriert (kein Abo), wird NICHT blockiert: dann ist
+   * der lokale Katalog die Quelle und die Prüfung würde jede Eingabe abweisen.
+   */
+  const exerciseExistiertInDb = async (
+    name: string,
+    key?: string,
+  ): Promise<{ ok: boolean; treffer?: { id: string; name: string }; grund?: string }> => {
+    if (!isExerciseDbConfigured()) return { ok: true };
+
+    const suchbegriff = String(name ?? '').trim();
+    if (!suchbegriff) return { ok: false, grund: 'Übung ohne Namen' };
+
+    // Catalog-Key (edb_…) zuerst direkt auflösen — das ist der sichere Weg.
+    if (key && isExerciseDbCatalogKey(key)) {
+      try {
+        const direkt = await fetchExerciseDbById(key.replace(/^edb_/, ''));
+        if (direkt) return { ok: true, treffer: { id: direkt.exerciseId ?? '', name: direkt.name } };
+      } catch {
+        /* unten weiter mit der Namenssuche */
+      }
+    }
+
+    try {
+      const treffer = await searchExerciseDbByName(suchbegriff, 5);
+      if (treffer.length > 0) {
+        return {
+          ok: true,
+          treffer: { id: treffer[0].exerciseId ?? '', name: treffer[0].name },
+        };
+      }
+      return {
+        ok: false,
+        grund: `„${suchbegriff}" ist in der ExerciseDB nicht zu finden.`,
+      };
+    } catch (e) {
+      // Bei einem API-Fehler nicht blockieren — sonst kann Tim nichts speichern,
+      // nur weil RapidAPI gerade nicht antwortet.
+      console.warn('[exercises] DB-Pruefung fehlgeschlagen:', e);
+      return { ok: true };
+    }
+  };
+
   app.post("/api/workouts", requireAuth, async (req: AuthRequest, res) => {
     const {
       name,
@@ -2412,6 +2462,37 @@ ${exerciseCatalog}
       coachSessionFeedback,
       cardioSessionFeedback,
     } = req.body;
+
+    /*
+     * Nur Uebungen zulassen, die es in der ExerciseDB gibt.
+     *
+     * Tim will keine Einheiten mit Uebungen, die in der Datenbank fehlen — fuer die
+     * gaebe es weder Erklaerung noch Video oder Verlauf. Die Pruefung laeuft nur,
+     * wenn ExerciseDB konfiguriert ist; ohne Abo bleibt der lokale Katalog die
+     * Quelle und es wird nicht blockiert.
+     */
+    const uebungsListe = Array.isArray(exercises) ? (exercises as Array<Record<string, unknown>>) : [];
+    if (uebungsListe.length > 0 && isExerciseDbConfigured()) {
+      const unbekannt: string[] = [];
+      for (const ue of uebungsListe) {
+        const treffer = await exerciseExistiertInDb(
+          String(ue.name ?? ''),
+          typeof ue.exerciseKey === 'string' ? ue.exerciseKey : undefined,
+        );
+        if (!treffer.ok) unbekannt.push(String(ue.name ?? 'Übung'));
+      }
+      if (unbekannt.length > 0) {
+        res.status(400).json({
+          error: "exercises-not-in-db",
+          message:
+            `Diese Übungen gibt es nicht in der ExerciseDB: ${unbekannt.join(', ')}. ` +
+            'Bitte eine passende Übung aus der Liste wählen.',
+          unbekannt,
+        });
+        return;
+      }
+    }
+
     const result = await pool.query(
       `INSERT INTO workouts (user_id,name,type,subtype,duration,calories_burned,date,exercises,notes,shared,session_rpe,coach_session_meta,coach_session_feedback,cardio_session_feedback)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,$14::jsonb) RETURNING id`,

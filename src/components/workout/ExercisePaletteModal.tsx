@@ -283,7 +283,10 @@ export default function ExercisePaletteModal({
             </div>
 
             {showRemoteHint && (
-              <p className="shrink-0 px-4 py-2 text-xs text-amber-600">ExerciseDB nicht konfiguriert (EXERCISEDB_RAPIDAPI_KEY).</p>
+              <p className="shrink-0 px-4 py-2 text-xs text-amber-600">
+                ExerciseDB ist nicht verfügbar. Ohne Datenbank lassen sich keine Übungen
+                auswählen — im Profil findest du den Status unter Integrationen.
+              </p>
             )}
             {remoteError && <p className="shrink-0 px-4 py-2 text-xs text-red-500">{remoteError}</p>}
 
