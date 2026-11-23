@@ -51,10 +51,13 @@ export default function BilanzChart({
   const tage = useMemo(() => bilanz.slice(-hoechstens), [bilanz, hoechstens]);
 
   const maxWert = useMemo(() => {
-    const roh = Math.max(1, ...tage.map((t) => Math.abs(t.bilanz)));
-    // Bei „halten" muss die Toleranzzone immer sichtbar bleiben.
+    // Maßstab ist das Tagesbudget: der Balken hängt am Tagesanfang in voller Höhe
+    // unter der Nulllinie (= wie viel noch offen ist) und schrumpft mit jedem Eintrag.
+    const budgets = tage.map((t) => t.ziel + t.verbrannt);
+    const ueberzogen = tage.filter((t) => t.hatDaten).map((t) => Math.abs(t.bilanz));
+    const roh = Math.max(0, ...budgets, ...ueberzogen);
     const mitZone = zielTyp === 'maintain' ? Math.max(roh, HALTEN_TOLERANZ_KCAL * 1.15) : roh;
-    return rundeGrenze(mitZone);
+    return rundeGrenze(Math.max(mitZone, 500));
   }, [tage, zielTyp]);
 
   const zone = zielZone(zielTyp);
@@ -67,13 +70,14 @@ export default function BilanzChart({
 
   const ticksY = useMemo(() => {
     const schritt = maxWert / 2;
+    // Unter der Nulllinie = noch offenes Budget, darüber = über dem Budget.
     return [maxWert, schritt, 0, -schritt, -maxWert];
   }, [maxWert]);
 
   const zonenTexte: Record<ZielTyp, string> = {
-    lose: `Zielführend: Defizit (unter 0)`,
-    maintain: `Zielführend: ±${HALTEN_TOLERANZ_KCAL} kcal um 0`,
-    gain: `Zielführend: Überschuss (über 0)`,
+    lose: 'im Budget geblieben (unter 0)',
+    maintain: `innerhalb ±${HALTEN_TOLERANZ_KCAL} kcal`,
+    gain: 'Budget ausgeschöpft (über 0)',
   };
 
   /** y-Position (px von oben) für einen kcal-Wert. */
@@ -142,40 +146,49 @@ export default function BilanzChart({
           />
         ))}
 
-        {/* Balken */}
-        <div className="absolute inset-0 flex items-end gap-[2px]">
+        {/* Balken: hängen an der Nulllinie und zeigen das verbleibende Tagesbudget.
+            Mit jedem erfassten Essen werden sie kürzer; bei Überschreitung wachsen sie
+            rot über die Nulllinie nach oben. */}
+        <div className="absolute inset-0 flex gap-[2px]">
           {tage.map((tag) => {
             const imZiel = bilanzImZiel(tag.bilanz, zielTyp);
             const farbe = !tag.hatDaten ? GRAU : imZiel ? GRUEN : ROT;
-            const hoehePx = tag.hatDaten ? Math.max(2, Math.abs(tag.bilanz) * skala) : 0;
-            const positiv = tag.bilanz >= 0;
+            // Budget des Tages: Ziel plus geschätzter Trainingsverbrauch.
+            const budget = tag.ziel + tag.verbrannt;
+            // Was noch offen ist. Negativ bedeutet: darüber hinaus gegessen.
+            const offen = budget - tag.kcal;
+            const ueberzogen = tag.hatDaten && offen < 0;
+            const istHeute = tag.ymd === heute;
+            // Am Tagesanfang hängt der volle Balken nach unten. Heute ohne Eintrag
+            // zeigt also das komplette Budget; vergangene leere Tage werden nicht
+            // gezeichnet, weil dort nichts mehr nachzutragen ist.
+            const sichtbar = tag.hatDaten || istHeute;
+            const hoehePx = Math.max(tag.hatDaten ? 2 : 0, Math.abs(offen) * skala);
             return (
               <div
                 key={tag.ymd}
                 className="relative flex-1"
                 title={
                   tag.hatDaten
-                    ? `${fmtDatum(tag.ymd)}: ${tag.kcal} kcal gegessen · ${tag.verbrannt} kcal Training · Bilanz ${fmtKcal(
-                        tag.bilanz,
-                      )} kcal${tag.vollstaendig ? '' : ' (unvollständig erfasst)'}`
+                    ? `${fmtDatum(tag.ymd)}: ${tag.kcal} kcal gegessen · Budget ${Math.round(
+                        budget,
+                      )} kcal · ${offen >= 0 ? `${Math.round(offen)} kcal offen` : `${Math.round(
+                        -offen,
+                      )} kcal über`}${tag.vollstaendig ? '' : ' (unvollständig erfasst)'}`
                     : `${fmtDatum(tag.ymd)}: nichts erfasst`
                 }
               >
-                {tag.hatDaten ? (
+                {sichtbar ? (
                   <div
                     className="absolute inset-x-[1px] rounded-[2px] transition-all duration-500"
                     style={{
-                      height: hoehePx,
-                      top: positiv ? mitte - hoehePx : mitte,
-                      background: `color-mix(in srgb, ${farbe} 82%, transparent)`,
+                      height: Math.min(hoehePx, mitte),
+                      // Unter der Nulllinie = offenes Budget; darüber = Überschuss.
+                      top: ueberzogen ? mitte - Math.min(hoehePx, mitte) : mitte,
+                      background: `color-mix(in srgb, ${farbe} ${tag.hatDaten ? 82 : 35}%, transparent)`,
                     }}
                   />
-                ) : (
-                  <div
-                    className="absolute inset-x-[1px]"
-                    style={{ top: mitte - 1, height: 2, background: `color-mix(in srgb, ${GRAU} 40%, transparent)` }}
-                  />
-                )}
+                ) : null}
               </div>
             );
           })}
