@@ -101,6 +101,7 @@ import {
   fetchExerciseDbById,
   fetchExerciseDbFilterLists,
   findSimilarExercises,
+  fetchExerciseDbByBodyPart,
   searchExerciseDbByName,
   searchExerciseDbCatalog,
 } from "./src/lib/exerciseDbFetch";
@@ -2446,6 +2447,148 @@ ${exerciseCatalog}
     }
   };
 
+/**
+ * Sucht eine Übung mit abnehmender Strenge, bis ein Treffer kommt.
+ *
+ * Reihenfolge (bewusst von genau nach grob):
+ *   1. Exakter Name.
+ *   2. Einzelne Wörter des Namens (das längste zuerst) — findet „Bankdrücken"
+ *      über „drücken" oder „Bench Press" über „bench".
+ *   3. Muskelgruppe aus dem Namen ableiten („Kniebeuge" → Beine) und dort suchen.
+ *   4. Erster Buchstabe des Namens als letzter Ausweg.
+ *
+ * Ohne diese Kette würde ein vom Coach erfundener Name den ganzen Plan
+ * blockieren, obwohl es fachlich eine passende Übung gibt.
+ */
+/**
+ * Sucht eine Übung mit abnehmender Strenge — aber prüft jeden Treffer auf Relevanz.
+ *
+ * Der Fehler im ersten Anlauf: ohne Relevanzprüfung liefert die Namenssuche bei
+ * einem unbekannten Begriff irgendetwas zurück. „Bankdrücken schräg" wurde so zu
+ * „Step-up on Chair" — formal ein Treffer, fachlich Unsinn.
+ *
+ * Jetzt muss der Treffer mindestens ein bedeutungstragendes Wort mit der Suche
+ * teilen (oder über die deutsche Übersetzungstabelle zustande kommen). Findet sich
+ * nichts Passendes, kommt `null` zurück und die Übung wird ausgelassen.
+ */
+async function findeUebungMitFallback(
+  name: string,
+  koerperteil?: string,
+): Promise<{ key: string; name: string } | null> {
+  const roh = String(name ?? '').trim();
+  if (!roh) return null;
+
+  /** Wörter, die nichts unterscheiden. */
+  const STOPP = new Set([
+    'mit', 'und', 'oder', 'der', 'die', 'das', 'dem', 'den', 'ein', 'eine', 'einer',
+    'auf', 'im', 'in', 'am', 'an', 'zu', 'von', 'fuer', 'für', 'the', 'with', 'and',
+    'machine', 'maschine', 'gerät', 'geraet', 'übung', 'uebung', 'exercise',
+  ]);
+  const woerter = (t: string) =>
+    t
+      .toLowerCase()
+      .split(/[^a-zäöüß0-9]+/)
+      .filter((w) => w.length >= 4 && !STOPP.has(w));
+
+  const suchWoerter = woerter(roh);
+  const uebersetztFrueh = uebersetzeDeutschenNamen(roh);
+  const uebersetzteWoerter = uebersetztFrueh ? woerter(uebersetztFrueh) : [];
+
+  /**
+   * Teilt der Kandidat ein bedeutungstragendes Wort mit der Suche?
+   *
+   * Verglichen wird gegen BEIDE Wortlisten — die deutsche und, falls vorhanden,
+   * die englische Übersetzung. Sonst findet „Bankdrücken schräg" den Treffer
+   * „Dumbbell Incline Bench Press" nicht: die eine Seite ist deutsch, die andere
+   * englisch, und es gibt keine gemeinsame Zeichenkette.
+   */
+  const passt = (kandidat: string): boolean => {
+    const kandidatWoerter = new Set(woerter(kandidat));
+    return (
+      suchWoerter.some((w) => kandidatWoerter.has(w)) ||
+      uebersetzteWoerter.some((w) => kandidatWoerter.has(w))
+    );
+  };
+
+  /*
+   * Reihenfolge von genau nach grob. Wichtig: die deutsche Übersetzung kommt
+   * VOR den Einzelwörtern, sonst gewinnt „schräg" gegen „Bankdrücken".
+   */
+  const versuche: Array<{ suche: string }> = [];
+  versuche.push({ suche: roh });
+  if (uebersetztFrueh) versuche.push({ suche: uebersetztFrueh });
+
+  // Einzelne Wörter, längste zuerst.
+  for (const wort of [...suchWoerter].sort((a, b) => b.length - a.length)) {
+    versuche.push({ suche: wort });
+  }
+
+  for (const v of versuche) {
+    try {
+      const treffer = await searchExerciseDbByName(v.suche, 10);
+      // Ersten Kandidaten nehmen, der die Relevanzprüfung besteht.
+      for (const k of treffer) {
+        if (passt(k.name)) return { key: k.key, name: k.name };
+      }
+    } catch {
+      /* nächster Versuch */
+    }
+  }
+
+  // Letzte Stufe: über den Körperteil, aber nur mit Relevanzprüfung.
+  if (koerperteil) {
+    try {
+      const liste = await fetchExerciseDbByBodyPart(koerperteil, 20);
+      for (const k of liste) {
+        if (passt(k.name)) return { key: k.key, name: k.name };
+      }
+    } catch {
+      /* aufgeben */
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Deutsche Übungsnamen auf englische Katalogbegriffe abbilden.
+ * Der Coach schreibt deutsch, die ExerciseDB ist englisch.
+ */
+const DEUTSCH_ENGLISCH: Array<[RegExp, string]> = [
+  [/bankdr(ü|ue)cken/i, 'bench press'],
+  [/schr(ä|ae)gbank/i, 'incline bench press'],
+  [/kniebeuge|kniebeugen/i, 'squat'],
+  [/kreuzheben/i, 'deadlift'],
+  [/schulterdr(ü|ue)cken|(ü|ue)berkopfdr(ü|ue)cken/i, 'shoulder press'],
+  [/rudern/i, 'row'],
+  [/klimmzug|klimmz(ü|ue)ge/i, 'chin up'],
+  [/liegest(ü|ue)tz/i, 'push up'],
+  [/dips?$/i, 'dip'],
+  [/latzug/i, 'pulldown'],
+  [/seitheben/i, 'lateral raise'],
+  [/beinpresse/i, 'leg press'],
+  [/beinstrecker/i, 'leg extension'],
+  [/beinbeuger|beincurl/i, 'leg curl'],
+  [/wadenheben/i, 'calf raise'],
+  [/bizeps/i, 'biceps curl'],
+  [/trizeps/i, 'triceps'],
+  [/ausfallschritt/i, 'lunge'],
+  [/plank|unterarmst(ü|ue)tz/i, 'plank'],
+  [/crunches?/i, 'crunch'],
+  [/h(ü|ue)ftheben/i, 'hip thrust'],
+  [/good ?morning/i, 'good morning'],
+  [/shrug|schulterheben/i, 'shrug'],
+  [/goblet/i, 'goblet squat'],
+  [/bulgarian|bulgarisch/i, 'bulgarian split squat'],
+];
+
+function uebersetzeDeutschenNamen(name: string): string | null {
+  for (const [muster, englisch] of DEUTSCH_ENGLISCH) {
+    if (muster.test(name)) return englisch;
+  }
+  return null;
+}
+
   app.post("/api/workouts", requireAuth, async (req: AuthRequest, res) => {
     const {
       name,
@@ -2463,34 +2606,56 @@ ${exerciseCatalog}
       cardioSessionFeedback,
     } = req.body;
 
+    // Muss veraenderbar sein: unbekannte Uebungen werden ersetzt bzw. entfernt.
+    let uebungsEingabe = exercises;
+
     /*
-     * Nur Uebungen zulassen, die es in der ExerciseDB gibt.
+     * Uebungen gegen die ExerciseDB pruefen — und unbekannte AUTOMATISCH ersetzen.
      *
-     * Tim will keine Einheiten mit Uebungen, die in der Datenbank fehlen — fuer die
-     * gaebe es weder Erklaerung noch Video oder Verlauf. Die Pruefung laeuft nur,
-     * wenn ExerciseDB konfiguriert ist; ohne Abo bleibt der lokale Katalog die
-     * Quelle und es wird nicht blockiert.
+     * Tims Vorgabe: nicht blockieren, sondern aehnliche Uebungen suchen, bis ein
+     * Treffer da ist. Ein vom Coach erfundener Name soll den Plan nicht kippen:
+     * die Uebung wird auf den naechstbesten echten Eintrag umgeschrieben und der
+     * Austausch in der Antwort gemeldet, damit man sieht, was geaendert wurde.
      */
     const uebungsListe = Array.isArray(exercises) ? (exercises as Array<Record<string, unknown>>) : [];
+    const ersetzt: Array<{ von: string; auf: string; key: string }> = [];
     if (uebungsListe.length > 0 && isExerciseDbConfigured()) {
-      const unbekannt: string[] = [];
       for (const ue of uebungsListe) {
-        const treffer = await exerciseExistiertInDb(
-          String(ue.name ?? ''),
-          typeof ue.exerciseKey === 'string' ? ue.exerciseKey : undefined,
+        const ueName = String(ue.name ?? '');
+        const ueKey = typeof ue.exerciseKey === 'string' ? ue.exerciseKey : undefined;
+        const geprueft = await exerciseExistiertInDb(ueName, ueKey);
+        if (geprueft.ok) {
+          // Key nachziehen, falls nur der Name bekannt war — sonst kein Video/Verlauf.
+          if (!ueKey && geprueft.treffer?.id) {
+            ue.exerciseKey = geprueft.treffer.id.startsWith('edb_')
+              ? geprueft.treffer.id
+              : `edb_${geprueft.treffer.id}`;
+          }
+          continue;
+        }
+
+        // Kein Treffer: aehnliche Uebung suchen, bis eine existiert.
+        const ersatz = await findeUebungMitFallback(
+          ueName,
+          typeof ue.bodyPart === 'string' ? ue.bodyPart : undefined,
         );
-        if (!treffer.ok) unbekannt.push(String(ue.name ?? 'Übung'));
+        if (ersatz) {
+          ue.name = ersatz.name;
+          ue.exerciseKey = ersatz.key;
+          ersetzt.push({ von: ueName, auf: ersatz.name, key: ersatz.key });
+          console.log(`[exercises] "${ueName}" ersetzt durch "${ersatz.name}"`);
+        } else {
+          // Wirklich nichts gefunden: Uebung entfernen statt den Plan zu blockieren.
+          ue.__entfernen = true;
+          ersetzt.push({ von: ueName, auf: '', key: '' });
+          console.warn(`[exercises] "${ueName}" hat keinen Treffer — Uebung wird entfernt`);
+        }
       }
-      if (unbekannt.length > 0) {
-        res.status(400).json({
-          error: "exercises-not-in-db",
-          message:
-            `Diese Übungen gibt es nicht in der ExerciseDB: ${unbekannt.join(', ')}. ` +
-            'Bitte eine passende Übung aus der Liste wählen.',
-          unbekannt,
-        });
-        return;
-      }
+
+      // Uebungen ohne Treffer aus der Liste nehmen (sonst steht eine leere Uebung drin).
+      const bereinigt = uebungsListe.filter((ue) => !ue.__entfernen);
+      for (const ue of bereinigt) delete ue.__entfernen;
+      uebungsEingabe = bereinigt;
     }
 
     const result = await pool.query(
@@ -2504,7 +2669,7 @@ ${exerciseCatalog}
         duration || 0,
         caloriesBurned || 0,
         date || new Date().toISOString().split("T")[0],
-        JSON.stringify(exercises || []),
+        JSON.stringify(uebungsEingabe || []),
         notes,
         shared || false,
         typeof sessionRpe === "number" ? Math.min(10, Math.max(1, Math.round(sessionRpe))) : null,

@@ -1,15 +1,14 @@
 /**
- * Detailansicht einer Einheit.
+ * Detailansicht einer Einheit — im Vollbild.
  *
- * Öffnet sich per Klick auf „Letzte Einheit" oder in der Aktivitäten-Liste.
- * Funktioniert für beide Quellen: Garmin (Aktivitäten aus der Uhr) und
- * Intervals.icu (geplante Einheiten). Die Felder heißen dort unterschiedlich,
- * deshalb wird beim Lesen normalisiert.
+ * Zeigt alles, was die Quelle zu dieser Einheit hat: Distanz, Dauer, Tempo bzw.
+ * Schnitt, Puls (Ø, max, min), Kalorien, Aufstieg, Startzeit und Typ. Öffnet sich
+ * als Vollbild-Overlay, weil Tim bei einer Einheit alle Werte auf einen Blick
+ * sehen will und nicht in einem kleinen Sheet scrollen möchte.
  */
 
-import { X, Activity, Clock, Zap, Mountain, Heart, MapPin } from 'lucide-react';
+import { X, Activity, Clock, Zap, Mountain, Heart, MapPin, TrendingUp } from 'lucide-react';
 import {
-  mobileSheetOverlayClass,
   overlayPortal,
   useMobileOverlaySheet,
 } from '@/src/lib/mobileViewport';
@@ -18,9 +17,9 @@ export type EinheitDaten = {
   id?: string;
   name?: string | null;
   type?: string | null;
-  /** Startzeit oder Datum — je nach Quelle ISO oder „YYYY-MM-DD". */
   datum?: string | null;
   start_date_local?: string | null;
+  date?: string | null;
   distance?: number | null;
   moving_time?: number | null;
   elapsed_time?: number | null;
@@ -29,9 +28,11 @@ export type EinheitDaten = {
   averageHr?: number | null;
   max_hr?: number | null;
   maxHr?: number | null;
+  min_hr?: number | null;
   calories?: number | null;
   elevation?: number | null;
   total_elevation_gain?: number | null;
+  average_speed?: number | null;
   source?: string | null;
 };
 
@@ -88,7 +89,7 @@ function geschwindigkeit(meter?: number | null, sekunden?: number | null): strin
 }
 
 function zeitpunkt(e: EinheitDaten): string | null {
-  const roh = e.datum ?? e.start_date_local ?? null;
+  const roh = e.start_date_local ?? e.date ?? e.datum ?? null;
   if (!roh) return null;
   const d = new Date(String(roh).length <= 10 ? `${roh}T12:00:00` : String(roh));
   if (Number.isNaN(d.getTime())) return String(roh).slice(0, 10);
@@ -126,6 +127,12 @@ export default function EinheitDetailModal({
   if (pulsMax) kacheln.push({ icon: Heart, label: 'Puls max.', wert: `${Math.round(pulsMax)} bpm` });
   if (e.calories) kacheln.push({ icon: Zap, label: 'Kalorien', wert: `${Math.round(e.calories)} kcal` });
   if (aufstieg) kacheln.push({ icon: Mountain, label: 'Aufstieg', wert: `${Math.round(aufstieg)} m` });
+  const pulsMin = e.min_hr ?? null;
+  if (pulsMin) kacheln.push({ icon: Heart, label: 'Puls min.', wert: `${Math.round(pulsMin)} bpm` });
+  const netto = e.elapsed_time ?? null;
+  if (netto && netto !== (e.moving_time ?? e.duration)) {
+    kacheln.push({ icon: Clock, label: 'Gesamtzeit', wert: dauer(netto) ?? '—' });
+  }
 
   const tempoWert = istLauf
     ? tempo(e.distance, e.moving_time ?? e.duration)
@@ -134,58 +141,67 @@ export default function EinheitDetailModal({
       : null;
 
   return overlayPortal(
-    <div className={mobileSheetOverlayClass()} onClick={onClose}>
-      <div
-        className="relative z-10 w-full max-w-lg rounded-t-3xl border border-[var(--border-muted)] bg-[var(--card-bg)] p-5 lg:rounded-3xl"
-        onClick={(ev) => ev.stopPropagation()}
-      >
-        <div className="mb-3 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-              <Activity className="h-3 w-3" />
-              {typLabel(e.type)}
-              {e.source === 'garmin' && <span className="normal-case tracking-normal">· von der Uhr</span>}
-            </p>
-            <p className="mt-1 truncate text-[17px] font-semibold text-[var(--foreground)]">
-              {e.name || typLabel(e.type)}
-            </p>
-            {zeitpunkt(e) && (
-              <p className="mt-0.5 text-[11.5px] text-[var(--text-muted)]">{zeitpunkt(e)}</p>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-[var(--text-muted)] transition hover:text-[var(--foreground)]"
-            aria-label="Schließen"
-          >
-            <X className="h-4 w-4" />
-          </button>
+    <div
+      className="fixed inset-0 z-[200] flex flex-col bg-[var(--background)]"
+      role="dialog"
+      aria-modal="true"
+    >
+      {/* Kopf: Name, Typ, Datum — schließt oben rechts */}
+      <div className="flex items-start justify-between gap-3 border-b border-[var(--border-muted)] px-5 py-4">
+        <div className="min-w-0">
+          <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+            <Activity className="h-3 w-3" />
+            {typLabel(e.type)}
+            {e.source === 'garmin' && <span className="normal-case tracking-normal">· von der Uhr</span>}
+          </p>
+          <h2 className="mt-1 truncate text-[19px] font-semibold text-[var(--foreground)]">
+            {e.name || typLabel(e.type)}
+          </h2>
+          {zeitpunkt(e) && (
+            <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">{zeitpunkt(e)}</p>
+          )}
         </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="shrink-0 rounded-xl border border-[var(--border-muted)] p-2 text-[var(--text-muted)] transition hover:text-[var(--foreground)]"
+          aria-label="Schließen"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
 
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      {/* Inhalt: scrollbar, alle Werte als gleich gebaute Kacheln */}
+      <div className="flex-1 overflow-y-auto px-5 py-4">
+        {tempoWert && (
+          <div className="mb-4 rounded-2xl border border-[var(--border-muted)] bg-[var(--card-bg)] px-4 py-3">
+            <p className="text-[9.5px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+              {istLauf ? 'Pace' : 'Schnitt'}
+            </p>
+            <p className="mt-0.5 text-[22px] font-semibold tabular-nums text-[var(--simple-accent)]">
+              {tempoWert}
+            </p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
           {kacheln.map(({ icon: Icon, label, wert }) => (
-            <div key={label} className="rounded-xl bg-[var(--background)] px-3 py-2.5">
+            <div
+              key={label}
+              className="rounded-2xl border border-[var(--border-muted)] bg-[var(--card-bg)] px-3 py-3"
+            >
               <p className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
                 <Icon className="h-3 w-3" /> {label}
               </p>
-              <p className="mt-0.5 text-[15px] font-semibold tabular-nums">{wert}</p>
+              <p className="mt-1 text-[17px] font-semibold tabular-nums">{wert}</p>
             </div>
           ))}
         </div>
 
-        {tempoWert && (
-          <p className="mt-2 rounded-xl bg-[var(--background)] px-3 py-2 text-[12px]">
-            <span className="text-[var(--text-muted)]">
-              {istLauf ? 'Pace' : 'Schnitt'}:
-            </span>{' '}
-            <span className="font-semibold tabular-nums">{tempoWert}</span>
-          </p>
-        )}
-
         {kacheln.length === 0 && (
-          <p className="text-[12px] text-[var(--text-muted)]">
-            Für diese Einheit liegen keine Messwerte vor.
+          <p className="rounded-2xl border border-[var(--border-muted)] bg-[var(--card-bg)] px-4 py-3 text-[12.5px] text-[var(--text-muted)]">
+            Für diese Einheit liegen keine Messwerte vor. Die Uhr hat nur den Zeitpunkt
+            aufgezeichnet.
           </p>
         )}
       </div>

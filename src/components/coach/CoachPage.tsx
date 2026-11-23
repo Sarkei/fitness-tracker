@@ -1447,8 +1447,17 @@ function PlanDetail({ planId, onBack, initialExpandedDay }: { planId: string; on
         // silent – auto-advance failure shouldn't break the UI
       }
     };
-    checkAdvance();
-    return () => { cancelled = true; };
+    /*
+     * Auto-Advance NICHT sofort starten: der Aufruf holt Plan-Daten und
+     * blockierte beim Oeffnen der Coach-Seite die Darstellung (Tim: "lagged
+     * richtig krass"). Jetzt erst nach dem ersten Bild und mit kurzer Verzoegerung,
+     * damit die Seite sofort bedienbar ist.
+     */
+    const timer = window.setTimeout(() => void checkAdvance(), 800);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [planId, aiCaps.loading, aiCaps.enabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchPlan(); }, [fetchPlan]);

@@ -99,6 +99,8 @@ export default function TrainingPage() {
   /** Aktivitaeten von der Uhr — Einheiten ohne geplantes Workout. */
   const [uhrEinheiten, setUhrEinheiten] = useState<Array<Record<string, unknown>>>([]);
   const [einheitOffen2, setEinheitOffen2] = useState<EinheitDaten | null>(null);
+  /** Seite der Uhr-Einheiten: 5 pro Seite, damit man durch alle blättern kann. */
+  const [uhrSeite, setUhrSeite] = useState(0);
   const [selected, setSelected] = useState<string>(dayKeyOf(today));
   /** 0 = diese Woche, 1 = nächste Woche, -1 = letzte Woche … */
   const [weekOffset, setWeekOffset] = useState(0);
@@ -566,7 +568,7 @@ export default function TrainingPage() {
             Einheiten von der Uhr
           </SectionTitle>
           <ul className="divide-y divide-[var(--border-muted)]">
-            {uhrEinheiten.slice(0, 6).map((e, i) => {
+            {uhrEinheiten.slice(uhrSeite * 5, uhrSeite * 5 + 5).map((e, i) => {
               const datum = String(e.date ?? e.start_date_local ?? '').slice(0, 10);
               const distanz = e.distance != null ? Number(e.distance) / 1000 : null;
               const dauerSek =
@@ -596,6 +598,34 @@ export default function TrainingPage() {
               );
             })}
           </ul>
+
+          {uhrEinheiten.length > 5 && (
+            <div className="mt-3 flex items-center justify-between gap-2 border-t border-[var(--border-muted)] pt-3">
+              <button
+                type="button"
+                onClick={() => setUhrSeite((v) => Math.max(0, v - 1))}
+                disabled={uhrSeite === 0}
+                className="rounded-lg border border-[var(--border-muted)] px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40"
+              >
+                ← Zurück
+              </button>
+              <span className="text-[11px] tabular-nums text-[var(--text-muted)]">
+                Seite {uhrSeite + 1} von {Math.max(1, Math.ceil(uhrEinheiten.length / 5))} ·{' '}
+                {uhrSeite * 5 + 1}–{Math.min(uhrEinheiten.length, uhrSeite * 5 + 5)} von{' '}
+                {uhrEinheiten.length}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setUhrSeite((v) => Math.min(Math.ceil(uhrEinheiten.length / 5) - 1, v + 1))
+                }
+                disabled={uhrSeite >= Math.ceil(uhrEinheiten.length / 5) - 1}
+                className="rounded-lg border border-[var(--border-muted)] px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40"
+              >
+                Weiter →
+              </button>
+            </div>
+          )}
         </Card>
       )}
 

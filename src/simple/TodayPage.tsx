@@ -59,12 +59,15 @@ export default function TodayPage() {
 
   useEffect(() => {
     let abgebrochen = false;
-    api<Array<Record<string, unknown>>>('/api/integrations/garmin/activities?limit=8')
+    api<{ aktivitaeten?: Array<Record<string, unknown>> }>('/api/integrations/garmin/activities?limit=20')
       .then((r) => {
-        if (!abgebrochen) {
-          const liste = (r as unknown as { aktivitaeten?: Array<Record<string, unknown>> }).aktivitaeten;
-          setEinheiten(Array.isArray(liste) ? liste : []);
-        }
+        if (abgebrochen) return;
+        const liste = Array.isArray(r.aktivitaeten) ? r.aktivitaeten : [];
+        // Nur heute — auf der Heute-Seite gehören keine alten Einheiten hin.
+        const heuteYmd = new Date().toISOString().slice(0, 10);
+        setEinheiten(
+          liste.filter((e) => String(e.date ?? e.start_date_local ?? '').slice(0, 10) === heuteYmd),
+        );
       })
       .catch(() => {});
     return () => {
@@ -191,7 +194,7 @@ export default function TodayPage() {
             <Dumbbell className="h-3 w-3" /> Einheiten von der Uhr
           </p>
           <ul className="mt-2 divide-y divide-[var(--border-muted)]">
-            {einheiten.slice(0, 5).map((e, i) => {
+            {einheiten.map((e, i) => {
               const datum = String(e.date ?? e.start_date_local ?? '').slice(0, 10);
               const distanz = e.distance != null ? Number(e.distance) / 1000 : null;
               const dauer = e.moving_time != null ? Number(e.moving_time) : e.duration != null ? Number(e.duration) : null;

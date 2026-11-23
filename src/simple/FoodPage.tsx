@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { api } from '../lib/api';
 import {
   Camera,
   ChevronLeft,
@@ -86,8 +87,12 @@ function bucketOf(entry: FoodEntry): string {
 export default function FoodPage() {
   const { profile } = useAuth();
   const [date, setDate] = useState(todayYmd());
+  /** Tagesleiste: darin wird der gewählte Tag automatisch in den Blick gescrollt. */
+  const tageLeiste = useRef<HTMLDivElement | null>(null);
   const [entries, setEntries] = useState<FoodEntry[]>([]);
   const [monat, setMonat] = useState<FoodEntry[]>([]);
+  /** Kalorienverbrauch von der Uhr: Grundumsatz plus Aktivkalorien. */
+  const [verbrauch, setVerbrauch] = useState<{ grundumsatz: number; aktiv: number } | null>(null);
   const [trainingDay, setTrainingDay] = useState(false);
   const [sheetFor, setSheetFor] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
@@ -115,6 +120,31 @@ export default function FoodPage() {
       setMonat(month);
       setEntries(month.filter((e) => toYmd(e.date) === date));
       setGerichte(mp);
+
+      /*
+       * Aktivkalorien der Uhr für heute holen. Das Tagesziel enthält den
+       * Grundumsatz; die Aktivkalorien kommen obendrauf. Ohne diesen Abruf sieht
+       * man an einem Lauftag nicht, warum mehr Kalorien offen sind.
+       */
+      api<{ aktivitaeten?: Array<Record<string, unknown>> }>('/api/integrations/garmin/activities?limit=20')
+        .then((r) => {
+          const liste = Array.isArray(r.aktivitaeten) ? r.aktivitaeten : [];
+          const heutige = liste.filter(
+            (e) => String(e.date ?? e.start_date_local ?? '').slice(0, 10) === todayYmd(),
+          );
+          const aktiv = heutige.reduce((a, e) => a + (Number(e.calories) || 0), 0);
+          setVerbrauch(
+            aktiv > 0
+              ? {
+                  // Grundumsatz aus dem Tagesziel ableiten (kcalBoost herausrechnen).
+                  grundumsatz: Math.round(Number(goals.dailyCalories) || 2400),
+                  aktiv: Math.round(aktiv),
+                }
+              : null,
+          );
+        })
+        .catch(() => {});
+
       const key = dayKeyOf(date);
       const day = (plan?.week?.schedule ?? []).find((d) => d.day === key);
       setTrainingDay(Boolean(day && !day.isRest));
@@ -216,6 +246,16 @@ export default function FoodPage() {
     return karte;
   }, [gerichte, date]);
 
+  // Gewählten Tag in den sichtbaren Bereich holen — auch wenn er weit hinten liegt.
+  useEffect(() => {
+    const leiste = tageLeiste.current;
+    if (!leiste) return;
+    const aktiv = leiste.querySelector<HTMLElement>('[data-aktiv="1"]');
+    if (aktiv) {
+      aktiv.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    }
+  }, [date]);
+
   // Auswertungen über 30 Tage
   const map = useMemo(() => kcalByDay(monat), [monat]);
   const oKcal = kcalDurchschnitt(monat, 7);
@@ -248,9 +288,6 @@ export default function FoodPage() {
         hint={`${entries.length} ${entries.length === 1 ? 'Eintrag' : 'Einträge'} · ${trainingDay ? 'Trainingstag' : 'Ruhetag'} · Ziel ${goalKcal} kcal`}
         action={
           <div className="flex flex-wrap items-center gap-2">
-            <GhostButton onClick={() => setDate(shiftYmd(date, -7))}>
-              <ChevronLeft className="h-3.5 w-3.5" /> Woche
-            </GhostButton>
             <GhostButton onClick={() => setDate(shiftYmd(date, -1))}>
               <ChevronLeft className="h-3.5 w-3.5" />
             </GhostButton>
@@ -324,6 +361,38 @@ export default function FoodPage() {
             </span>
           </div>
 
+          {/* Tagesbilanz offenlegen: Grundumsatz + Aktivkalorien = Bedarf, davon gegessen abziehen. */}
+          {verbrauch && (
+            <div className="mb-3 grid grid-cols-3 gap-2 rounded-xl border border-[var(--border-muted)] bg-[var(--background)] px-3 py-2.5">
+              <div>
+                <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
+                  Grundumsatz
+                </p>
+                <p className="mt-0.5 text-[13.5px] font-semibold tabular-nums">
+                  {verbrauch.grundumsatz.toLocaleString('de-DE')}
+                </p>
+              </div>
+              <div>
+                <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--simple-accent)]">
+                  + Aktivität
+                </p>
+                <p className="mt-0.5 text-[13.5px] font-semibold tabular-nums text-[var(--simple-accent)]">
+                  {verbrauch.aktiv.toLocaleString('de-DE')}
+                </p>
+              </div>
+              <div>
+                <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
+                  Noch offen
+                </p>
+                <p className="mt-0.5 text-[13.5px] font-semibold tabular-nums">
+                  {Math.round(
+                    verbrauch.grundumsatz + verbrauch.aktiv - sum.kcal,
+                  ).toLocaleString('de-DE')}
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="mt-4 flex flex-col items-center gap-6 sm:flex-row sm:items-start">
             <Ring value={sum.kcal} max={goalKcal} label="gegessen" unit="kcal" size={132} />
             <div className="w-full flex-1 space-y-3">
@@ -357,21 +426,49 @@ export default function FoodPage() {
           <SectionTitle action={<GhostButton onClick={() => setDate(todayYmd())}>Heute</GhostButton>}>
             Woche
           </SectionTitle>
-          <div className="flex flex-1 items-end gap-1.5">
-            {Array.from({ length: 7 }, (_, i) => shiftYmd(date, -6 + i)).map((ymd) => {
+          {/*
+           * 30 Tage waagerecht scrollbar. Vorher waren es nur 7 Tage ab dem
+           * gewählten Datum — sobald man einen älteren Tag öffnete, verschwand
+           * die Möglichkeit zurückzugehen und man hing am „Heute"-Button.
+           */}
+          <div
+            ref={tageLeiste}
+            className="flex flex-1 items-end gap-1.5 overflow-x-auto pb-1"
+            style={{ scrollbarWidth: 'thin' }}
+          >
+            {Array.from({ length: 30 }, (_, i) => shiftYmd(todayYmd(), -(29 - i))).map((ymd) => {
               const active = ymd === date;
               const kcal = map.get(ymd) ?? 0;
               const anteil = Math.min(1, kcal / Math.max(1, Number(goals.dailyCalories) || 2400));
+              // Gewählten Tag in den sichtbaren Bereich holen — auch wenn er weit hinten liegt.
+  useEffect(() => {
+    const leiste = tageLeiste.current;
+    if (!leiste) return;
+    const aktiv = leiste.querySelector<HTMLElement>('[data-aktiv="1"]');
+    if (aktiv) {
+      aktiv.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    }
+  }, [date]);
+
+  const istHeute = ymd === todayYmd();
               return (
                 <button
                   key={ymd}
+                  data-aktiv={active ? '1' : undefined}
                   onClick={() => setDate(ymd)}
-                  className={`flex flex-1 flex-col items-center gap-1 rounded-lg py-1.5 transition ${
+                  className={`flex w-8 shrink-0 flex-col items-center gap-1 rounded-lg py-1.5 transition ${
                     active ? 'bg-[var(--simple-accent-soft)]' : 'hover:bg-[var(--border-muted)]/40'
                   }`}
+                  title={`${ymd}${kcal > 0 ? ` · ${Math.round(kcal)} kcal` : ' · nichts erfasst'}`}
                 >
                   <span
-                    className={`text-[10px] ${active ? 'font-semibold text-[var(--simple-accent)]' : 'text-[var(--text-muted)]'}`}
+                    className={`text-[10px] ${
+                      active
+                        ? 'font-semibold text-[var(--simple-accent)]'
+                        : istHeute
+                          ? 'font-semibold text-[var(--foreground)]'
+                          : 'text-[var(--text-muted)]'
+                    }`}
                   >
                     {dayLabelShort(ymd)}
                   </span>
@@ -385,20 +482,9 @@ export default function FoodPage() {
                       }}
                     />
                   </div>
-                  <span className="text-[9px] tabular-nums text-[var(--text-muted)]">
-                    {kcal > 0 ? Math.round(kcal / 100) / 10 + 'k' : '–'}
-                  </span>
                 </button>
               );
             })}
-          </div>
-          <div className="mt-auto border-t border-[var(--border-muted)] pt-2.5">
-            <ProgressBar
-              value={erfasst7}
-              max={7}
-              label="Erfasste Tage"
-              right={`${erfasst7} / 7`}
-            />
           </div>
         </Card>
       </div>
