@@ -107,11 +107,51 @@ export async function fetchWorkouts(): Promise<WorkoutEntry[]> {
   return Array.isArray(rows) ? rows : [];
 }
 
-export async function fetchActivePlan(): Promise<{ plan: CoachPlan; week: CoachWeek } | null> {
+export type PlanWeek = {
+  week_number: number;
+  /** Montag dieser Planwoche als YYYY-MM-DD. */
+  start_date: string;
+  schedule: CoachWeek;
+};
+
+export async function fetchActivePlan(): Promise<{
+  plan: CoachPlan;
+  week: CoachWeek;
+  /** Alle vorhandenen Planwochen — die Wochenansicht darf keine erfundenen Wochen zeigen. */
+  weeks: PlanWeek[];
+} | null> {
   const plans = await api<CoachPlan[]>('/api/coach/plans');
   const plan = (plans ?? []).find((p) => p.type === 'workout' && p.status === 'active');
   if (!plan) return null;
-  return { plan, week: (plan.current_schedule?.schedule ?? null) as CoachWeek };
+
+  const current = plan.current_schedule;
+  let weeks: PlanWeek[] = current
+    ? [
+        {
+          week_number: Number(current.week_number ?? plan.current_week ?? 1),
+          start_date: String((current as { start_date?: string }).start_date ?? '').slice(0, 10),
+          schedule: (current.schedule ?? null) as CoachWeek,
+        },
+      ]
+    : [];
+
+  // Alle Wochen nachladen: sonst zeigt die Wochenansicht für jede Woche denselben Plan.
+  try {
+    const detail = await api<{ schedules?: Array<{ week_number: number; start_date: string; schedule: CoachWeek }> }>(
+      `/api/coach/plans/${plan.id}`,
+    );
+    if (Array.isArray(detail?.schedules) && detail.schedules.length) {
+      weeks = detail.schedules.map((s) => ({
+        week_number: Number(s.week_number),
+        start_date: String(s.start_date ?? '').slice(0, 10),
+        schedule: (s.schedule ?? null) as CoachWeek,
+      }));
+    }
+  } catch {
+    /* Detailabruf ist optional — die aktuelle Woche reicht als Rückfallebene. */
+  }
+
+  return { plan, week: (current?.schedule ?? null) as CoachWeek, weeks };
 }
 
 export function totals(entries: FoodEntry[]): Macro {

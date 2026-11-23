@@ -1832,13 +1832,22 @@ function PlanDetail({ planId, onBack, initialExpandedDay }: { planId: string; on
           </>
         )}
         {plan.status === 'paused' && (
-          <button
-            type="button"
-            onClick={() => setStatus('active')}
-            className={cn('w-full', coachActionBtnBase, coachActionBtnHover)}
-          >
-            <Play size={14} /> {t('coach.actions.resume')}
-          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setStatus('active')}
+              className={cn(coachActionBtnBase, coachActionBtnHover)}
+            >
+              <Play size={14} /> {t('coach.actions.resume')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmDialog('deletePlan')}
+              className={cn(coachActionBtnBase, coachActionBtnDangerHover)}
+            >
+              <Trash2 size={14} /> {t('coach.actions.delete')}
+            </button>
+          </div>
         )}
         {plan.status === 'cancelled' && (
           <div className="grid grid-cols-2 gap-2">
@@ -2091,9 +2100,16 @@ interface CoachPageProps {
   deepLink?: { planId: string, day: string } | null;
   /** Nach App-Onboarding: Coach-Wizard direkt öffnen */
   autoStartOnboarding?: boolean;
+  /** Kopfzeile (Titel, KI-Status, "Neuer Plan") ausblenden, z. B. eingebettet im Training. */
+  hideHeader?: boolean;
+  /**
+   * Zähler: jede Erhöhung öffnet den Plan-Wizard. Damit kann ein Button außerhalb
+   * (Trainingsseite, neben "Sofort starten") die Plan-Anlage auslösen.
+   */
+  openOnboardingToken?: number;
 }
 
-export default function CoachPage({ planType, deepLink, autoStartOnboarding }: CoachPageProps = {}) {
+export default function CoachPage({ planType, deepLink, autoStartOnboarding, hideHeader, openOnboardingToken }: CoachPageProps = {}) {
   const navigate = useNavigate();
   const aiCaps = useAiCapabilities();
   const { t } = useI18n();
@@ -2138,6 +2154,13 @@ export default function CoachPage({ planType, deepLink, autoStartOnboarding }: C
     if (!autoStartOnboarding || loading) return;
     if (aiCaps.enabled) setShowOnboarding(true);
   }, [autoStartOnboarding, loading, aiCaps.enabled]);
+
+  // Externer "Neuer Plan"-Button (z. B. Trainingsseite): Wizard öffnen, sobald KI bereit ist.
+  useEffect(() => {
+    if (!openOnboardingToken) return;
+    if (aiCaps.loading || !aiCaps.enabled) return;
+    setShowOnboarding(true);
+  }, [openOnboardingToken, aiCaps.loading, aiCaps.enabled]);
 
   const scopedAll = planType ? allPlans.filter(p => p.type === planType) : allPlans;
   const pendingPlans: PendingCoachPlan[] = scopedAll.filter(
@@ -2256,6 +2279,7 @@ export default function CoachPage({ planType, deepLink, autoStartOnboarding }: C
   return (
     <div className={cn(embedded ? 'space-y-5 pb-6' : 'space-y-8 pb-10')}>
       {/* Header */}
+      {!hideHeader && (
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2
@@ -2298,6 +2322,7 @@ export default function CoachPage({ planType, deepLink, autoStartOnboarding }: C
           <Plus size={14} /> {t('coach.newPlan')}
         </button>
       </div>
+      )}
 
       {!creating && pendingPlans.length > 0 && (
         <CoachPendingPlansPanel
@@ -2394,7 +2419,7 @@ export default function CoachPage({ planType, deepLink, autoStartOnboarding }: C
       {/* Active plans */}
       {activePlans.length > 0 && (
         <div className="space-y-2">
-          {!embedded && (
+          {!embedded && !hideHeader && (
             <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--text-muted)] px-1">
               {t('coach.section.active')}
             </h2>
@@ -2413,9 +2438,11 @@ export default function CoachPage({ planType, deepLink, autoStartOnboarding }: C
       {/* Paused / cancelled plans */}
       {otherPlans.length > 0 && (
         <div className="space-y-2">
-          <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--text-muted)] px-1">
-            {t('coach.section.other')}
-          </h2>
+          {!embedded && !hideHeader && (
+            <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--text-muted)] px-1">
+              {t('coach.section.other')}
+            </h2>
+          )}
           {otherPlans.map(plan => (
             <PlanCard
               key={plan.id}

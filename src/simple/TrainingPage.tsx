@@ -8,6 +8,7 @@ import {
   Flame,
   Moon,
   Play,
+  Plus,
   Timer,
   Trash2,
   TrendingUp,
@@ -26,6 +27,7 @@ import {
 } from './ui';
 import WorkoutSheet from './WorkoutSheet';
 import PlanBereich from '../components/coach/CoachPage';
+import { useAiCapabilities } from '../lib/AiCapabilitiesContext';
 import { TrainingTagesdetail } from '../components/training/TrainingTagesdetail';
 import {
   DAY_LABELS,
@@ -37,6 +39,7 @@ import {
   todayYmd,
   type CoachWeek,
   type PlanDay,
+  type PlanWeek,
   type WorkoutEntry,
 } from './simpleApi';
 import {
@@ -85,6 +88,8 @@ function dateOfDayKey(key: string, weekMonday: string = ymdOf(mondayOfYmd(todayY
 export default function TrainingPage() {
   const today = todayYmd();
   const [week, setWeek] = useState<CoachWeek>(null);
+  /** Alle Wochen des aktiven Plans (mit Startdatum) — Grundlage für die Wochenansicht. */
+  const [planWochen, setPlanWochen] = useState<PlanWeek[]>([]);
   const [workouts, setWorkouts] = useState<WorkoutEntry[]>([]);
   const [selected, setSelected] = useState<string>(dayKeyOf(today));
   /** 0 = diese Woche, 1 = nächste Woche, -1 = letzte Woche … */
@@ -94,6 +99,9 @@ export default function TrainingPage() {
   const [tagOffen, setTagOffen] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [laedt, setLaedt] = useState(true);
+  /** Zähler für den äußeren "Neuer Plan"-Button; CoachPage öffnet bei jeder Erhöhung den Wizard. */
+  const [neuerPlanToken, setNeuerPlanToken] = useState(0);
+  const aiCaps = useAiCapabilities();
 
   const load = useCallback(async () => {
     setError(null);
@@ -101,6 +109,7 @@ export default function TrainingPage() {
     try {
       const [plan, list] = await Promise.all([fetchActivePlan().catch(() => null), fetchWorkouts().catch(() => [])]);
       setWeek(plan?.week ?? null);
+      setPlanWochen(plan?.weeks ?? []);
       setWorkouts(list);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Konnte nicht laden.');
@@ -131,10 +140,29 @@ export default function TrainingPage() {
     setSelected(WEEK_ORDER[0]);
   }, []);
 
+  /**
+   * Planwoche zur angezeigten Kalenderwoche.
+   * Eine Woche ohne Eintrag im Plan gibt es nicht — dann bleibt `schedule` leer und die
+   * Tage erscheinen als Ruhetage. Vorher wurde für jede Woche derselbe Plan gezeigt.
+   */
+  const angezeigtePlanWoche = useMemo<PlanWeek | null>(() => {
+    if (!planWochen.length) return null;
+    const treffer = planWochen.find((w) => w.start_date === shownMondayYmd);
+    if (treffer) return treffer;
+    // Kein exaktes Startdatum: die Woche nehmen, in die der Montag fällt.
+    return (
+      planWochen.find((w) => {
+        if (!w.start_date) return false;
+        const ende = shiftYmdLocal(w.start_date, 6);
+        return shownMondayYmd >= w.start_date && shownMondayYmd <= ende;
+      }) ?? null
+    );
+  }, [planWochen, shownMondayYmd]);
+
   const days = useMemo<PlanDay[]>(() => {
-    const schedule = week?.schedule ?? [];
+    const schedule = angezeigtePlanWoche?.schedule?.schedule ?? [];
     return WEEK_ORDER.map((key) => schedule.find((d) => d.day === key) ?? { day: key, isRest: true, title: 'Ruhetag' });
-  }, [week]);
+  }, [angezeigtePlanWoche]);
 
   const planDay = days.find((d) => d.day === selected) ?? null;
   const selectedYmd = dateOfDayKey(selected, shownMondayYmd);
@@ -200,11 +228,17 @@ export default function TrainingPage() {
       <PageHeader
         eyebrow="Dein Plan"
         title="Training"
-        hint={week?.weekFocus || 'Wähle einen Tag und starte die Einheit.'}
+        hint={angezeigtePlanWoche?.schedule?.weekFocus || 'Wähle einen Tag und starte die Einheit.'}
         action={
           <div className="flex gap-2">
             <GhostButton onClick={() => setRunning(true)}>
               <Play className="h-3.5 w-3.5" /> Sofort starten
+            </GhostButton>
+            <GhostButton
+              onClick={() => aiCaps.enabled && setNeuerPlanToken((n) => n + 1)}
+              disabled={aiCaps.loading || !aiCaps.enabled}
+            >
+              <Plus className="h-3.5 w-3.5" /> Neuer Plan
             </GhostButton>
           </div>
         }
@@ -475,6 +509,11 @@ export default function TrainingPage() {
                 Noch kein aktiver Plan — unter <b>Mehr → Coach &amp; Pläne</b> erzeugen lassen.
               </p>
             )}
+            {week && !angezeigtePlanWoche && (
+              <p className="mt-2 rounded-lg bg-[var(--border-muted)]/30 px-2.5 py-2 text-[11px] leading-relaxed text-[var(--text-muted)]">
+                Für diese Woche ist nichts geplant — der Plan deckt sie nicht ab.
+              </p>
+            )}
           </Card>
 
           <Card className="p-5">
@@ -585,22 +624,10 @@ export default function TrainingPage() {
 
       {error && <p className="rounded-xl bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-600">{error}</p>}
 
-      {/* Trainingsplan: anlegen, wechseln, bearbeiten (frueher im Coach) */}
+      {/* Trainingspläne: direkt unter dem Verlauf, ohne eigene Überschrift/Button —
+          "Neuer Plan" sitzt oben in der Kopfzeile. */}
       <section className="mt-2 border-t border-[var(--border-muted)] pt-6">
-        <div className="mb-4 flex items-end justify-between gap-3">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-              Trainingsplan
-            </p>
-            <h2
-              className="mt-0.5 text-[22px] leading-tight text-[var(--foreground)]"
-              style={{ fontFamily: 'var(--simple-serif)' }}
-            >
-              Dein Plan
-            </h2>
-          </div>
-        </div>
-        <PlanBereich />
+        <PlanBereich hideHeader openOnboardingToken={neuerPlanToken} />
       </section>
 
       {tagOffen && (() => {

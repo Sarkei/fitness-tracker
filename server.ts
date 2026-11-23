@@ -4110,14 +4110,16 @@ COMPARISON WITH WEEK ${plan.current_week - 1}:
 
   app.delete("/api/coach/plans/:id", requireAuth, async (req: AuthRequest, res) => {
     try {
-      // Only allow deleting cancelled plans (safety guard)
+      // Löschbar sind Pläne, die nicht mehr laufen: pausiert oder abgebrochen.
+      // Ein aktiver Plan muss vorher pausiert/beendet werden, damit niemand
+      // versehentlich seinen laufenden Plan verliert.
       const check = await pool.query(
         "SELECT status FROM coach_plans WHERE id=$1 AND user_id=$2",
         [req.params.id, req.userId]
       );
       if (!check.rows.length) { res.status(404).json({ error: "Not found" }); return; }
-      if (check.rows[0].status !== 'cancelled') {
-        res.status(400).json({ error: "Only cancelled plans can be deleted. Cancel the plan first." });
+      if (check.rows[0].status === 'active') {
+        res.status(400).json({ error: "Aktive Pläne lassen sich nicht löschen. Pausiere den Plan zuerst." });
         return;
       }
       await pool.query("DELETE FROM coach_weekly_schedules WHERE plan_id=$1", [req.params.id]);
