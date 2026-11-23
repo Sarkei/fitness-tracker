@@ -1,70 +1,68 @@
-/*
- * Service Worker: macht die App installierbar und startet sie offline schnell.
+/**
+ * Service Worker für Push-Benachrichtigungen.
  *
- * Strategie bewusst einfach gehalten:
- *  - Navigationen: Netz zuerst (die App braucht aktuelle Daten), Fallback Cache.
- *  - Gebaute Assets (JS/CSS mit Hash im Namen): Cache zuerst, sie ändern sich nie.
- *  - API-Aufrufe: niemals cachen — Trainings- und Garmin-Daten müssen frisch sein.
+ * Liegt als `/sw.js` im App-Ordner und wird vom Browser installiert, sobald die
+ * App geladen wird. Er läuft auch weiter, wenn die App geschlossen ist — nur so
+ * kommen Nachrichten an, während niemand die Seite offen hat.
  *
- * Bei einer neuen Version wird der alte Cache beim Aktivieren gelöscht.
+ * Wichtig: Der Service Worker cached **nichts**. Die Apps liefern ihre Dateien
+ * über gehashte Namen aus; ein Cache würde nach einem Deploy alte Stände zeigen.
  */
-const CACHE = 'vrtx-v1';
-const ASSET_CACHE = 'vrtx-assets-v1';
 
 self.addEventListener('install', (event) => {
+  // Sofort aktiv werden, nicht auf den nächsten Start warten.
   self.skipWaiting();
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(['/', '/index.html']).catch(() => {})));
 });
 
 self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
+/**
+ * Push-Nachricht empfangen und anzeigen.
+ *
+ * Der Server schickt JSON mit `title`, `body` und optional `url`.
+ */
+self.addEventListener('push', (event) => {
+  let daten = { title: 'Benachrichtigung', body: '', url: '/' };
+  try {
+    if (event.data) daten = { ...daten, ...event.data.json() };
+  } catch {
+    // Kein JSON — dann den reinen Text nehmen.
+    if (event.data) daten.body = event.data.text();
+  }
+
   event.waitUntil(
-    caches
-      .keys()
-      .then((keys) =>
-        Promise.all(keys.filter((k) => k !== CACHE && k !== ASSET_CACHE).map((k) => caches.delete(k))),
-      )
-      .then(() => self.clients.claim()),
+    self.registration.showNotification(daten.title, {
+      body: daten.body,
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      // Ein Tag pro Nachrichtentyp: gleiche Nachrichten ersetzen sich,
+      // statt sich zu stapeln.
+      tag: daten.tag || 'allgemein',
+      data: { url: daten.url || '/' },
+      vibrate: [90, 40, 90],
+    }),
   );
 });
 
-self.addEventListener('fetch', (event) => {
-  const { request } = event;
-  if (request.method !== 'GET') return;
+/** Klick auf die Benachrichtigung: App öffnen oder in den Vordergrund holen. */
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const ziel = (event.notification.data && event.notification.data.url) || '/';
 
-  const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return;
-
-  // API nie cachen — sonst zeigt die App veraltete Werte.
-  if (url.pathname.startsWith('/api/')) return;
-
-  // Navigation: Netz zuerst, damit ein Deploy sofort greift.
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then((res) => {
-          const kopie = res.clone();
-          caches.open(CACHE).then((c) => c.put('/index.html', kopie)).catch(() => {});
-          return res;
-        })
-        .catch(() => caches.match('/index.html').then((r) => r || Response.error())),
-    );
-    return;
-  }
-
-  // Gehashte Assets: aus dem Cache, sonst holen und ablegen.
-  if (/\.(js|css|woff2?|png|jpe?g|svg|webp|ico)$/.test(url.pathname)) {
-    event.respondWith(
-      caches.match(request).then(
-        (treffer) =>
-          treffer ||
-          fetch(request).then((res) => {
-            if (res.ok) {
-              const kopie = res.clone();
-              caches.open(ASSET_CACHE).then((c) => c.put(request, kopie)).catch(() => {});
-            }
-            return res;
-          }),
-      ),
-    );
-  }
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((fenster) => {
+      // Schon offen? Dann dorthin springen.
+      for (const f of fenster) {
+        if ('focus' in f) {
+          f.navigate(ziel);
+          return f.focus();
+        }
+      }
+      // Sonst neu öffnen.
+      if (self.clients.openWindow) return self.clients.openWindow(ziel);
+      return undefined;
+    }),
+  );
 });

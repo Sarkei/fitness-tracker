@@ -195,6 +195,7 @@ import {
 } from "./src/lib/server/migrateUserData";
 import type { BatchMigrationResult } from "./src/lib/server/migrateUserData";
 import { pushoverRouter } from "./src/lib/server/pushover-route.ts";
+import { pushRouter } from "./server/push-route";
 const { Pool } = pg;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -953,7 +954,6 @@ function createAdminMigrationJob(force: boolean): AdminMigrationJob {
 async function startServer(): Promise<void> {
   const app = express();
   app.use(express.json({ limit: "10mb" }));
-
   /*
    * Pushover: Zugang hinterlegen, testen, trennen.
    * Die Werte bleiben serverseitig — GET liefert nur „verbunden".
@@ -965,6 +965,16 @@ async function startServer(): Promise<void> {
       titel: "Fitness-Tracker",
       text: "Wenn du das siehst, funktionieren deine Benachrichtigungen.",
     }),
+  );
+
+  /*
+   * Web Push: Gerät anmelden, abmelden, testen.
+   * Läuft parallel zu Pushover — beides kann gleichzeitig aktiv sein.
+   */
+  app.use(
+    "/api/push",
+    requireAuth,
+    pushRouter(pool as never, (req: Request) => (req as AuthRequest).userId ?? null, "Fitness-Tracker"),
   );
 
   // ── Health ────────────────────────────────────────────────────────────────
@@ -2434,7 +2444,48 @@ ${exerciseCatalog}
       "SELECT * FROM workouts WHERE user_id=$1 ORDER BY date DESC, created_at DESC",
       [req.userId]
     );
-    res.json(result.rows.map(mapWorkout));
+    const eigene = result.rows.map(mapWorkout);
+
+    /*
+     * Garmin-Aktivitäten mitgeben.
+     *
+     * Läufe und Fahrten, die von der Uhr kommen, stehen nicht in `workouts` —
+     * sie liegen in `garmin_activities`. Ohne diesen Zusatz fehlten sie in der
+     * Trainingsserie: Ein Lauf am Sonntag hätte die Serie nicht fortgeführt,
+     * weil die Serie nur `workouts` kennt.
+     *
+     * Sie werden als Einträge mit `source: 'garmin'` geliefert. `id` ist die
+     * Garmin-Activity-ID, damit sie sich von eigenen Einheiten unterscheiden
+     * und nicht doppelt gezählt werden.
+     */
+    let garmin: Array<Record<string, unknown>> = [];
+    try {
+      const g = await pool.query(
+        `SELECT activity_id, date, name, type, distance_m, duration_s, calories, avg_hr, max_hr
+           FROM garmin_activities
+          WHERE user_id = $1
+          ORDER BY date DESC
+          LIMIT 400`,
+        [req.userId],
+      );
+      garmin = g.rows.map((r) => ({
+        id: `garmin-${r.activity_id}`,
+        date: r.date,
+        name: String(r.name ?? '') || String(r.type ?? 'Aktivität'),
+        type: String(r.type ?? 'other'),
+        duration_min: r.duration_s ? Math.round(Number(r.duration_s) / 60) : null,
+        distance_km: r.distance_m ? Math.round((Number(r.distance_m) / 1000) * 100) / 100 : null,
+        calories: r.calories ?? null,
+        avg_hr: r.avg_hr ?? null,
+        max_hr: r.max_hr ?? null,
+        /** Kennzeichnet die Herkunft — die Oberfläche kann das anzeigen. */
+        source: 'garmin',
+      }));
+    } catch {
+      /* Tabelle fehlt (Garmin nie verbunden) — dann bleibt es bei den eigenen. */
+    }
+
+    res.json([...eigene, ...garmin]);
   });
 
   /**
