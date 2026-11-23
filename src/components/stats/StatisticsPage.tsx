@@ -656,7 +656,6 @@ export default function StatisticsPage() {
                     tickMargin={8}
                     axisLine={false}
                     tickLine={false}
-                    tickMargin={8}
                     label={{ value: t('stats.axis.day'), position: 'bottom', offset: 0, fontSize: 11, fill: 'var(--text-muted)', fontWeight: 600 }}
                   />
                   <YAxis
