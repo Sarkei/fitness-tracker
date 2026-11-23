@@ -35,6 +35,7 @@ import {
   SYNC_INTERVAL_OPTIONS,
   type IntervalsSettings,
 } from "./src/lib/intervals";
+import { syncGarmin, type GarminCache } from "./src/lib/garmin";
 import {
   deleteEvent as intervalsDeleteEvent,
   syncWorkout as intervalsSyncWorkout,
@@ -5693,6 +5694,141 @@ ${JSON.stringify(userCtx, null, 2)}
   };
 
   /** Status ohne den Key selbst - der bleibt im Server. */
+  // ── Garmin Connect Personal API (nur lesend) ──────────────────────────────
+  /**
+   * Garmin-Direktanbindung.
+   *
+   * Tim erzeugt den Key selbst in Garmin Connect Web; er liegt in
+   * `profile_extras.garmin.apiKey` und geht nie an den Browser. Abgerufen werden
+   * Schlaf, HRV, Schritte, Stress, Body Battery, SpO₂ und Herzfrequenz — genau die
+   * Werte, die Intervals.icu teils gar nicht oder verzögert liefert.
+   *
+   * Nicht möglich: Trainings auf die Uhr schreiben. Die Personal API hat
+   * ausschließlich GET-Endpunkte; der Rückweg läuft über Intervals.icu.
+   */
+  type GarminSettings = {
+    apiKey?: string;
+    connectedAt?: string;
+    displayName?: string;
+    lastError?: string;
+    cache?: GarminCache;
+    lastAutoSyncAt?: string;
+  };
+
+  const readGarminSettings = async (userId: number): Promise<GarminSettings> => {
+    const r = await pool.query("SELECT profile_extras FROM users WHERE id=$1", [userId]);
+    const extras = (r.rows[0]?.profile_extras || {}) as Record<string, unknown>;
+    return (extras.garmin as GarminSettings) || {};
+  };
+
+  const writeGarminSettings = async (userId: number, next: GarminSettings): Promise<void> => {
+    await pool.query(
+      `UPDATE users
+          SET profile_extras = COALESCE(profile_extras,'{}'::jsonb)
+              || jsonb_build_object('garmin', $2::jsonb),
+              updated_at = NOW()
+        WHERE id=$1`,
+      [userId, JSON.stringify(next)],
+    );
+  };
+
+  app.get("/api/integrations/garmin", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const g = await readGarminSettings(req.userId!);
+      const tage = g.cache?.tage ?? [];
+      const heute = tage[tage.length - 1] ?? null;
+      res.json({
+        connected: Boolean(g.apiKey),
+        connectedAt: g.connectedAt ?? null,
+        displayName: g.displayName ?? null,
+        lastSync: g.cache?.fetchedAt ?? null,
+        lastError: g.lastError ?? null,
+        nichtVerfuegbar: g.cache?.nichtVerfuegbar ?? [],
+        heute,
+        tage,
+      });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "load failed" });
+    }
+  });
+
+  app.post("/api/integrations/garmin/connect", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const apiKey = String(req.body?.apiKey ?? "").trim();
+      if (!apiKey) {
+        res.status(400).json({ error: "Garmin-API-Key fehlt." });
+        return;
+      }
+      // Erst prüfen, dann speichern — ein falscher Key landet nicht in der DB.
+      const cache = await syncGarmin(apiKey, 30);
+      await writeGarminSettings(req.userId!, {
+        apiKey,
+        connectedAt: new Date().toISOString(),
+        displayName: cache.displayName,
+        cache,
+        lastAutoSyncAt: new Date().toISOString(),
+      });
+      res.json({
+        ok: true,
+        displayName: cache.displayName ?? null,
+        tage: cache.tage.length,
+        nichtVerfuegbar: cache.nichtVerfuegbar,
+      });
+    } catch (err: unknown) {
+      res.status(400).json({
+        error:
+          err instanceof Error && err.name === "TimeoutError"
+            ? "Garmin hat nicht rechtzeitig geantwortet."
+            : err instanceof Error
+              ? err.message
+              : "Verbindung fehlgeschlagen.",
+      });
+    }
+  });
+
+  app.post("/api/integrations/garmin/sync", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const g = await readGarminSettings(req.userId!);
+      if (!g.apiKey) {
+        res.status(400).json({ error: "Garmin ist nicht verbunden." });
+        return;
+      }
+      const t0 = Date.now();
+      const cache = await syncGarmin(g.apiKey, 30);
+      await writeGarminSettings(req.userId!, {
+        ...g,
+        cache,
+        displayName: cache.displayName ?? g.displayName,
+        lastError: undefined,
+        lastAutoSyncAt: new Date().toISOString(),
+      });
+      res.json({
+        ok: true,
+        ms: Date.now() - t0,
+        tage: cache.tage.length,
+        heute: cache.tage[cache.tage.length - 1] ?? null,
+        nichtVerfuegbar: cache.nichtVerfuegbar,
+      });
+    } catch (err: unknown) {
+      const meldung = err instanceof Error ? err.message : "Sync fehlgeschlagen.";
+      const g = await readGarminSettings(req.userId!).catch(() => ({} as GarminSettings));
+      await writeGarminSettings(req.userId!, { ...g, lastError: meldung }).catch(() => {});
+      res.status(500).json({ error: meldung });
+    }
+  });
+
+  app.delete("/api/integrations/garmin", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      await pool.query(
+        `UPDATE users SET profile_extras = profile_extras - 'garmin', updated_at=NOW() WHERE id=$1`,
+        [req.userId],
+      );
+      res.json({ ok: true });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "disconnect failed" });
+    }
+  });
+
   app.get("/api/integrations/intervals", requireAuth, async (req: AuthRequest, res) => {
     try {
       const s = await readIntervalsSettings(req.userId!);
@@ -5948,6 +6084,57 @@ ${JSON.stringify(userCtx, null, 2)}
       hintergrundLaeuft = false;
     }
   };
+
+  /**
+   * Garmin-Hintergrundabgleich: alle 5 Minuten.
+   *
+   * Tim wollte „fast instant" — die Uhr synct selbst alle 15 Minuten in die
+   * Garmin-Cloud, deshalb ist 5 Minuten der sinnvolle Takt: neue Daten sind
+   * spätestens fünf Minuten nach dem Uhr-Sync in der App.
+   */
+  let garminLaeuft = false;
+  const garminTick = async () => {
+    if (garminLaeuft) return;
+    garminLaeuft = true;
+    try {
+      const rows = await pool.query(
+        `SELECT id, profile_extras->'garmin' AS g FROM users
+          WHERE profile_extras->'garmin'->>'apiKey' IS NOT NULL`,
+      );
+      for (const row of rows.rows) {
+        const g = (row.g || {}) as GarminSettings;
+        if (!g.apiKey) continue;
+        // Nicht öfter als alle 5 Minuten — der Takt unten ist schon 5 Minuten,
+        // dieser Schutz fängt manuelle Syncs und Neustarts ab.
+        const letzter = Date.parse(g.cache?.fetchedAt ?? g.lastAutoSyncAt ?? "");
+        if (Number.isFinite(letzter) && Date.now() - letzter < 5 * 60_000) continue;
+        try {
+          const cache = await syncGarmin(g.apiKey, 30);
+          await writeGarminSettings(Number(row.id), {
+            ...g,
+            cache,
+            displayName: cache.displayName ?? g.displayName,
+            lastError: undefined,
+            lastAutoSyncAt: new Date().toISOString(),
+          });
+        } catch (e) {
+          await writeGarminSettings(Number(row.id), {
+            ...g,
+            lastError: e instanceof Error ? e.message : "Garmin-Abgleich fehlgeschlagen.",
+            lastAutoSyncAt: new Date().toISOString(),
+          }).catch(() => {});
+        }
+      }
+    } catch (e) {
+      console.warn("[garmin] Hintergrund-Abgleich:", e);
+    } finally {
+      garminLaeuft = false;
+    }
+  };
+
+  const garminTimer = setInterval(() => void garminTick(), 5 * 60_000);
+  garminTimer.unref?.();
+  setTimeout(() => void garminTick(), 30_000).unref?.();
 
   // Takt: jede Minute pruefen, ob ein Nutzer faellig ist. Die teuren API-Aufrufe
   // passieren nur, wenn das eingestellte Intervall wirklich abgelaufen ist.

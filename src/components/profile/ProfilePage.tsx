@@ -18,6 +18,7 @@ import { cn } from '@/src/lib/utils';
 import ReportHistoryView from './ReportHistoryView';
 import IntervalsConnect from './IntervalsConnect';
 import MealplannerConnect from './MealplannerConnect';
+import GarminConnect from './GarminConnect';
 import { PageHeader } from '@/src/simple/ui';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
@@ -1014,6 +1015,7 @@ export default function ProfilePage() {
       {/* ── Verbindungen ── */}
       <div className="space-y-3">
         <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--text-muted)] px-4">Verbindungen</h3>
+        <GarminConnect />
         <IntervalsConnect />
         <MealplannerConnect />
         <Link
