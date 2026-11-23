@@ -14,6 +14,74 @@
 
 import type { Pool } from "pg";
 
+const DISCIPLINE_LABEL: Record<string, string> = {
+  strength: 'Krafttraining',
+  cardio: 'Ausdauer',
+  run: 'Lauftraining',
+  running: 'Lauftraining',
+  bike: 'Radtraining',
+  swim: 'Schwimmtraining',
+  hiit: 'HIIT',
+  mobility: 'Mobility',
+  balanced: 'Ausgewogene Ernährung',
+  lose: 'Abnehmen',
+  gain: 'Muskelaufbau',
+  maintain: 'Gewicht halten',
+};
+
+/** Sinnvoller Name aus Typ und Disziplin, z. B. "Krafttraining – 4 Wochen ab 23.11.". */
+export function sinnvollerPlanName(
+  planType: 'workout' | 'nutrition',
+  discipline?: string | null,
+  opts: { weeks?: number; startYmd?: string } = {},
+): string {
+  const basis =
+    DISCIPLINE_LABEL[String(discipline ?? '').toLowerCase()] ??
+    (planType === 'workout' ? 'Trainingsplan' : 'Ernährungsplan');
+  const teile = [basis];
+  if (opts.weeks && opts.weeks > 0) teile.push(`${opts.weeks} Wochen`);
+  if (opts.startYmd) {
+    const [, m, d] = opts.startYmd.split('-');
+    if (m && d) teile.push(`ab ${d}.${m}.`);
+  }
+  return teile.join(' – ');
+}
+
+/** Plan auswählen: nach Name (Teiltreffer, ohne Groß/klein) oder den neuesten. */
+async function waehlePlan(
+  pool: Pool,
+  userId: number,
+  planType: 'workout' | 'nutrition' | undefined,
+  opts: { name?: string; newest?: boolean },
+): Promise<{ id: string; type: string; discipline: string | null; name: string | null; status: string } | null> {
+  const typFilter = planType ? 'AND type=$2' : '';
+  const params: unknown[] = planType ? [userId, planType] : [userId];
+  if (opts.name && opts.name.trim()) {
+    params.push(`%${opts.name.trim()}%`);
+    const r = await pool.query(
+      `SELECT id, type, discipline, name, status FROM coach_plans
+        WHERE user_id=$1 ${typFilter} AND coalesce(name,'') ILIKE $${params.length}
+        ORDER BY updated_at DESC LIMIT 1`,
+      params,
+    );
+    if (r.rows.length) return r.rows[0];
+  }
+  const r = await pool.query(
+    `SELECT id, type, discipline, name, status FROM coach_plans
+      WHERE user_id=$1 ${typFilter}
+      ORDER BY updated_at DESC LIMIT 1`,
+    planType ? [userId, planType] : [userId],
+  );
+  return r.rows[0] ?? null;
+}
+
+function targetLabel(plan: { name?: string | null; discipline?: string | null; type?: string }): string {
+  return (
+    plan.name?.trim() ||
+    sinnvollerPlanName((plan.type as 'workout' | 'nutrition') ?? 'workout', plan.discipline)
+  );
+}
+
 export type CoachChatAction =
   | { type: "update_goals"; goals: Record<string, unknown> }
   | { type: "update_measurements"; measurements: Record<string, unknown> }
@@ -21,6 +89,10 @@ export type CoachChatAction =
   | { type: "update_extras"; extras: Record<string, unknown> }
   | { type: "create_plan"; planType: "workout" | "nutrition"; discipline?: string }
   | { type: "set_coaching_active"; active: boolean }
+  | { type: "rename_plan"; planType: "workout" | "nutrition"; name: string }
+  | { type: "activate_plan"; planType: "workout" | "nutrition"; name?: string; newest?: boolean }
+  | { type: "deactivate_plans"; planType?: "workout" | "nutrition" }
+  | { type: "delete_plan"; planType?: "workout" | "nutrition"; name?: string; newest?: boolean }
   | {
       type: "create_schedule";
       /** Was ausgeloest werden soll. */
@@ -157,6 +229,10 @@ export function buildCoachChatSystemPrompt(input: {
     '- {"type":"update_coach_preferences","preferences":{...}}',
     '- {"type":"create_plan","planType":"workout"|"nutrition"} - legt einen neuen Plan an',
     '- {"type":"set_coaching_active","active":true|false}',
+    '- {"type":"activate_plan","planType":"workout"|"nutrition","name":"..."} - Plan aktivieren (loest im Chat KEINE Generierung aus)',
+    '- {"type":"deactivate_plans","planType":"workout"|"nutrition"} - alle Plaene dieses Typs pausieren (bleiben erhalten)',
+    '- {"type":"delete_plan","planType":"workout"|"nutrition","name":"..."} - Plan loeschen (endgueltig)',
+    '- {"type":"rename_plan","planType":"workout"|"nutrition","name":"..."} - Plan umbenennen',
     '- {"type":"create_schedule","trigger":"nach_training"|"taeglich"|"waechentlich"|"monatlich",' +
       '"time":"HH:MM","weekday":1-7,"dayOfMonth":1-28,"title":"...","task":"..."} - legt einen eigenen Zeitplan an',
     "  Zeitplaene: der Nutzer sagt z.B. 'mach nach jedem Training eine Analyse'. Dann:",
@@ -453,17 +529,75 @@ export async function applyCoachChatActions(
         }
         case "create_plan": {
           const discipline = action.discipline ?? (action.planType === "workout" ? "strength" : "balanced");
+          const name = sinnvollerPlanName(action.planType, discipline);
           const inserted = await pool.query(
-            `INSERT INTO coach_plans (user_id, type, discipline, plan_mode, generation_status)
-             VALUES ($1,$2,$3,'chat','idle')
+            `INSERT INTO coach_plans (user_id, type, discipline, plan_mode, name, generation_status)
+             VALUES ($1,$2,$3,'chat',$4,'idle')
              RETURNING id`,
-            [userId, action.planType, discipline],
+            [userId, action.planType, discipline, name],
           );
           applied.push({
             type: action.type,
             ok: true,
-            note: `Plan ${inserted.rows[0]?.id ?? ""} angelegt - im Trainingsbereich starten`,
+            note: `„${name}" angelegt – die Einheiten entstehen im Trainingsbereich über „Woche generieren"`,
           });
+          break;
+        }
+        case "rename_plan": {
+          const target = await waehlePlan(pool, userId, action.planType, { name: undefined, newest: true });
+          if (!target) {
+            applied.push({ type: action.type, ok: false, note: "Kein Plan dieses Typs gefunden." });
+            break;
+          }
+          const neuerName = String(action.name ?? "").trim().slice(0, 120) || sinnvollerPlanName(action.planType, target.discipline);
+          await pool.query("UPDATE coach_plans SET name=$2, updated_at=NOW() WHERE id=$1", [target.id, neuerName]);
+          applied.push({ type: action.type, ok: true, note: `Plan umbenannt in „${neuerName}".` });
+          break;
+        }
+        case "activate_plan": {
+          const target = await waehlePlan(pool, userId, action.planType, { name: action.name, newest: action.newest });
+          if (!target) {
+            applied.push({ type: action.type, ok: false, note: "Kein passender Plan gefunden." });
+            break;
+          }
+          // Genau ein aktiver Plan pro Typ: die anderen desselben Typs werden pausiert.
+          await pool.query(
+            "UPDATE coach_plans SET status='active', updated_at=NOW() WHERE id=$1",
+            [target.id],
+          );
+          await pool.query(
+            "UPDATE coach_plans SET status='paused', updated_at=NOW() WHERE user_id=$1 AND type=$2 AND id<>$3 AND status='active'",
+            [userId, target.type, target.id],
+          );
+          applied.push({
+            type: action.type,
+            ok: true,
+            note: `„${targetLabel(target)}" ist jetzt der aktive ${target.type === "workout" ? "Trainings" : "Ernährungs"}-Plan; andere wurden pausiert.`,
+          });
+          break;
+        }
+        case "deactivate_plans": {
+          const r = await pool.query(
+            `UPDATE coach_plans SET status='paused', updated_at=NOW()
+              WHERE user_id=$1 AND status='active' ${action.planType ? "AND type=$2" : ""}
+              RETURNING id`,
+            action.planType ? [userId, action.planType] : [userId],
+          );
+          applied.push({
+            type: action.type,
+            ok: true,
+            note: r.rowCount ? `${r.rowCount} Plan/Pläne pausiert (bleiben erhalten).` : "Es war kein Plan aktiv.",
+          });
+          break;
+        }
+        case "delete_plan": {
+          const target = await waehlePlan(pool, userId, action.planType, { name: action.name, newest: action.newest });
+          if (!target) {
+            applied.push({ type: action.type, ok: false, note: "Kein passender Plan gefunden." });
+            break;
+          }
+          await pool.query("DELETE FROM coach_plans WHERE id=$1 AND user_id=$2", [target.id, userId]);
+          applied.push({ type: action.type, ok: true, note: `„${targetLabel(target)}" gelöscht.` });
           break;
         }
         default:

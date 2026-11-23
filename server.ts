@@ -19,7 +19,12 @@ import {
   completeCoachChat,
 } from "./aiProviders";
 import { reloadEnvFromFile, upsertEnvVar } from "./src/lib/envFileManager";
-import { buildCoachChatSystemPrompt, parseCoachChatReply, applyCoachChatActions } from "./src/lib/coachChat";
+import {
+  buildCoachChatSystemPrompt,
+  parseCoachChatReply,
+  applyCoachChatActions,
+  sinnvollerPlanName,
+} from "./src/lib/coachChat";
 import {
   buildIntervalsContext,
   fetchAthlete,
@@ -463,6 +468,8 @@ async function initDb(): Promise<void> {
   await pool.query(`ALTER TABLE coach_plans ADD COLUMN IF NOT EXISTS generation_error TEXT`);
   await pool.query(`ALTER TABLE coach_plans ADD COLUMN IF NOT EXISTS generation_phase VARCHAR(40)`);
   await pool.query(`ALTER TABLE coach_plans ADD COLUMN IF NOT EXISTS coach_plan_state JSONB`);
+  // Anzeigename des Plans (statt roher UUID im Chat und in Listen)
+  await pool.query(`ALTER TABLE coach_plans ADD COLUMN IF NOT EXISTS name TEXT`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS coach_weekly_schedules (
@@ -3800,6 +3807,13 @@ COMPARISON WITH WEEK ${plan.current_week - 1}:
         "UPDATE coach_plans SET generation_status='ready', generation_error=NULL, generation_phase='ready', updated_at=NOW() WHERE id=$1",
         [req.params.id],
       );
+      // Nur ein aktiver Plan pro Typ: fruehere Plaene desselben Typs pausieren.
+      await pool.query(
+        `UPDATE coach_plans SET status='paused', updated_at=NOW()
+          WHERE user_id=$1 AND type=(SELECT type FROM coach_plans WHERE id=$2)
+            AND id<>$2 AND status='active'`,
+        [req.userId, req.params.id],
+      );
     }
     res.json({ status, phase, error: plan.rows[0].generation_error ?? null });
   });
@@ -4034,12 +4048,15 @@ COMPARISON WITH WEEK ${plan.current_week - 1}:
         res.status(503).json({ error: "KI ist nicht konfiguriert (kein gültiger API-Key)." });
         return;
       }
-      const { type, discipline, planMode, eventName, eventDate, eventDistance, onboardingData } = req.body;
+      const { type, discipline, eventName, eventDate, eventDistance, onboardingData } = req.body;
+      // planMode ist Pflicht in der DB: aus dem Onboarding uebernehmen, sonst "ongoing".
+      const planMode = String(req.body?.planMode ?? onboardingData?.planMode ?? "ongoing");
 
       const planResult = await pool.query(
-        `INSERT INTO coach_plans (user_id,type,discipline,plan_mode,event_name,event_date,event_distance,onboarding_data,generation_status,coach_plan_state)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'generating',$9) RETURNING *`,
-        [req.userId, type, discipline, planMode, eventName, eventDate || null, eventDistance, JSON.stringify(onboardingData), JSON.stringify(DEFAULT_COACH_PLAN_STATE)],
+        `INSERT INTO coach_plans (user_id,type,discipline,plan_mode,event_name,event_date,event_distance,onboarding_data,generation_status,coach_plan_state,name)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'generating',$9,$10) RETURNING *`,
+        [req.userId, type, discipline, planMode, eventName, eventDate || null, eventDistance, JSON.stringify(onboardingData),
+         JSON.stringify(DEFAULT_COACH_PLAN_STATE), sinnvollerPlanName(type, discipline, { weeks: Number(onboardingData?.weeks) || undefined })],
       );
       const plan = planResult.rows[0];
 
