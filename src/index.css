@@ -559,3 +559,23 @@ body {
   min-height: 44px;
   font-size: 16px; /* verhindert das automatische Hineinzoomen auf iOS */
 }
+
+/* ------------------------------------------------------ Barcode-Scanner */
+
+/*
+ * Führungslinie im Zielrahmen. Sie wandert von oben nach unten und zurück und
+ * zeigt, dass gescannt wird. Reine CSS-Animation, kostet keine Rechenzeit.
+ */
+@keyframes barcode-scan {
+  0%, 100% { transform: translateY(-26px); opacity: 0.35; }
+  50% { transform: translateY(26px); opacity: 1; }
+}
+
+.barcode-linie {
+  animation: barcode-scan 1.9s ease-in-out infinite;
+}
+
+/* Wer Bewegung reduziert haben will, bekommt eine ruhige Linie. */
+@media (prefers-reduced-motion: reduce) {
+  .barcode-linie { animation: none; }
+}

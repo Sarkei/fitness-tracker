@@ -18,7 +18,19 @@ type Product = {
 
 /**
  * Barcode-Scanner für die einfache Ansicht.
- * Nutzt die BarcodeDetector-API (Chrome/Android). Ohne Kamera bleibt die manuelle Eingabe.
+ *
+ * **Warum das vorher schwarz war:** Das `<video>`-Element wurde nur gerendert,
+ * wenn `status === 'scanning'` galt. Der Stream wurde aber zugewiesen, solange
+ * `status` noch `'starting'` war — da gab es kein `<video>`, also lief
+ * `videoRef.current` ins Leere. Die Kamera war an, das Bild kam nie an, und
+ * danach blieb das Feld schwarz.
+ *
+ * Jetzt ist das Video **immer** im DOM; es wird nur unsichtbar geschaltet,
+ * solange die Kamera noch startet. Der Stream wird nach dem Statuswechsel
+ * zugewiesen und `play()` erneut versucht.
+ *
+ * Kein manuelles Eingabefeld mehr: Wer den Barcode nicht scannen kann, bekommt
+ * eine klare Meldung statt eines Eingabefelds.
  */
 export function BarcodeSheet({
   category,
@@ -35,22 +47,40 @@ export function BarcodeSheet({
   const streamRef = useRef<MediaStream | null>(null);
   const [status, setStatus] = useState<'starting' | 'scanning' | 'found' | 'error'>('starting');
   const [message, setMessage] = useState('');
-  const [manual, setManual] = useState('');
   const [product, setProduct] = useState<Product | null>(null);
   const [grams, setGrams] = useState(100);
   const [saving, setSaving] = useState(false);
 
+  /** Stream an das Video hängen — mehrfach aufrufbar, bis es greift. */
+  const streamAnhaengen = () => {
+    const v = videoRef.current;
+    const s = streamRef.current;
+    if (!v || !s) return false;
+    if (v.srcObject !== s) v.srcObject = s;
+    v.play().catch(() => undefined);
+    return true;
+  };
+
   useEffect(() => {
     let cancelled = false;
+    let takt: number | undefined;
+
     async function start() {
       if (!('BarcodeDetector' in window)) {
         setStatus('error');
-        setMessage('Dieser Browser kann keine Barcodes scannen. Bitte Nummer eintippen.');
+        setMessage(
+          'Dieser Browser kann keine Barcodes scannen. Nutze Chrome auf Android oder trage das Produkt über die Suche ein.',
+        );
         return;
       }
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' } },
+          // Exakte Rückkamera, hohe Auflösung: kleine EAN-Codes brauchen Schärfe.
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
           audio: false,
         });
         if (cancelled) {
@@ -58,40 +88,61 @@ export function BarcodeSheet({
           return;
         }
         streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play().catch(() => {});
-        }
         setStatus('scanning');
-        const detector = new (window as any).BarcodeDetector({
+
+        // Erst nach dem Statuswechsel existiert ein sichtbares Video. Das
+        // Zuweisen wird mehrfach versucht, bis das Element da ist.
+        let versuche = 0;
+        const anhaengen = window.setInterval(() => {
+          versuche += 1;
+          if (streamAnhaengen() || versuche > 40) window.clearInterval(anhaengen);
+        }, 50);
+
+        const detector = new (window as unknown as {
+          BarcodeDetector: new (o: { formats: string[] }) => {
+            detect: (v: HTMLVideoElement) => Promise<Array<{ rawValue?: string }>>;
+          };
+        }).BarcodeDetector({
           formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'qr_code'],
         });
+
         const tick = async () => {
-          if (cancelled || !videoRef.current) return;
-          try {
-            const codes = await detector.detect(videoRef.current);
-            if (codes && codes.length && codes[0].rawValue) {
-              const code = String(codes[0].rawValue).replace(/[^0-9]/g, '');
+          if (cancelled) return;
+          const v = videoRef.current;
+          // Erst scannen, wenn wirklich Bild da ist.
+          if (v && v.readyState >= 2 && v.videoWidth > 0) {
+            try {
+              const codes = await detector.detect(v);
+              const code = codes?.[0]?.rawValue ? String(codes[0].rawValue).replace(/[^0-9]/g, '') : '';
               if (code.length >= 6) {
                 stopCamera();
                 await loadProduct(code);
                 return;
               }
+            } catch {
+              /* weiter scannen */
             }
-          } catch {
-            /* weiter scannen */
           }
-          setTimeout(tick, 350);
+          takt = window.setTimeout(tick, 300);
         };
-        setTimeout(tick, 600);
-      } catch {
+        takt = window.setTimeout(tick, 700);
+      } catch (e) {
+        const name = (e as { name?: string }).name;
         setStatus('error');
-        setMessage('Kamera nicht verfügbar. Bitte Nummer eintippen.');
+        setMessage(
+          name === 'NotAllowedError'
+            ? 'Kamera-Zugriff wurde abgelehnt. In den Android-Einstellungen unter Chrome → Berechtigungen → Kamera erlauben.'
+            : name === 'NotFoundError'
+              ? 'Keine Kamera gefunden.'
+              : 'Kamera konnte nicht gestartet werden.',
+        );
       }
     }
+
     void start();
     return () => {
       cancelled = true;
+      if (takt) window.clearTimeout(takt);
       stopCamera();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -146,36 +197,66 @@ export function BarcodeSheet({
     }
   }
 
+  /* Nach dem Fund ist die Kamera aus — der Stream wird freigegeben. */
+  const kameraAktiv = status === 'scanning' || status === 'starting';
+
   const inhalt = (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black/80 p-4 text-white">
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-lg font-semibold">
-            <ScanBarcode className="h-5 w-5" /> Barcode scannen
-          </h2>
-          <button onClick={onClose} className="rounded-full bg-white/10 p-2" aria-label="Schließen">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+    <div className="fixed inset-0 z-50 flex flex-col bg-black text-white">
+      {/* Kopf */}
+      <div className="flex items-center justify-between px-4 py-3">
+        <h2 className="flex items-center gap-2 text-[15px] font-semibold">
+          <ScanBarcode className="h-5 w-5" /> Barcode scannen
+        </h2>
+        <button
+          onClick={onClose}
+          className="rounded-full bg-white/10 p-2"
+          aria-label="Schließen"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
 
-        {status === 'scanning' && (
-          <div className="relative overflow-hidden rounded-2xl bg-black">
-            <video ref={videoRef} className="h-64 w-full object-cover" playsInline muted />
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="h-28 w-72 rounded-xl border-2 border-white/70" />
+      {kameraAktiv && (
+        /*
+         * Das Video füllt den ganzen Bereich und ist **immer** im DOM — auch
+         * während die Kamera noch startet. Nur so kann der Stream ankommen.
+         * Das Zielrechteck sitzt mittig im Bild.
+         */
+        <div className="relative flex-1 overflow-hidden">
+          <video
+            ref={videoRef}
+            className="absolute inset-0 h-full w-full object-cover"
+            playsInline
+            muted
+            autoPlay
+          />
+
+          {/* Abdunkelung außerhalb des Zielrahmens */}
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div className="relative">
+              {/* Zielrahmen für den Barcode */}
+              <div className="h-[26vh] w-[78vw] max-w-md rounded-2xl border-2 border-white/85 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]" />
+              {/* Führungslinie, die von links nach rechts wandert */}
+              <div className="barcode-linie absolute left-2 right-2 top-1/2 h-0.5 bg-emerald-400/90" />
             </div>
-            <p className="p-2 text-center text-xs text-white/70">Barcode in den Rahmen halten …</p>
           </div>
-        )}
 
-        {status === 'starting' && (
-          <div className="flex h-32 items-center justify-center gap-2 rounded-2xl bg-white/5 text-sm">
-            <Loader2 className="h-4 w-4 animate-spin" /> Kamera wird gestartet …
-          </div>
-        )}
+          {status === 'starting' && (
+            <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/70 text-sm">
+              <Loader2 className="h-4 w-4 animate-spin" /> Kamera wird gestartet …
+            </div>
+          )}
 
-        {status === 'found' && product && (
-          <div className="rounded-2xl bg-surface p-4 text-ink">
+          <p className="absolute inset-x-0 bottom-4 text-center text-[12px] text-white/80">
+            Barcode mittig in den Rahmen halten
+          </p>
+        </div>
+      )}
+
+      {/* Gefundenes Produkt */}
+      {status === 'found' && product && (
+        <div className="flex-1 overflow-y-auto bg-black/90 p-4">
+          <div className="mx-auto w-full max-w-md rounded-2xl bg-surface p-4 text-ink">
             <div className="flex gap-3">
               {product.imageUrl ? (
                 <img src={product.imageUrl} alt="" className="h-20 w-20 rounded-lg object-contain" />
@@ -207,7 +288,7 @@ export function BarcodeSheet({
               <button
                 onClick={() => void save()}
                 disabled={saving}
-                className="ml-auto rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                className="ml-auto rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-on-accent disabled:opacity-60"
               >
                 {saving ? 'Speichert …' : 'Hinzufügen'}
               </button>
@@ -216,33 +297,27 @@ export function BarcodeSheet({
               {Math.round((product.kcal ?? 0) * (grams / 100))} kcal für {grams} g
             </p>
           </div>
-        )}
+        </div>
+      )}
 
-        <div className="mt-4 rounded-2xl bg-white/10 p-3">
-          <p className="mb-2 text-xs text-white/70">Barcode manuell eingeben</p>
-          <div className="flex gap-2">
-            <input
-              value={manual}
-              onChange={(e) => setManual(e.target.value)}
-              inputMode="numeric"
-              placeholder="z. B. 4008400402222"
-              className="flex-1 rounded-lg bg-white/90 px-3 py-2 text-ink"
-            />
+      {/* Fehler: klarer Text statt Eingabefeld */}
+      {status === 'error' && (
+        <div className="flex-1 p-5">
+          <div className="mx-auto w-full max-w-md rounded-2xl bg-white/10 p-4">
+            <p className="text-[13px] leading-relaxed text-white/90">{message}</p>
             <button
-              onClick={() => manual.replace(/[^0-9]/g, '').length >= 6 && void loadProduct(manual.replace(/[^0-9]/g, ''))}
-              className="rounded-lg bg-surface px-4 py-2 text-sm font-semibold text-ink"
+              onClick={onClose}
+              className="mt-3 w-full rounded-lg bg-white/15 px-4 py-2.5 text-[12.5px] font-semibold"
             >
-              Suchen
+              Schließen
             </button>
           </div>
         </div>
-
-        {message && <p className="mt-2 text-sm text-amber-300">{message}</p>}
-      </div>
+      )}
     </div>
   );
 
   // Portal statt Inline: der Sheet haengt an <body> und kann die Seite nicht mehr
   // verschieben, wenn nach dem Eintragen neue Werte dazukommen.
-  return typeof document === "undefined" ? inhalt : createPortal(inhalt, document.body);
+  return typeof document === 'undefined' ? inhalt : createPortal(inhalt, document.body);
 }
