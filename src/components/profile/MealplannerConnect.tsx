@@ -14,6 +14,7 @@ type Status = {
   baseUrl: string;
   householdName: string | null;
   connectedAt: string | null;
+  lastSync: string | null;
   lastError: string | null;
   hasCode: boolean;
 };
@@ -158,9 +159,14 @@ export default function MealplannerConnect() {
             {laedt
               ? 'Status wird geladen …'
               : status?.connected
-                ? `${status.householdName ?? 'Haushalt'} · seit ${fmtDatum(status.connectedAt)}`
+                ? `Erfolgreich verbunden${status.householdName ? ` · ${status.householdName}` : ''}`
                 : 'Kopplungscode im Mealplanner unter Profil erzeugen und hier eintragen.'}
           </p>
+          {status?.connected && (
+            <p className="mt-0.5 text-[10.5px] text-[var(--text-muted)]">
+              Zuletzt synchronisiert: {fmtDatum(status.lastSync ?? status.connectedAt)}
+            </p>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {status?.connected ? (
@@ -249,24 +255,11 @@ export default function MealplannerConnect() {
         </div>
       )}
 
-      {/* Diese Woche aus dem Mealplanner */}
       {status?.connected && woche && woche.anzahl > 0 && (
-        <div className="mt-3 border-t border-[var(--border-muted)] pt-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
-            Essensplan diese Woche · {woche.kcalSumme} kcal
-          </p>
-          <ul className="mt-1.5 space-y-1">
-            {woche.eintraege.slice(0, 7).map((e, i) => (
-              <li key={`${e.tag}-${e.mahlzeit}-${i}`} className="flex items-baseline gap-2 text-[11.5px]">
-                <span className="w-16 shrink-0 text-[var(--text-muted)]">{e.tag.slice(0, 2)}</span>
-                <span className="min-w-0 flex-1 truncate">{e.titel}</span>
-                {e.kcal ? (
-                  <span className="shrink-0 tabular-nums text-[var(--text-muted)]">{e.kcal} kcal</span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </div>
+        <p className="mt-2 border-t border-[var(--border-muted)] pt-2 text-[11px] text-[var(--text-muted)]">
+          Wochenplan gelesen: {woche.anzahl} {woche.anzahl === 1 ? 'Gericht' : 'Gerichte'} ·{' '}
+          {woche.kcalSumme} kcal
+        </p>
       )}
       {status?.connected && (!woche || woche.anzahl === 0) && !laedt && (
         <p className="mt-3 border-t border-[var(--border-muted)] pt-2 text-[11px] text-[var(--text-muted)]">

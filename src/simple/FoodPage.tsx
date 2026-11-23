@@ -32,6 +32,7 @@ import {
 } from './ui';
 import PhotoMealSheet from './PhotoMealSheet';
 import MealEditRow from './EditRows';
+import MealplannerRezeptSheet from './MealplannerRezeptSheet';
 import {
   addFoodEntry,
   dayKeyOf,
@@ -93,6 +94,8 @@ export default function FoodPage() {
   /** Gerichte aus dem verbundenen Mealplanner für die Schnellerfassung. */
   const [gerichte, setGerichte] = useState<MealplanerGericht[]>([]);
   const [schnellBusy, setSchnellBusy] = useState<string | null>(null);
+  /** Offene Rezeptkarte aus dem Mealplanner (Klick auf die Vorlage). */
+  const [rezeptOffen, setRezeptOffen] = useState<{ gericht: MealplanerGericht; kategorie: string } | null>(null);
 
   const load = useCallback(async () => {
     setLaedt(true);
@@ -146,6 +149,41 @@ export default function FoodPage() {
       protein: liste.reduce((acc, entry) => acc + (Number(entry.protein) || 0), 0),
     };
   });
+
+  /**
+   * Vorlage aus dem Mealplanner — nur für HEUTE und nur die passende Mahlzeit.
+   *
+   * Der Mealplanner kennt die Slots fruehstueck/mittag/abend/snack; hier heißen sie
+   * breakfast/lunch/dinner/snack. Was an einem anderen Tag liegt, wird bewusst
+   * ignoriert: die Vorlage gehört zum heutigen Tag.
+   */
+  const SLOT_ZU_MAHLZEIT: Record<string, string> = {
+    fruehstueck: 'breakfast',
+    mittag: 'lunch',
+    abend: 'dinner',
+    mahlzeit: 'dinner', // unspezifischer Eintrag landet beim Abendessen
+    snack: 'snack',
+  };
+
+  const vorlageProMahlzeit = useMemo(() => {
+    const karte = new Map<string, MealplanerGericht>();
+    // Nur heute: das Datum der Seite muss der heutige Tag sein.
+    if (date !== todayYmd()) return karte;
+    // Der Mealplanner liefert tagIndex (Montag = 0); fehlt er, zählt der Wochentagsname.
+    const heuteIndex = (new Date().getDay() + 6) % 7;
+    const heuteName = new Date().toLocaleDateString('de-DE', { weekday: 'long' }).toLowerCase();
+    for (const g of gerichte) {
+      const index = (g as { tagIndex?: number }).tagIndex;
+      const istHeute =
+        typeof index === 'number'
+          ? index === heuteIndex
+          : String(g.tag ?? '').toLowerCase() === heuteName;
+      if (!istHeute) continue;
+      const ziel = SLOT_ZU_MAHLZEIT[String(g.mahlzeit ?? '').toLowerCase()] ?? 'dinner';
+      if (!karte.has(ziel)) karte.set(ziel, g);
+    }
+    return karte;
+  }, [gerichte, date]);
 
   // Auswertungen über 30 Tage
   const map = useMemo(() => kcalByDay(monat), [monat]);
@@ -339,6 +377,8 @@ export default function FoodPage() {
         {grouped.map((meal) => {
           const Icon = meal.icon;
           const anteil = goalKcal > 0 ? Math.round((meal.kcal / goalKcal) * 100) : 0;
+          // Vorlage aus dem Mealplanner für genau diese Mahlzeit (nur heute).
+          const vorlage = vorlageProMahlzeit.get(meal.id) ?? null;
           return (
             <Card key={meal.id} className="flex flex-col p-5">
               <div className="flex items-center gap-2.5">
@@ -359,9 +399,37 @@ export default function FoodPage() {
 
               {meal.entries.length === 0 ? (
                 <div className="my-2 flex-1">
-                  <p className="py-3 text-center text-[11.5px] text-[var(--text-muted)]">
-                    Noch nichts eingetragen
-                  </p>
+                  {vorlage ? (
+                    <button
+                      type="button"
+                      disabled={Boolean(schnellBusy)}
+                      onClick={() => setRezeptOffen({ gericht: vorlage, kategorie: meal.id })}
+                      className="flex w-full items-center gap-2.5 rounded-xl border border-dashed border-[var(--simple-accent)]/50 bg-[var(--simple-accent-soft)]/40 px-3 py-2.5 text-left transition hover:border-[var(--simple-accent)] disabled:opacity-50"
+                      title="Rezept ansehen und eintragen"
+                    >
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--simple-accent)] text-white">
+                        {schnellBusy === meal.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Plus className="h-4 w-4" />
+                        )}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[12.5px] font-semibold">{vorlage.titel}</span>
+                        <span className="block text-[11px] text-[var(--text-muted)]">
+                          aus dem Mealplanner
+                          {vorlage.kcal ? ` · ${vorlage.kcal} kcal` : ''}
+                          {vorlage.protein ? ` · ${Math.round(vorlage.protein)} P` : ''}
+                          {vorlage.carbs ? ` · ${Math.round(vorlage.carbs)} KH` : ''}
+                          {vorlage.fat ? ` · ${Math.round(vorlage.fat)} F` : ''}
+                        </span>
+                      </span>
+                    </button>
+                  ) : (
+                    <p className="py-3 text-center text-[11.5px] text-[var(--text-muted)]">
+                      Noch nichts eingetragen
+                    </p>
+                  )}
                 </div>
               ) : (
                 <ul className="my-2 flex-1 divide-y divide-[var(--border-muted)]">
@@ -416,69 +484,6 @@ export default function FoodPage() {
         })}
       </div>
 
-      {/* Schnellerfassung: Gerichte aus dem verbundenen Mealplanner */}
-      {gerichte.length > 0 && (
-        <Card className="p-5">
-          <SectionTitle
-            action={
-              <span className="text-[11px] text-[var(--text-muted)]">aus dem Mealplanner</span>
-            }
-          >
-            Schnell hinzufügen
-          </SectionTitle>
-          <p className="-mt-1 mb-3 text-[11px] leading-relaxed text-[var(--text-muted)]">
-            Antippen trägt das Gericht mit seinen Nährwerten für heute ein.
-          </p>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {gerichte.slice(0, 8).map((g) => {
-              const schluessel = `${g.tag}-${g.titel}`;
-              const laeuft = schnellBusy === schluessel;
-              return (
-                <button
-                  key={schluessel}
-                  type="button"
-                  disabled={Boolean(schnellBusy)}
-                  onClick={() => {
-                    void (async () => {
-                      setSchnellBusy(schluessel);
-                      try {
-                        await addFoodEntry({
-                          meal: g.titel,
-                          category: 'lunch',
-                          calories: Number(g.kcal) || 0,
-                          protein: Number(g.protein) || 0,
-                          carbs: 0,
-                          fat: 0,
-                          date,
-                        });
-                        await load();
-                      } catch (e) {
-                        setError(e instanceof Error ? e.message : 'Eintragen fehlgeschlagen.');
-                      } finally {
-                        setSchnellBusy(null);
-                      }
-                    })();
-                  }}
-                  className="flex items-center gap-2 rounded-xl border border-[var(--border-muted)] px-3 py-2 text-left transition hover:border-[var(--simple-accent)] disabled:opacity-50"
-                >
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--simple-accent-soft)] text-[var(--simple-accent)]">
-                    {laeuft ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[12.5px] font-semibold">{g.titel}</span>
-                    <span className="block text-[11px] text-[var(--text-muted)]">
-                      {g.tag}
-                      {g.kcal ? ` · ${g.kcal} kcal` : ''}
-                      {g.protein ? ` · ${Math.round(g.protein)} g Protein` : ''}
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </Card>
-      )}
-
       {/* Verlauf */}
       <div className="grid gap-4 lg:grid-cols-3 lg:items-stretch">
         <Card className="flex flex-col p-5 lg:col-span-2">
@@ -528,6 +533,16 @@ export default function FoodPage() {
       </div>
 
       {error && <p className="rounded-xl bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-600">{error}</p>}
+
+      {rezeptOffen && (
+        <MealplannerRezeptSheet
+          gericht={rezeptOffen.gericht}
+          kategorie={rezeptOffen.kategorie}
+          datum={date}
+          onClose={() => setRezeptOffen(null)}
+          onSaved={() => void load()}
+        />
+      )}
 
       {sheetFor && (
         <PhotoMealSheet

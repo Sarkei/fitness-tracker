@@ -222,10 +222,31 @@ export async function addFoodEntry(entry: {
 /** Gerichte aus dem verbundenen Mealplanner (für die Schnellerfassung). */
 export type MealplanerGericht = {
   tag: string;
+  tagIndex?: number;
+  /** Slot im Mealplanner: fruehstueck, mittag, abend, snack. */
+  mahlzeit?: string;
   titel: string;
   kcal: number | null;
   protein: number | null;
+  carbs: number | null;
+  fat: number | null;
   portionen: number | null;
+  /** Rezept-ID im Mealplanner — für die Detailkarte. */
+  rezeptId?: string | null;
+};
+
+export type MealplannerRezept = {
+  id: string;
+  title: string;
+  description: string | null;
+  servings: number | null;
+  prep_minutes: number | null;
+  total_minutes: number | null;
+  difficulty: string | null;
+  tags: string[] | null;
+  ingredients: Array<{ name?: string; amount?: number | string; unit?: string } | string> | null;
+  steps: Array<{ text?: string } | string> | null;
+  nutrition: { kcal?: number; protein?: number; carbs?: number; fat?: number } | null;
 };
 
 export async function fetchMealplannerGerichte(): Promise<MealplanerGericht[]> {
@@ -236,6 +257,20 @@ export async function fetchMealplannerGerichte(): Promise<MealplanerGericht[]> {
     return Array.isArray(r.eintraege) ? r.eintraege : [];
   } catch {
     return [];
+  }
+}
+
+/** Rezeptdetails (Zutaten, Zubereitung) aus dem Mealplanner. */
+export async function fetchMealplannerRezept(
+  rezeptId: string,
+): Promise<MealplannerRezept | null> {
+  try {
+    const r = await api<{ recipe: MealplannerRezept }>(
+      `/api/integrations/mealplanner/recipe/${rezeptId}`,
+    );
+    return r.recipe ?? null;
+  } catch {
+    return null;
   }
 }
 

@@ -108,6 +108,8 @@ export default function TrainingPage() {
     setLaedt(true);
     try {
       const [plan, list] = await Promise.all([fetchActivePlan().catch(() => null), fetchWorkouts().catch(() => [])]);
+      // Ohne Plan ausdrücklich leeren: sonst bleibt die zuletzt geladene Woche stehen,
+      // auch wenn der Plan inzwischen gelöscht wurde.
       setWeek(plan?.week ?? null);
       setPlanWochen(plan?.weeks ?? []);
       setWorkouts(list);
@@ -627,7 +629,7 @@ export default function TrainingPage() {
       {/* Trainingspläne: direkt unter dem Verlauf, ohne eigene Überschrift/Button —
           "Neuer Plan" sitzt oben in der Kopfzeile. */}
       <section className="mt-2 border-t border-[var(--border-muted)] pt-6">
-        <PlanBereich hideHeader openOnboardingToken={neuerPlanToken} />
+        <PlanBereich hideHeader openOnboardingToken={neuerPlanToken} onPlansChanged={() => void load()} />
       </section>
 
       {tagOffen && (() => {

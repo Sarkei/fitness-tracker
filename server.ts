@@ -5317,12 +5317,14 @@ ${JSON.stringify(userCtx, null, 2)}
         connectedAt?: string;
         householdName?: string;
         lastError?: string;
+        lastSync?: string;
       };
       res.json({
         connected: Boolean(mp.code && mp.baseUrl),
         baseUrl: mp.baseUrl ?? "https://meal-planner.nas-timgreen.com",
         householdName: mp.householdName ?? null,
         connectedAt: mp.connectedAt ?? null,
+        lastSync: mp.lastSync ?? null,
         lastError: mp.lastError ?? null,
         // Der Code selbst wird nie ausgeliefert — nur ob einer gesetzt ist.
         hasCode: Boolean(mp.code),
@@ -5435,6 +5437,33 @@ ${JSON.stringify(userCtx, null, 2)}
       res.json(await antwort.json());
     } catch (err: unknown) {
       res.status(500).json({ error: err instanceof Error ? err.message : "week failed" });
+    }
+  });
+
+  /**
+   * Rezeptdetails aus dem Mealplanner (Zutaten, Zubereitung) für die Detailkarte
+   * in der Schnellerfassung.
+   */
+  app.get("/api/integrations/mealplanner/recipe/:id", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const r = await pool.query("SELECT profile_extras FROM users WHERE id=$1", [req.userId]);
+      const extras = (r.rows[0]?.profile_extras || {}) as Record<string, unknown>;
+      const mp = (extras.mealplanner || {}) as { baseUrl?: string; code?: string };
+      if (!mp.code || !mp.baseUrl) {
+        res.status(400).json({ error: "Mealplanner ist nicht verbunden." });
+        return;
+      }
+      const antwort = await fetch(
+        `${mp.baseUrl}/api/connect/${encodeURIComponent(mp.code)}/recipe/${encodeURIComponent(String(req.params.id))}`,
+        { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(15_000) },
+      );
+      if (!antwort.ok) {
+        res.status(antwort.status).json({ error: "Rezept konnte nicht geladen werden." });
+        return;
+      }
+      res.json(await antwort.json());
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "recipe failed" });
     }
   });
 

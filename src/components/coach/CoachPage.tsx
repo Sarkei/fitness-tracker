@@ -2107,9 +2107,21 @@ interface CoachPageProps {
    * (Trainingsseite, neben "Sofort starten") die Plan-Anlage auslösen.
    */
   openOnboardingToken?: number;
+  /**
+   * Wird gerufen, wenn ein Plan gelöscht oder pausiert wurde. Die Trainingsseite
+   * lädt dann ihre Woche neu — sonst stehen dort weiter die Einheiten des alten Plans.
+   */
+  onPlansChanged?: () => void;
 }
 
-export default function CoachPage({ planType, deepLink, autoStartOnboarding, hideHeader, openOnboardingToken }: CoachPageProps = {}) {
+export default function CoachPage({
+  planType,
+  deepLink,
+  autoStartOnboarding,
+  hideHeader,
+  openOnboardingToken,
+  onPlansChanged,
+}: CoachPageProps = {}) {
   const navigate = useNavigate();
   const aiCaps = useAiCapabilities();
   const { t } = useI18n();
@@ -2260,7 +2272,9 @@ export default function CoachPage({ planType, deepLink, autoStartOnboarding, hid
           onBack={() => {
             setSelectedPlanId(null);
             setInitialExpandedDay(null); // Clear expanded day when going back
-            fetchPlans();
+            void fetchPlans();
+            // Trainingsseite mitziehen: nach dem Löschen darf dort keine Woche stehen bleiben.
+            onPlansChanged?.();
           }}
           initialExpandedDay={initialExpandedDay}
         />
