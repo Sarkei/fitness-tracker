@@ -579,3 +579,41 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .barcode-linie { animation: none; }
 }
+
+/* ------------------------------------------------------ Touch-Ziele (mobil) */
+
+/*
+ * Auf dem Handy braucht jedes antippbare Element mindestens 44 px Höhe.
+ * Darunter trifft man daneben — besonders mit dem Daumen.
+ *
+ * Die Kader-Zeilen und Tabellenzeilen lagen bei 31 px, weil die Polsterung
+ * (py-2.5 = 10px) zu klein war. Diese Regel setzt die Mindesthöhe zentral,
+ * statt jeden Aufruf einzeln anzupassen.
+ */
+@media (max-width: 1023px) {
+  /* Zeilen in Listen, die als Ganzes antippbar sind */
+  a.flex.items-center,
+  button.flex.items-center,
+  li > a,
+  li > button {
+    min-height: 44px;
+  }
+
+  /* Tabellenzeilen, die auf eine Detailseite führen */
+  tr[onclick],
+  tr.cursor-pointer {
+    min-height: 44px;
+  }
+  tr[onclick] td,
+  tr.cursor-pointer td {
+    padding-top: 11px;
+    padding-bottom: 11px;
+  }
+
+  /* Kleine Aktionsknöpfe nicht unter 40 px */
+  .app-tab,
+  nav a,
+  nav button {
+    min-height: 40px;
+  }
+}

@@ -50,13 +50,57 @@ function faehigkeit(): { moeglich: boolean; grund?: string } {
   return { moeglich: true };
 }
 
-/** Base64url → Uint8Array (für `applicationServerKey`). */
-function schluesselAlsBytes(b64: string): Uint8Array {
+/**
+ * Base64url → Bytes für `applicationServerKey`.
+ *
+ * Der Cast auf `BufferSource` ist nötig, weil sich die Typdefinition von
+ * `applicationServerKey` zwischen TypeScript-Versionen unterscheidet.
+ */
+function schluesselAlsBytes(b64: string): BufferSource {
   const roh = atob(b64.replace(/-/g, '+').replace(/_/g, '/'));
   const arr = new Uint8Array(roh.length);
   for (let i = 0; i < roh.length; i += 1) arr[i] = roh.charCodeAt(i);
-  return arr;
+  return arr as unknown as BufferSource;
 }
+
+/*
+ * Knopf-Stile als Konstanten statt Tailwind-Klassen.
+ *
+ * **Warum:** Die Apps haben unterschiedliche Farbnamen (`brand`, `leaf`,
+ * `accent`) — oder wie Mitfahr gar keine Theme-Farben, nur Zinc-Klassen. Ein
+ * Button mit `bg-accent` hat deshalb in mehreren Apps keinen Hintergrund und
+ * ist praktisch unsichtbar.
+ *
+ * Diese Stile nutzen die CSS-Variablen, die in jeder App existieren, mit
+ * Rückfallwerten. Damit sieht der Button überall gleich aus.
+ */
+const knopfPrimaer: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
+  borderRadius: 8,
+  padding: '9px 14px',
+  fontSize: 11.5,
+  fontWeight: 600,
+  background: 'var(--accent, #2f7d5a)',
+  color: 'var(--on-accent, #ffffff)',
+  border: '1px solid var(--accent, #2f7d5a)',
+  cursor: 'pointer',
+};
+
+const knopfLeise: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
+  borderRadius: 8,
+  padding: '9px 14px',
+  fontSize: 11.5,
+  fontWeight: 600,
+  background: 'transparent',
+  color: 'var(--muted, #55635c)',
+  border: '1px solid var(--line, #dde3df)',
+  cursor: 'pointer',
+};
 
 export default function PushKarte({
   basis = '/api/push',
@@ -186,7 +230,21 @@ export default function PushKarte({
           <Bell size={12} /> {titel}
         </span>
         {diesesGeraet && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-[9.5px] font-semibold normal-case tracking-normal text-accent-ink">
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              borderRadius: 999,
+              padding: '2px 8px',
+              fontSize: 9.5,
+              fontWeight: 700,
+              textTransform: 'none',
+              letterSpacing: 0,
+              background: 'var(--accent-soft, #e6f1eb)',
+              color: 'var(--accent-ink, #123a28)',
+            }}
+          >
             <Check size={9} /> aktiv
           </span>
         )}
@@ -207,7 +265,7 @@ export default function PushKarte({
                 type="button"
                 onClick={() => void anmelden()}
                 disabled={laeuft}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-[11.5px] font-semibold text-on-accent disabled:opacity-50"
+                style={knopfPrimaer}
               >
                 {laeuft ? <Loader2 size={12} className="animate-spin" /> : <Bell size={12} />}
                 Dieses Gerät anmelden
@@ -218,7 +276,7 @@ export default function PushKarte({
                   type="button"
                   onClick={() => void testen()}
                   disabled={laeuft}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-[11.5px] font-semibold text-on-accent disabled:opacity-50"
+                  style={knopfPrimaer}
                 >
                   {laeuft ? <Loader2 size={12} className="animate-spin" /> : <Bell size={12} />}
                   Testnachricht
@@ -227,7 +285,7 @@ export default function PushKarte({
                   type="button"
                   onClick={() => void abmelden()}
                   disabled={laeuft}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-[11.5px] font-semibold text-muted transition hover:border-danger hover:text-danger disabled:opacity-50"
+                  style={knopfLeise}
                 >
                   <BellOff size={12} /> Abmelden
                 </button>
@@ -245,9 +303,15 @@ export default function PushKarte({
 
       {meldung && (
         <p
-          className={`mt-2 rounded-lg px-2.5 py-1.5 text-[11px] ${
-            meldung.art === 'ok' ? 'bg-accent-soft text-accent-ink' : 'bg-danger-soft text-danger'
-          }`}
+          style={{
+            marginTop: 8,
+            borderRadius: 8,
+            padding: '6px 10px',
+            fontSize: 11,
+            background:
+              meldung.art === 'ok' ? 'var(--accent-soft, #e6f1eb)' : 'var(--danger-soft, #fbecea)',
+            color: meldung.art === 'ok' ? 'var(--accent-ink, #123a28)' : 'var(--danger, #b4453a)',
+          }}
         >
           {meldung.text}
         </p>
