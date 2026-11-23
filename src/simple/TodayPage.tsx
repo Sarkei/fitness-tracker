@@ -123,6 +123,21 @@ export default function TodayPage() {
   const goalFat = Number(goals.macros?.fat) || 80;
   /** Zielrichtung aus dem Profil — bestimmt die Farbzonen der Bilanzgrafik. */
   const zielTyp = zielTypAusProfil(goals.type);
+
+  /**
+   * Heute von der Uhr verbrauchte Kalorien. Sie erhöhen das Tagesbudget, damit die
+   * Bilanz auf Aktivitäten reagiert. Nur heute — die Historie bleibt unangetastet.
+   */
+  const aktivKcalHeute = useMemo(
+    () =>
+      einheiten.reduce((sum, e) => {
+        const kcal = Number(e.calories ?? e.kcal ?? 0);
+        return sum + (Number.isFinite(kcal) && kcal > 0 ? kcal : 0);
+      }, 0),
+    [einheiten],
+  );
+  /** Budget des Tages: Ziel plus Aktivkalorien. */
+  const budgetHeute = Math.round(goalKcal + aktivKcalHeute);
   const koerpergewicht = Number(
     (profile as unknown as { measurements?: { weight?: number } } | null)?.measurements?.weight,
   );
@@ -144,8 +159,9 @@ export default function TodayPage() {
   }, [heutePlanWoche, date]);
 
   const trainingToday = workouts.find((w) => toYmd(w.date) === date) ?? null;
-  const uebrig = Math.max(0, Math.round(goalKcal - sum.kcal));
-  const ueber = sum.kcal > goalKcal;
+  // Offenes Budget: Tagesziel plus Aktivkalorien minus Gegessenes.
+  const offen = Math.round(budgetHeute - sum.kcal);
+  const ueber = offen < 0;
 
   /** Serien und Bilanz */
   const fasten = useMemo(
@@ -154,8 +170,8 @@ export default function TodayPage() {
   );
   const serie = useMemo(() => trainingsSerie(workouts, planWochen, date), [workouts, planWochen, date]);
   const bilanz = useMemo(
-    () => kcalBilanz(monatEntries, workouts, goalKcal, 14, date, koerpergewicht),
-    [monatEntries, workouts, goalKcal, date, koerpergewicht],
+    () => kcalBilanz(monatEntries, workouts, goalKcal, 14, date, koerpergewicht, aktivKcalHeute),
+    [monatEntries, workouts, goalKcal, date, koerpergewicht, aktivKcalHeute],
   );
   const oBilanz = useMemo(() => bilanzDurchschnitt(bilanz), [bilanz]);
   const hatBilanz = bilanz.some((t) => t.hatDaten);
@@ -172,7 +188,9 @@ export default function TodayPage() {
         hint={
           entries.length
             ? `${entries.length} Mahlzeiten · ${
-                ueber ? `${Math.round(sum.kcal - goalKcal)} kcal über dem Ziel` : `${uebrig} kcal übrig`
+                ueber
+                  ? `${Math.abs(offen).toLocaleString('de-DE')} kcal über dem Budget`
+                  : `${offen.toLocaleString('de-DE')} kcal übrig`
               }`
             : 'Noch nichts erfasst'
         }
@@ -294,21 +312,36 @@ export default function TodayPage() {
           </SectionTitle>
 
           <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center">
-            <Ring value={sum.kcal} max={goalKcal} label="Kalorien" unit="kcal" size={148} />
+            <Ring value={sum.kcal} max={budgetHeute} label="Kalorien" unit="kcal" size={148} />
             <div className="w-full flex-1 space-y-3.5">
               <MacroBar label="Protein" value={sum.protein} max={goalProtein} color={MAKRO_FARBEN.protein} />
               <MacroBar label="Kohlenhydrate" value={sum.carbs} max={goalCarbs} color={MAKRO_FARBEN.carbs} />
               <MacroBar label="Fett" value={sum.fat} max={goalFat} color={MAKRO_FARBEN.fat} />
-              <div className="flex items-center justify-between border-t border-[var(--border-muted)] pt-3 text-[11px] text-[var(--text-muted)]">
-                <span>{entries.length} Mahlzeiten</span>
-                <span className="tabular-nums">
-                  {ueber ? (
-                    <span className="font-semibold text-[#f87171]">+{Math.round(sum.kcal - goalKcal)} über Ziel</span>
-                  ) : (
-                    <>
-                      noch <span className="font-semibold text-[var(--foreground)]">{uebrig}</span> kcal
-                    </>
-                  )}
+
+              {/* Offenes Budget groß, die Herleitung klein daneben. */}
+              <div className="flex items-end justify-between gap-3 border-t border-[var(--border-muted)] pt-3">
+                <div className="min-w-0">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                    {ueber ? 'über dem Budget' : 'noch übrig'}
+                  </p>
+                  <p
+                    className="text-2xl font-black leading-tight tabular-nums"
+                    style={{ color: ueber ? '#ef4444' : 'var(--text-primary)' }}
+                  >
+                    {Math.abs(offen).toLocaleString('de-DE')}
+                    <span className="ml-1 text-xs font-bold text-[var(--text-muted)]">kcal</span>
+                  </p>
+                  <p className="mt-0.5 text-[10px] leading-tight tabular-nums text-[var(--text-muted)]">
+                    {Math.round(budgetHeute).toLocaleString('de-DE')} Budget
+                    {aktivKcalHeute > 0 && (
+                      <> · {Math.round(goalKcal).toLocaleString('de-DE')} + {Math.round(aktivKcalHeute)} Aktivität</>
+                    )}
+                    {' − '}
+                    {Math.round(sum.kcal).toLocaleString('de-DE')} gegessen
+                  </p>
+                </div>
+                <span className="shrink-0 text-[11px] tabular-nums text-[var(--text-muted)]">
+                  {entries.length} {entries.length === 1 ? 'Mahlzeit' : 'Mahlzeiten'}
                 </span>
               </div>
             </div>

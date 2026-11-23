@@ -176,6 +176,11 @@ export function kcalBilanz(
   tage = 14,
   heute: Ymd = new Date().toISOString().slice(0, 10),
   koerpergewichtKg?: number,
+  /**
+   * Zusätzlich verbrauchte Kalorien je Tag (z. B. Läufe von der Uhr).
+   * Zählt nur für den heutigen Tag — Vergangenes wird nicht nachträglich aufgefüllt.
+   */
+  aktivKcalHeute = 0,
 ): BilanzTag[] {
   // Grobe Schätzung: 7 kcal pro Minute Krafttraining bei ~80 kg, proportional zum Gewicht.
   const gewicht = koerpergewichtKg && koerpergewichtKg > 0 ? koerpergewichtKg : 80;
@@ -199,7 +204,10 @@ export function kcalBilanz(
   return Array.from({ length: tage }, (_, i) => {
     const ymd = shiftYmdLocal(heute, -(tage - 1 - i));
     const kcal = Math.round(kcalMap.get(ymd) ?? 0);
-    const verbrannt = verbrauchtMap.get(ymd) ?? 0;
+    // Aktivitäten von der Uhr zählen nur heute. Vergangene Tage bleiben so, wie sie
+    // erfasst wurden — sonst würde die Historie rückwirkend aufgefüllt.
+    const istHeute = ymd === heute;
+    const verbrannt = (verbrauchtMap.get(ymd) ?? 0) + (istHeute ? Math.round(aktivKcalHeute) : 0);
     return {
       ymd,
       kcal,

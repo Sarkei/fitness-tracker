@@ -390,8 +390,8 @@ export default function StatisticsPage() {
   const topVolume = useMemo(() => computeVolumeByExercise(rangeWorkouts).slice(0, 5), [rangeWorkouts]);
 
   const energyWeek = useMemo(
-    () => computeWeeklyEnergyBalance(workouts, nutritionEntries, weekStart, dailyTargetKcal),
-    [workouts, nutritionEntries, weekStart, dailyTargetKcal]
+    () => computeWeeklyEnergyBalance(workouts, nutritionEntries, weekStart, dailyTargetKcal, dfLocale),
+    [workouts, nutritionEntries, weekStart, dailyTargetKcal, dfLocale]
   );
 
   const energyReliable = energyWeek.estimateReliable;
@@ -601,24 +601,25 @@ export default function StatisticsPage() {
                 action={{ label: t('stats.empty.nutritionCta'), onClick: () => navigate('/nutrition') }}
               />
             ) : (
-              <div className="h-[280px] w-full">
+              <div className="h-[310px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={nutritionByDay} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <ComposedChart data={nutritionByDay} margin={{ top: 10, right: 12, left: 4, bottom: 32 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-muted)" />
                     <XAxis
                       dataKey="label"
-                      tick={{ fontSize: 10, fill: 'var(--text-muted)', fontWeight: 700 }}
+                      tick={{ fontSize: 11, fill: 'var(--text-muted)', fontWeight: 600 }}
                       axisLine={false}
                       tickLine={false}
-                      label={{ value: t('stats.axis.day'), position: 'insideBottom', offset: -2, fontSize: 10, fill: 'var(--text-muted)' }}
+                      label={{ value: t('stats.axis.day'), position: 'bottom', offset: 0, fontSize: 11, fill: 'var(--text-muted)', fontWeight: 600 }}
                     />
                     <YAxis
-                      tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
-                      width={44}
-                      label={{ value: 'kcal', angle: -90, position: 'insideLeft', fontSize: 10, fill: 'var(--text-muted)' }}
+                      tick={{ fontSize: 11, fill: 'var(--text-muted)' }}
+                      tickMargin={6}
+                      width={54}
+                      label={{ value: 'kcal', angle: -90, position: 'insideLeft', fontSize: 11, fill: 'var(--text-muted)', fontWeight: 600 }}
                     />
                     <Tooltip content={props => <NutritionStatsTooltip {...props} t={t} dfLocale={dfLocale} />} />
-                    <Legend wrapperStyle={{ fontSize: 10, fontWeight: 800, paddingTop: 12 }} />
+                    <Legend wrapperStyle={{ fontSize: 11, fontWeight: 600, paddingTop: 8 }} verticalAlign="bottom" />
                     <Bar dataKey="calories" name={t('stats.chart.kcal')} fill="#14b8a6" radius={[6, 6, 0, 0]} maxBarSize={28} />
                     <Line type="monotone" dataKey="target" name={t('stats.chart.target')} stroke="#f59e0b" strokeWidth={2} strokeDasharray="6 4" dot={false} />
                   </ComposedChart>
@@ -645,21 +646,24 @@ export default function StatisticsPage() {
               />
             ) : (
             <>
-            <div className="h-[280px]">
+            <div className="h-[310px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={energyWeek.days} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <LineChart data={energyWeek.days} margin={{ top: 10, right: 12, left: 4, bottom: 32 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-muted)" />
                   <XAxis
                     dataKey="label"
-                    tick={{ fontSize: 10, fill: 'var(--text-muted)', fontWeight: 700 }}
+                    tick={{ fontSize: 11, fill: 'var(--text-muted)', fontWeight: 600 }}
+                    tickMargin={8}
                     axisLine={false}
                     tickLine={false}
-                    label={{ value: t('stats.axis.day'), position: 'insideBottom', offset: -2, fontSize: 10, fill: 'var(--text-muted)' }}
+                    tickMargin={8}
+                    label={{ value: t('stats.axis.day'), position: 'bottom', offset: 0, fontSize: 11, fill: 'var(--text-muted)', fontWeight: 600 }}
                   />
                   <YAxis
-                    tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
-                    width={52}
-                    label={{ value: 'kcal', angle: -90, position: 'insideLeft', fontSize: 10, fill: 'var(--text-muted)' }}
+                    tick={{ fontSize: 11, fill: 'var(--text-muted)' }}
+                    tickMargin={6}
+                    width={60}
+                    label={{ value: 'kcal', angle: -90, position: 'insideLeft', fontSize: 11, fill: 'var(--text-muted)', fontWeight: 600 }}
                   />
                   <Tooltip
                     contentStyle={TT}
@@ -669,7 +673,7 @@ export default function StatisticsPage() {
                       return [s, t('stats.energy.balanceLine')];
                     }}
                   />
-                  <Legend wrapperStyle={{ fontSize: 10, fontWeight: 800 }} />
+                  <Legend wrapperStyle={{ fontSize: 11, fontWeight: 600, paddingTop: 6 }} verticalAlign="bottom" />
                   <ReferenceLine y={0} stroke="var(--text-muted)" strokeDasharray="4 4" strokeOpacity={0.45} />
                   <Line
                     type="monotone"
@@ -741,33 +745,36 @@ export default function StatisticsPage() {
               action={{ label: t('stats.empty.workoutsCta'), onClick: () => navigate('/workouts') }}
             />
           ) : (
-            <div className="h-[280px] w-full">
+            <div className="h-[310px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={trainingSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <ComposedChart data={trainingSeries} margin={{ top: 10, right: 12, left: 4, bottom: 32 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-muted)" />
                   <XAxis
                     dataKey="label"
-                    tick={{ fontSize: 10, fill: 'var(--text-muted)', fontWeight: 700 }}
+                    tick={{ fontSize: 11, fill: 'var(--text-muted)', fontWeight: 600 }}
+                    tickMargin={8}
                     axisLine={false}
                     tickLine={false}
-                    label={{ value: t('stats.axis.day'), position: 'insideBottom', offset: -2, fontSize: 10, fill: 'var(--text-muted)' }}
+                    label={{ value: t('stats.axis.day'), position: 'bottom', offset: 0, fontSize: 11, fill: 'var(--text-muted)', fontWeight: 600 }}
                   />
                   <YAxis
                     yAxisId="left"
-                    tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
-                    width={40}
+                    tick={{ fontSize: 11, fill: 'var(--text-muted)' }}
+                    tickMargin={6}
+                    width={46}
                     allowDecimals={false}
-                    label={{ value: t('stats.axis.sessions'), angle: -90, position: 'insideLeft', fontSize: 10, fill: 'var(--text-muted)' }}
+                    label={{ value: t('stats.axis.sessions'), angle: -90, position: 'insideLeft', fontSize: 11, fill: 'var(--text-muted)', fontWeight: 600 }}
                   />
                   <YAxis
                     yAxisId="right"
                     orientation="right"
-                    tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
-                    width={52}
-                    label={{ value: t('stats.axis.volume'), angle: 90, position: 'insideRight', fontSize: 10, fill: 'var(--text-muted)' }}
+                    tick={{ fontSize: 11, fill: 'var(--text-muted)' }}
+                    tickMargin={6}
+                    width={60}
+                    label={{ value: t('stats.axis.volume'), angle: 90, position: 'insideRight', fontSize: 11, fill: 'var(--text-muted)', fontWeight: 600 }}
                   />
                   <Tooltip contentStyle={TT} />
-                  <Legend wrapperStyle={{ fontSize: 10, fontWeight: 800, paddingTop: 12 }} />
+                  <Legend wrapperStyle={{ fontSize: 11, fontWeight: 600, paddingTop: 8 }} verticalAlign="bottom" />
                   <Bar yAxisId="left" dataKey="sessions" name={t('stats.chart.sessions')} fill="var(--brand, #14b8a6)" radius={[6, 6, 0, 0]} maxBarSize={28} />
                   <Line yAxisId="right" type="monotone" dataKey="volume" name={t('stats.chart.volume')} stroke="#6366f1" strokeWidth={2} dot={false} />
                 </ComposedChart>
@@ -834,9 +841,9 @@ export default function StatisticsPage() {
               className="border-0 bg-transparent p-6"
             />
           ) : (
-            <div className="h-[220px]">
+            <div className="h-[250px]">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={weightSeries}>
+                <AreaChart data={weightSeries} margin={{ top: 10, right: 12, left: 4, bottom: 32 }}>
                   <defs>
                     <linearGradient id="wgrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="var(--brand, #14b8a6)" stopOpacity={0.25} />
@@ -846,17 +853,19 @@ export default function StatisticsPage() {
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-muted)" />
                   <XAxis
                     dataKey="date"
-                    tick={{ fontSize: 10, fill: 'var(--text-muted)', fontWeight: 700 }}
+                    tick={{ fontSize: 11, fill: 'var(--text-muted)', fontWeight: 600 }}
+                    tickMargin={8}
                     axisLine={false}
                     tickLine={false}
-                    label={{ value: t('stats.axis.date'), position: 'insideBottom', offset: -2, fontSize: 10, fill: 'var(--text-muted)' }}
+                    label={{ value: t('stats.axis.date'), position: 'bottom', offset: 0, fontSize: 11, fill: 'var(--text-muted)', fontWeight: 600 }}
                   />
                   <YAxis
                     domain={weightDomain}
-                    tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
+                    tick={{ fontSize: 11, fill: 'var(--text-muted)' }}
+                    tickMargin={6}
                     width={46}
                     tickFormatter={(v: number) => String(Math.round(Number(v)))}
-                    label={{ value: 'kg', angle: -90, position: 'insideLeft', fontSize: 10, fill: 'var(--text-muted)' }}
+                    label={{ value: 'kg', angle: -90, position: 'insideLeft', fontSize: 11, fill: 'var(--text-muted)', fontWeight: 600 }}
                   />
                   <Tooltip
                     contentStyle={TT}

@@ -4,6 +4,7 @@
  */
 
 import { format, subDays, eachDayOfInterval, startOfDay, endOfDay, isWithinInterval } from 'date-fns';
+import type { Locale } from 'date-fns';
 import type { Workout, Exercise, SetDetail, Nutrition, UserProfile } from '../types';
 import { effectiveNutritionTotals } from './nutritionTotals';
 import { resolveWeightHistoryForProfile } from './weightHistory';
@@ -128,7 +129,9 @@ export function computeWeeklyEnergyBalance(
   workouts: Workout[],
   nutrition: Nutrition[],
   weekStart: Date,
-  dailyTargetKcal: number
+  dailyTargetKcal: number,
+  /** date-fns-Locale für die Wochentagskürzel (deutsch/englisch). */
+  locale?: Locale
 ): {
   days: {
     label: string;
@@ -169,7 +172,7 @@ export function computeWeeklyEnergyBalance(
       .reduce((s, w) => s + (w.caloriesBurned || 0), 0);
     const hatDaten = intake > 0;
     return {
-      label: format(d, 'EEE'),
+      label: format(d, 'EEE', locale ? { locale } : undefined),
       intake,
       burned,
       net: intake - burned,
