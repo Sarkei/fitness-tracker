@@ -12,8 +12,7 @@ import { applyTheme, getStoredTheme, persistTheme, resolveTheme, type ThemeMode 
 type NavEntry = { to: string; labelKey: string; end?: boolean };
 
 const PRIMARY: NavEntry[] = [
-  { to: '/', labelKey: 'nav.dashboard', end: true },
-  { to: '/today', labelKey: 'nav.today' },
+  { to: '/', labelKey: 'nav.today', end: true },
   { to: '/training', labelKey: 'nav.training' },
   { to: '/foods', labelKey: 'nav.nutrition.short' },
   { to: '/coach', labelKey: 'nav.coach.short' },
@@ -36,7 +35,7 @@ function sectionLabelKey(pathname: string): string {
   const nested = all
     .filter((item) => item.to !== '/' && pathname.startsWith(`${item.to}/`))
     .sort((a, b) => b.to.length - a.to.length)[0];
-  return nested?.labelKey ?? 'nav.dashboard';
+  return nested?.labelKey ?? 'nav.today';
 }
 
 /**
@@ -86,7 +85,7 @@ export default function AppHeader() {
   return (
     <header className="app-header">
       <div className="app-container app-header__inner">
-        <Link className="app-brand" to="/" aria-label={`${t('app.name')} — ${t('nav.dashboard')}`}>
+        <Link className="app-brand" to="/" aria-label={`${t('app.name')} — ${t('nav.today')}`}>
           <span className="app-brand__mark" aria-hidden>
             <Dumbbell size={20} strokeWidth={1.8} />
           </span>

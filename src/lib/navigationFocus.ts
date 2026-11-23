@@ -13,7 +13,7 @@ export type NavItem = {
 };
 
 const ALL: NavItem[] = [
-  { path: '/', messageKey: 'nav.dashboard' },
+  { path: '/', messageKey: 'nav.today' },
   { path: '/workouts', messageKey: 'nav.workouts' },
   { path: '/nutrition', messageKey: 'nav.nutrition' },
   { path: '/coach', messageKey: 'nav.coach' },

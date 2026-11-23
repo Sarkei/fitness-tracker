@@ -3,7 +3,6 @@
  */
 
 const MAIN_ROUTE_IMPORTS = [
-  () => import('../pages/OverviewPage'),
   () => import('../simple/TodayPage'),
   () => import('../simple/TrainingPage'),
   () => import('../simple/FoodPage'),

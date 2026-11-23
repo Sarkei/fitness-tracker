@@ -9,7 +9,6 @@ import { needsDataMigration } from './lib/dataMigration';
 import DataMigrationOverlay from './components/system/DataMigrationOverlay';
 import RouteErrorBoundary from './components/ui/RouteErrorBoundary';
 
-const OverviewPage = lazy(() => import('./pages/OverviewPage'));
 const TodayPage = lazy(() => import('./simple/TodayPage'));
 const TrainingPage = lazy(() => import('./simple/TrainingPage'));
 const FoodPage = lazy(() => import('./simple/FoodPage'));
@@ -56,19 +55,12 @@ const AppContent = () => {
         <Route
           path="/"
           element={
-            <RouteErrorBoundary title="Übersicht konnte nicht geladen werden">
-              <OverviewPage />
-            </RouteErrorBoundary>
-          }
-        />
-        <Route
-          path="/today"
-          element={
             <RouteErrorBoundary title="Heute konnte nicht geladen werden">
               <TodayPage />
             </RouteErrorBoundary>
           }
         />
+        <Route path="/today" element={<Navigate to="/" replace />} />
         <Route path="/dashboard" element={<Navigate to="/" replace />} />
         <Route
           path="/training"

@@ -1,32 +1,17 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  AlertCircle,
-  Camera,
-  ChevronRight,
-  Dumbbell,
-  Flame,
-  Moon,
-  Scale,
-  Target,
-  TrendingUp,
-  Utensils,
-} from 'lucide-react';
+import { Camera, ChevronRight, Dumbbell, Flame, Moon, Target, Utensils } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
+import { FastingCard } from '../components/dashboard/FastingCard';
 import {
-  BarRow,
   Card,
   EmptyState,
   GhostButton,
-  Heatmap,
   MacroBar,
   PageHeader,
   PrimaryButton,
-  ProgressBar,
   Ring,
   SectionTitle,
-  Sparkline,
-  StatTile,
 } from './ui';
 import PhotoMealSheet from './PhotoMealSheet';
 import SessionSheet from './SessionSheet';
@@ -37,37 +22,31 @@ import {
   fetchMonth,
   fetchWorkouts,
   formatDay,
-  shiftYmd,
   todayYmd,
   totals,
   type FoodEntry,
   type PlanDay,
+  type PlanWeek,
   type WorkoutEntry,
 } from './simpleApi';
-import {
-  dayLabelShort,
-  kcalByDay,
-  muskelbalance,
-  shiftYmdLocal,
-  tageSeitLetztemTraining,
-  toYmd,
-  durchschnittsdauer,
-  kcalDurchschnitt,
-  erfassteTage,
-  workoutStreak,
-  workoutsInLastDays,
-  workoutsThisMonth,
-} from './analytics';
+import { tageSeitLetztemTraining, toYmd, workoutStreak, workoutsInLastDays } from './analytics';
 
+/**
+ * Startseite „Heute" — bewusst kein zweites Dashboard.
+ *
+ * Im Mittelpunkt steht, was heute ansteht: Fasten-Phase, die geplante Einheit, die
+ * Mahlzeiten und ein schmaler Wochenbalken. Kennzahlen, Heatmap und Muskelbalance
+ * bleiben im Training und in den Statistiken — sie hier zu wiederholen war der Grund,
+ * warum sich „Heute" vorher wie eine Kopie der Übersicht angefühlt hat.
+ */
 export default function TodayPage() {
   const { profile } = useAuth();
   const navigate = useNavigate();
   const date = todayYmd();
 
   const [entries, setEntries] = useState<FoodEntry[]>([]);
-  const [wocheEntries, setWocheEntries] = useState<FoodEntry[]>([]);
-  const [planDay, setPlanDay] = useState<PlanDay | null>(null);
-  const [weekPlan, setWeekPlan] = useState<PlanDay[]>([]);
+  const [monatEntries, setMonatEntries] = useState<FoodEntry[]>([]);
+  const [planWochen, setPlanWochen] = useState<PlanWeek[]>([]);
   const [workouts, setWorkouts] = useState<WorkoutEntry[]>([]);
   const [showPhoto, setShowPhoto] = useState(false);
   const [showSession, setShowSession] = useState(false);
@@ -75,18 +54,15 @@ export default function TodayPage() {
 
   const load = useCallback(async () => {
     setLaedt(true);
-    // Ein Aufruf fuer 30 Tage statt 30 einzelne
     const [month, list, plan] = await Promise.all([
       fetchMonth().catch(() => []),
       fetchWorkouts().catch(() => []),
       fetchActivePlan().catch(() => null),
     ]);
-    setWocheEntries(month);
+    setMonatEntries(month);
     setEntries(month.filter((e) => toYmd(e.date) === date));
     setWorkouts(list);
-    const schedule = plan?.week?.schedule ?? [];
-    setWeekPlan(schedule);
-    setPlanDay(schedule.find((d) => d.day === dayKeyOf(date)) ?? null);
+    setPlanWochen(plan?.weeks ?? []);
     setLaedt(false);
   }, [date]);
 
@@ -98,53 +74,76 @@ export default function TodayPage() {
   const goals = (profile?.goals ?? {}) as {
     dailyCalories?: number;
     macros?: { protein?: number; carbs?: number; fat?: number };
-    weight?: number;
-    targetWeight?: number;
   };
   const goalKcal = Number(goals.dailyCalories) || 2400;
   const goalProtein = Number(goals.macros?.protein) || 180;
   const goalCarbs = Number(goals.macros?.carbs) || 240;
   const goalFat = Number(goals.macros?.fat) || 80;
 
-  // Auswertungen
-  const streak = workoutStreak(workouts);
-  const diesenMonat = workoutsThisMonth(workouts);
-  const letzte7 = workoutsInLastDays(workouts, 7);
-  const seitLetztem = tageSeitLetztemTraining(workouts);
-  const oDauer = durchschnittsdauer(workouts);
-  const muskel = muskelbalance(workouts, 30).slice(0, 6);
-  const maxMuskel = Math.max(1, ...muskel.map((m) => m.saetze));
-  const oKcal = kcalDurchschnitt(wocheEntries, 7);
-  const erfasst = erfassteTage(wocheEntries, 7);
+  /** Die Planwoche, in die heute fällt. */
+  const heutePlanWoche = useMemo<PlanWeek | null>(() => {
+    if (!planWochen.length) return null;
+    return (
+      planWochen.find((w) => {
+        if (!w.start_date) return false;
+        return date >= w.start_date && date <= verschiebeTage(w.start_date, 6);
+      }) ?? null
+    );
+  }, [planWochen, date]);
 
-  const kcalMap = kcalByDay(wocheEntries);
-  const verlauf = Array.from({ length: 14 }, (_, i) => {
-    const ymd = shiftYmdLocal(date, -(13 - i));
-    return { ymd, kcal: kcalMap.get(ymd) ?? 0 };
-  });
-  const heatmapTage = Array.from({ length: 84 }, (_, i) => {
-    const ymd = shiftYmdLocal(date, -(83 - i));
-    return { ymd, value: kcalMap.get(ymd) ?? 0 };
-  });
-  const hatVerlauf = verlauf.some((v) => v.kcal > 0);
+  const planDay: PlanDay | null = useMemo(() => {
+    const schedule = heutePlanWoche?.schedule?.schedule ?? [];
+    return schedule.find((d) => d.day === dayKeyOf(date)) ?? null;
+  }, [heutePlanWoche, date]);
 
   const trainingToday = workouts.find((w) => toYmd(w.date) === date) ?? null;
-  const geplantHeute = weekPlan.filter((d) => !d.isRest);
+  const streak = workoutStreak(workouts);
+  const letzte7 = workoutsInLastDays(workouts, 7);
+  const seitLetztem = tageSeitLetztemTraining(workouts);
   const uebrig = Math.max(0, Math.round(goalKcal - sum.kcal));
   const ueber = sum.kcal > goalKcal;
 
-  return (
-    <div className="space-y-5 lg:space-y-6">
-      <PageHeader
-        eyebrow={new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })}
-        title="Heute"
-        /* Persoenliche Anrede absichtlich weg: kostet eine Zeile, die die
-           Kennzahlen besser nutzen. */
+  /** Sieben Tage als schmaler Balken — Tagesfortschritt, keine Statistikwand. */
+  const woche = useMemo(() => {
+    return Array.from({ length: 7 }, (_, i) => {
+      const ymd = verschiebeTage(date, -(6 - i));
+      const kcal = monatEntries
+        .filter((e) => toYmd(e.date) === ymd)
+        .reduce((s, e) => s + (Number(e.calories) || 0), 0);
+      const hatTraining = workouts.some((w) => toYmd(w.date) === ymd);
+      return { ymd, kcal, hatTraining, heute: ymd === date, label: tagKuerzel(ymd) };
+    });
+  }, [date, monatEntries, workouts]);
 
+  /** Eine Zeile, die den Tag zusammenfasst. */
+  const naechsterSchritt = useMemo(() => {
+    if (trainingToday) return { text: `Training erledigt: ${trainingToday.name}`, tone: 'done' as const };
+    if (planDay && !planDay.isRest) {
+      return {
+        text: `Heute geplant: ${planDay.title || DAY_LABELS[planDay.day] || 'Training'}`,
+        tone: 'open' as const,
+      };
+    }
+    if (planDay?.isRest) return { text: 'Ruhetag — Erholung ist eingeplant', tone: 'rest' as const };
+    if (entries.length === 0) return { text: 'Noch nichts gegessen eingetragen', tone: 'open' as const };
+    return { text: 'Kein Training für heute geplant', tone: 'rest' as const };
+  }, [trainingToday, planDay, entries.length]);
+
+  return (
+    <div className="space-y-4 lg:space-y-5">
+      <PageHeader
+        eyebrow={new Date().toLocaleDateString('de-DE', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+        })}
+        title="Heute"
         hint={
           entries.length
-            ? `${entries.length} Mahlzeiten · ${ueber ? `${Math.round(sum.kcal - goalKcal)} kcal über dem Ziel` : `${uebrig} kcal übrig`}`
-            : 'Noch nichts erfasst — leg los'
+            ? `${entries.length} Mahlzeiten · ${
+                ueber ? `${Math.round(sum.kcal - goalKcal)} kcal über dem Ziel` : `${uebrig} kcal übrig`
+              }`
+            : 'Noch nichts erfasst'
         }
         action={
           <div className="flex gap-2">
@@ -158,45 +157,40 @@ export default function TodayPage() {
         }
       />
 
-      {/* Kennzahlen */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile
-          label="Serie"
-          value={streak.aktuell}
-          unit={streak.aktuell === 1 ? 'Tag' : 'Tage'}
-          hint={streak.laengste > 0 ? `Rekord ${streak.laengste}` : 'Noch kein Training'}
-          tone={streak.aktuell > 0 ? 'accent' : 'muted'}
-          icon={<Flame className="h-3.5 w-3.5" />}
-        />
-        <StatTile
-          label="Dieser Monat"
-          value={diesenMonat}
-          unit="Einheiten"
-          hint={`${letzte7.length} in den letzten 7 Tagen`}
-          tone={diesenMonat > 0 ? 'default' : 'muted'}
-          icon={<Dumbbell className="h-3.5 w-3.5" />}
-        />
-        <StatTile
-          label="Ø Dauer"
-          value={oDauer || '—'}
-          unit={oDauer ? 'min' : undefined}
-          hint={seitLetztem === null ? 'Kein Training erfasst' : seitLetztem === 0 ? 'Heute trainiert' : `Zuletzt vor ${seitLetztem} ${seitLetztem === 1 ? 'Tag' : 'Tagen'}`}
-          tone="default"
-          icon={<TrendingUp className="h-3.5 w-3.5" />}
-        />
-        <StatTile
-          label="Ø Kalorien"
-          value={oKcal || '—'}
-          unit={oKcal ? 'kcal' : undefined}
-          hint={erfasst ? `${erfasst} von 7 Tagen erfasst` : 'Keine Daten'}
-          tone={oKcal > goalKcal ? 'warn' : oKcal > 0 ? 'accent' : 'muted'}
-          icon={<Utensils className="h-3.5 w-3.5" />}
-        />
-      </div>
+      {/* Fasten läuft dauerhaft mit, deshalb ganz oben */}
+      <FastingCard />
 
-      <div className="grid gap-4 lg:grid-cols-3 lg:items-stretch">
+      {/* Der Tag in einer Zeile */}
+      <Card className="flex items-center gap-3 p-4">
+        <span
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+          style={{
+            background:
+              naechsterSchritt.tone === 'rest' ? 'var(--border-muted)' : 'var(--simple-accent-soft)',
+            color: naechsterSchritt.tone === 'rest' ? 'var(--text-muted)' : 'var(--simple-accent)',
+          }}
+        >
+          {naechsterSchritt.tone === 'rest' ? (
+            <Moon className="h-4 w-4" />
+          ) : naechsterSchritt.tone === 'done' ? (
+            <Flame className="h-4 w-4" />
+          ) : (
+            <Target className="h-4 w-4" />
+          )}
+        </span>
+        <p className="min-w-0 flex-1 text-sm font-medium">{naechsterSchritt.text}</p>
+        <button
+          type="button"
+          onClick={() => navigate('/training')}
+          className="shrink-0 text-[11px] font-semibold text-[var(--simple-accent)]"
+        >
+          Woche
+        </button>
+      </Card>
+
+      <div className="grid gap-4 lg:grid-cols-5 lg:items-start">
         {/* Ernährung heute */}
-        <Card className="flex flex-col p-5 lg:col-span-2">
+        <Card className="flex flex-col p-5 lg:col-span-3">
           <SectionTitle
             action={
               <GhostButton onClick={() => navigate('/foods')}>
@@ -204,77 +198,62 @@ export default function TodayPage() {
               </GhostButton>
             }
           >
-            Heute gegessen
+            Gegessen
           </SectionTitle>
-          <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start">
-            <Ring value={sum.kcal} max={goalKcal} label="Kalorien" unit="kcal" size={148} />
-            <div className="w-full flex-1 space-y-3.5">
+
+          <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center">
+            <Ring value={sum.kcal} max={goalKcal} label="kcal" unit="" size={132} />
+            <div className="w-full flex-1 space-y-3">
               <MacroBar label="Protein" value={sum.protein} max={goalProtein} />
               <MacroBar label="Kohlenhydrate" value={sum.carbs} max={goalCarbs} />
               <MacroBar label="Fett" value={sum.fat} max={goalFat} />
-              <div className="flex items-center justify-between border-t border-[var(--border-muted)] pt-3 text-[11px] text-[var(--text-muted)]">
-                <span>{entries.length} Mahlzeiten</span>
-                <span className="tabular-nums">
-                  {ueber ? (
-                    <span className="font-semibold text-[#f87171]">+{Math.round(sum.kcal - goalKcal)} über Ziel</span>
-                  ) : (
-                    <>
-                      noch <span className="font-semibold text-[var(--foreground)]">{uebrig}</span> kcal
-                    </>
-                  )}
-                </span>
-              </div>
             </div>
           </div>
 
-          {entries.length > 0 && (
-            <ul className="mt-4 divide-y divide-[var(--border-muted)] border-t border-[var(--border-muted)] pt-1">
-              {entries.slice(0, 5).map((entry) => (
+          {entries.length > 0 ? (
+            <ul className="mt-4 divide-y divide-[var(--border-muted)] border-t border-[var(--border-muted)]">
+              {entries.slice(0, 4).map((entry) => (
                 <li key={entry.id} className="flex items-center gap-3 py-2">
                   <span className="min-w-0 flex-1 truncate text-sm">{entry.meal}</span>
-                  <span className="text-xs tabular-nums text-[var(--text-muted)]">
-                    {Math.round(Number(entry.protein) || 0)} P
-                  </span>
-                  <span className="text-xs tabular-nums text-[var(--text-muted)]">
-                    {Math.round(Number(entry.carbs) || 0)} KH
-                  </span>
-                  <span className="w-14 text-right text-sm font-semibold tabular-nums">
+                  <span className="shrink-0 text-sm font-semibold tabular-nums">
                     {Math.round(Number(entry.calories) || 0)}
                   </span>
                 </li>
               ))}
-              {entries.length > 5 && (
-                <li className="pt-2 text-center">
+              {entries.length > 4 && (
+                <li className="pt-2">
                   <button
+                    type="button"
                     className="text-[11.5px] font-semibold text-[var(--simple-accent)]"
                     onClick={() => navigate('/foods')}
                   >
-                    +{entries.length - 5} weitere ansehen
+                    +{entries.length - 4} weitere
                   </button>
                 </li>
               )}
             </ul>
-          )}
-
-          {entries.length === 0 && !laedt && (
-            <EmptyState
-              icon={<Utensils className="h-6 w-6" />}
-              title="Noch nichts eingetragen"
-              hint="Mach ein Foto vom Essen — die KI schätzt Portion und Nährwerte."
-              action={
-                <GhostButton onClick={() => setShowPhoto(true)}>
-                  <Camera className="h-3.5 w-3.5" /> Foto aufnehmen
-                </GhostButton>
-              }
-            />
+          ) : (
+            !laedt && (
+              <EmptyState
+                icon={<Utensils className="h-6 w-6" />}
+                title="Noch nichts eingetragen"
+                hint="Foto vom Essen — die KI schätzt Portion und Nährwerte."
+                action={
+                  <GhostButton onClick={() => setShowPhoto(true)}>
+                    <Camera className="h-3.5 w-3.5" /> Foto aufnehmen
+                  </GhostButton>
+                }
+              />
+            )
           )}
         </Card>
 
         {/* Training heute */}
-        <Card className="flex flex-col p-5">
-          <SectionTitle action={<GhostButton onClick={() => navigate('/training')}>Woche</GhostButton>}>
+        <Card className="flex flex-col p-5 lg:col-span-2">
+          <SectionTitle action={<GhostButton onClick={() => navigate('/training')}>Plan</GhostButton>}>
             Training
           </SectionTitle>
+
           {trainingToday ? (
             <div className="flex items-start gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--simple-accent-soft)] text-[var(--simple-accent)]">
@@ -287,12 +266,13 @@ export default function TodayPage() {
                   {Array.isArray(trainingToday.exercises) ? ` · ${trainingToday.exercises.length} Übungen` : ''}
                 </p>
               </div>
-              <span className="rounded-md bg-[var(--simple-accent-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--simple-accent)]">
-                ✓
-              </span>
             </div>
           ) : planDay && !planDay.isRest ? (
-            <button className="flex w-full items-start gap-3 text-left" onClick={() => setShowSession(true)}>
+            <button
+              type="button"
+              className="flex w-full items-start gap-3 text-left"
+              onClick={() => setShowSession(true)}
+            >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--simple-accent-soft)] text-[var(--simple-accent)]">
                 <Dumbbell className="h-5 w-5" />
               </span>
@@ -305,7 +285,7 @@ export default function TodayPage() {
                   {planDay.estimatedDuration ? ` · ca. ${planDay.estimatedDuration} min` : ''}
                 </p>
                 {(planDay.exercises ?? []).length > 0 && (
-                  <p className="mt-1 truncate text-[11px] text-[var(--text-muted)]">
+                  <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-[var(--text-muted)]">
                     {(planDay.exercises ?? [])
                       .slice(0, 3)
                       .map((e) => e.name)
@@ -313,7 +293,7 @@ export default function TodayPage() {
                   </p>
                 )}
               </div>
-              <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+              <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[var(--text-muted)]" />
             </button>
           ) : (
             <div className="flex items-start gap-3">
@@ -321,7 +301,9 @@ export default function TodayPage() {
                 <Moon className="h-5 w-5" />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold">{planDay?.isRest ? 'Ruhetag' : 'Kein Plan für heute'}</p>
+                <p className="text-sm font-semibold">
+                  {planDay?.isRest ? 'Ruhetag' : laedt ? '…' : 'Kein Plan für heute'}
+                </p>
                 <p className="text-xs text-[var(--text-muted)]">
                   {planDay?.isRest ? 'Erholung ist Teil des Plans.' : 'Training kannst du trotzdem erfassen.'}
                 </p>
@@ -329,14 +311,18 @@ export default function TodayPage() {
             </div>
           )}
 
-          <div className="mt-4 space-y-2 border-t border-[var(--border-muted)] pt-3">
-            <ProgressBar
-              value={letzte7.length}
-              max={Math.max(geplantHeute.length, 7)}
-              label="Diese Woche"
-              right={`${letzte7.length} / ${Math.max(geplantHeute.length, 7)}`}
-            />
+          <div className="mt-auto space-y-2 border-t border-[var(--border-muted)] pt-3">
+            <div className="flex items-baseline justify-between text-[11px] text-[var(--text-muted)]">
+              <span>7 Tage</span>
+              <span className="tabular-nums">
+                <span className="font-semibold text-[var(--foreground)]">{letzte7.length}</span> Einheiten
+                {streak.aktuell > 0
+                  ? ` · ${streak.aktuell} ${streak.aktuell === 1 ? 'Tag' : 'Tage'} Serie`
+                  : ''}
+              </span>
+            </div>
             <button
+              type="button"
               className="w-full text-left text-[11px] font-semibold text-[var(--simple-accent)]"
               onClick={() => setShowSession(true)}
             >
@@ -344,95 +330,64 @@ export default function TodayPage() {
             </button>
           </div>
         </Card>
-
-        {/* Kalorien-Verlauf */}
-        <Card className="p-5 lg:col-span-2">
-          <SectionTitle action={<span className="text-[11px] text-[var(--text-muted)]">Ziel {Math.round(goalKcal)}</span>}>
-            Kalorien · 14 Tage
-          </SectionTitle>
-          {hatVerlauf ? (
-            <>
-              <Sparkline values={verlauf.map((v) => v.kcal)} goal={goalKcal} height={64} />
-              <div className="mt-1 flex gap-1 text-[9.5px] text-[var(--text-muted)]">
-                {verlauf.map((v, i) => (
-                  <span
-                    key={v.ymd}
-                    className={`flex-1 text-center ${v.ymd === date ? 'font-semibold text-[var(--foreground)]' : ''}`}
-                  >
-                    {i % 2 === 0 ? dayLabelShort(v.ymd) : ''}
-                  </span>
-                ))}
-              </div>
-              <div className="mt-3 flex items-center justify-between border-t border-[var(--border-muted)] pt-2 text-[11px] text-[var(--text-muted)]">
-                <span>
-                  Ø <span className="font-semibold text-[var(--foreground)]">{oKcal}</span> kcal
-                </span>
-                <span>
-                  Min {Math.round(Math.min(...verlauf.filter((v) => v.kcal > 0).map((v) => v.kcal), goalKcal))} · Max{' '}
-                  {Math.round(Math.max(...verlauf.map((v) => v.kcal)))}
-                </span>
-              </div>
-            </>
-          ) : (
-            <EmptyState
-              icon={<TrendingUp className="h-6 w-6" />}
-              title="Noch kein Verlauf"
-              hint="Sobald du ein paar Tage erfasst hast, siehst du hier deine Kurve."
-            />
-          )}
-        </Card>
-
-        {/* Muskelbalance */}
-        <Card className="p-5">
-          <SectionTitle>Muskelbalance · 30 Tage</SectionTitle>
-          {muskel.length ? (
-            <div className="space-y-2">
-              {muskel.map((m) => (
-                <BarRow key={m.gruppe} label={m.gruppe} value={m.saetze} max={maxMuskel} caption={`${m.saetze}`} />
-              ))}
-              <p className="pt-2 text-[10.5px] leading-relaxed text-[var(--text-muted)]">
-                Sätze pro Muskelgruppe. Alles unter 6 Sätzen bleibt ohne Reiz.
-              </p>
-            </div>
-          ) : (
-            <EmptyState
-              icon={<Target className="h-6 w-6" />}
-              title="Keine Trainingsdaten"
-              hint="Erfasse Trainings, dann siehst du hier deine Verteilung."
-            />
-          )}
-        </Card>
-
-        {/* Aktivität */}
-        <Card className="p-5 lg:col-span-3">
-          <SectionTitle action={<GhostButton onClick={() => navigate('/training')}>Details</GhostButton>}>
-            Aktivität · 12 Wochen
-          </SectionTitle>
-          <Heatmap days={heatmapTage} weeks={12} />
-          <div className="mt-3 grid grid-cols-2 gap-3 border-t border-[var(--border-muted)] pt-3 sm:grid-cols-4">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">Erfasste Tage</p>
-              <p className="mt-0.5 text-lg font-semibold tabular-nums">{erfasst}</p>
-              <p className="text-[10.5px] text-[var(--text-muted)]">von 7</p>
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">Einheiten</p>
-              <p className="mt-0.5 text-lg font-semibold tabular-nums">{letzte7.length}</p>
-              <p className="text-[10.5px] text-[var(--text-muted)]">letzte 7 Tage</p>
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">Rekord</p>
-              <p className="mt-0.5 text-lg font-semibold tabular-nums">{streak.laengste}</p>
-              <p className="text-[10.5px] text-[var(--text-muted)]">Tage in Folge</p>
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">Geplant</p>
-              <p className="mt-0.5 text-lg font-semibold tabular-nums">{geplantHeute.length}</p>
-              <p className="text-[10.5px] text-[var(--text-muted)]">Trainingstage/Woche</p>
-            </div>
-          </div>
-        </Card>
       </div>
+
+      {/* Diese Woche: ein Balken, keine Kacheln */}
+      <Card className="p-5">
+        <SectionTitle
+          action={
+            <button
+              type="button"
+              onClick={() => navigate('/stats')}
+              className="text-[11px] font-semibold text-[var(--simple-accent)]"
+            >
+              Statistiken
+            </button>
+          }
+        >
+          Diese Woche
+        </SectionTitle>
+        <div className="grid grid-cols-7 gap-2">
+          {woche.map((tag) => {
+            const relativ = tag.kcal > 0 ? Math.min(1, tag.kcal / goalKcal) : 0;
+            return (
+              <div key={tag.ymd} className="flex flex-col items-center gap-1.5">
+                <div className="flex h-16 w-full items-end overflow-hidden rounded-lg bg-[var(--border-muted)]/40">
+                  <div
+                    className="w-full rounded-lg transition-[height] duration-500"
+                    style={{
+                      height: `${relativ * 100}%`,
+                      background: tag.heute
+                        ? 'var(--simple-accent)'
+                        : 'color-mix(in srgb, var(--simple-accent) 45%, transparent)',
+                    }}
+                  />
+                </div>
+                <span
+                  className={`text-[10px] font-semibold uppercase tracking-[0.1em] ${
+                    tag.heute ? 'text-[var(--simple-accent)]' : 'text-[var(--text-muted)]'
+                  }`}
+                >
+                  {tag.label}
+                </span>
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ background: tag.hatTraining ? 'var(--simple-accent)' : 'transparent' }}
+                  aria-label={tag.hatTraining ? 'Training erfasst' : undefined}
+                />
+              </div>
+            );
+          })}
+        </div>
+        <p className="mt-3 border-t border-[var(--border-muted)] pt-2 text-[11px] text-[var(--text-muted)]">
+          Balken: Kalorien gegen dein Tagesziel. Punkt darunter: Training erfasst.
+          {seitLetztem !== null && seitLetztem > 1
+            ? ` Letztes Training vor ${seitLetztem} Tagen.`
+            : seitLetztem === 1
+              ? ' Letztes Training gestern.'
+              : ''}
+        </p>
+      </Card>
 
       {showPhoto && <PhotoMealSheet date={date} onClose={() => setShowPhoto(false)} onSaved={() => void load()} />}
       {showSession && (
@@ -446,4 +401,24 @@ export default function TodayPage() {
       )}
     </div>
   );
+}
+
+/** Lokale Datumsarithmetik — kein Zeitzonen-Versatz über UTC. */
+function verschiebeTage(ymd: string, days: number): string {
+  const [y, m, d] = ymd.split('-').map(Number);
+  const dt = new Date(y, (m ?? 1) - 1, d ?? 1);
+  dt.setDate(dt.getDate() + days);
+  const yy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
+
+/** Wochentagskürzel für den Balken (Mo, Di …). */
+function tagKuerzel(ymd: string): string {
+  const [y, m, d] = ymd.split('-').map(Number);
+  const dt = new Date(y, (m ?? 1) - 1, d ?? 1);
+  const keys = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
+  const key = keys[dt.getDay()] as keyof typeof DAY_LABELS;
+  return String(DAY_LABELS[key] ?? '').slice(0, 2);
 }

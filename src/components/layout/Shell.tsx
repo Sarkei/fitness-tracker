@@ -17,8 +17,8 @@ interface ShellProps {
   children: ReactNode;
 }
 
-/** Seiten mit eigenem Vollbreite-Aufbau (Übersicht) bringen ihren Container selbst mit. */
-const FULL_BLEED_ROUTES = new Set(['/']);
+/** Seiten mit eigenem Vollbreite-Aufbau bringen ihren Container selbst mit. */
+const FULL_BLEED_ROUTES = new Set<string>();
 
 export default function Shell({ children }: ShellProps) {
   const location = useLocation();
