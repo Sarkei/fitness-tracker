@@ -91,8 +91,8 @@ export default function FoodPage() {
   const tageLeiste = useRef<HTMLDivElement | null>(null);
   const [entries, setEntries] = useState<FoodEntry[]>([]);
   const [monat, setMonat] = useState<FoodEntry[]>([]);
-  /** Kalorienverbrauch von der Uhr: Grundumsatz plus Aktivkalorien. */
-  const [verbrauch, setVerbrauch] = useState<{ grundumsatz: number; aktiv: number } | null>(null);
+  /** Kalorienverbrauch von der Uhr: Aktivkalorien des heutigen Tages. */
+  const [verbrauch, setVerbrauch] = useState<{ aktiv: number } | null>(null);
   const [trainingDay, setTrainingDay] = useState(false);
   const [sheetFor, setSheetFor] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
@@ -133,15 +133,7 @@ export default function FoodPage() {
             (e) => String(e.date ?? e.start_date_local ?? '').slice(0, 10) === todayYmd(),
           );
           const aktiv = heutige.reduce((a, e) => a + (Number(e.calories) || 0), 0);
-          setVerbrauch(
-            aktiv > 0
-              ? {
-                  // Grundumsatz aus dem Tagesziel ableiten (kcalBoost herausrechnen).
-                  grundumsatz: Math.round(Number(goals.dailyCalories) || 2400),
-                  aktiv: Math.round(aktiv),
-                }
-              : null,
-          );
+          setVerbrauch(aktiv > 0 ? { aktiv: Math.round(aktiv) } : null);
         })
         .catch(() => {});
 
@@ -193,10 +185,16 @@ export default function FoodPage() {
   // An Trainingstagen mehr Kalorien und Kohlenhydrate — wie bei MacroBurn.
   const kcalBoost = trainingDay ? 1.12 : 1;
   const carbBoost = trainingDay ? 55 : 0;
-  const goalKcal = Math.round((Number(goals.dailyCalories) || 2400) * kcalBoost);
+  const basisKcal = Math.round(Number(goals.dailyCalories) || 2400);
   const goalProtein = Number(goals.macros?.protein) || 180;
   const goalCarbs = (Number(goals.macros?.carbs) || 240) + carbBoost;
   const goalFat = Number(goals.macros?.fat) || 80;
+  /**
+   * Gemeinsames Tagesbudget: Ziel (inkl. Trainingszuschlag) plus die heute von der
+   * Uhr verbrauchten Aktivkalorien. Ring, „noch übrig" und die Aufschlüsselung
+   * müssen dieselbe Zahl verwenden — sonst widersprechen sie sich.
+   */
+  const goalKcal = Math.round(basisKcal * kcalBoost) + (verbrauch?.aktiv ?? 0);
   const remaining = Math.round(goalKcal - sum.kcal);
   const ueber = sum.kcal > goalKcal;
   const isToday = date === todayYmd();
@@ -307,7 +305,11 @@ export default function FoodPage() {
           label="Gegessen"
           value={Math.round(sum.kcal)}
           unit="kcal"
-          hint={ueber ? `${Math.round(sum.kcal - goalKcal)} über Ziel` : `noch ${remaining} übrig`}
+          hint={
+            ueber
+              ? `${Math.round(sum.kcal - goalKcal).toLocaleString('de-DE')} über Budget`
+              : `noch ${remaining.toLocaleString('de-DE')} übrig`
+          }
           tone={ueber ? 'warn' : sum.kcal > 0 ? 'accent' : 'muted'}
         />
         <StatTile
@@ -361,15 +363,24 @@ export default function FoodPage() {
             </span>
           </div>
 
+          <div className="mt-2 flex flex-col items-center gap-6 sm:flex-row sm:items-start">
+            <Ring value={sum.kcal} max={goalKcal} label="gegessen" unit="kcal" size={132} />
+            <div className="w-full flex-1 space-y-3">
+              <MacroBar label="Protein" value={sum.protein} max={goalProtein} />
+              <MacroBar label="Kohlenhydrate" value={sum.carbs} max={goalCarbs} />
+              <MacroBar label="Fett" value={sum.fat} max={goalFat} />
+            </div>
+          </div>
+
           {/* Tagesbilanz offenlegen: Grundumsatz + Aktivkalorien = Bedarf, davon gegessen abziehen. */}
           {verbrauch && (
-            <div className="mb-3 grid grid-cols-3 gap-2 rounded-xl border border-[var(--border-muted)] bg-[var(--background)] px-3 py-2.5">
+            <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl border border-[var(--border-muted)] bg-[var(--background)] px-3 py-2.5">
               <div>
                 <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
                   Grundumsatz
                 </p>
                 <p className="mt-0.5 text-[13.5px] font-semibold tabular-nums">
-                  {verbrauch.grundumsatz.toLocaleString('de-DE')}
+                  {basisKcal.toLocaleString('de-DE')}
                 </p>
               </div>
               <div>
@@ -385,22 +396,11 @@ export default function FoodPage() {
                   Noch offen
                 </p>
                 <p className="mt-0.5 text-[13.5px] font-semibold tabular-nums">
-                  {Math.round(
-                    verbrauch.grundumsatz + verbrauch.aktiv - sum.kcal,
-                  ).toLocaleString('de-DE')}
+                  {remaining.toLocaleString('de-DE')}
                 </p>
               </div>
             </div>
           )}
-
-          <div className="mt-4 flex flex-col items-center gap-6 sm:flex-row sm:items-start">
-            <Ring value={sum.kcal} max={goalKcal} label="gegessen" unit="kcal" size={132} />
-            <div className="w-full flex-1 space-y-3">
-              <MacroBar label="Protein" value={sum.protein} max={goalProtein} />
-              <MacroBar label="Kohlenhydrate" value={sum.carbs} max={goalCarbs} />
-              <MacroBar label="Fett" value={sum.fat} max={goalFat} />
-            </div>
-          </div>
 
           {trainingDay && (
             <p className="mt-3 rounded-lg bg-[var(--simple-accent-soft)] px-3 py-2 text-[11px] leading-relaxed text-[var(--simple-accent)]">
@@ -433,8 +433,7 @@ export default function FoodPage() {
            */}
           <div
             ref={tageLeiste}
-            className="flex flex-1 items-end gap-1.5 overflow-x-auto pb-1"
-            style={{ scrollbarWidth: 'thin' }}
+            className="scrollbar-hide flex flex-1 items-stretch gap-1 overflow-x-auto pb-1"
           >
             {Array.from({ length: 30 }, (_, i) => shiftYmd(todayYmd(), -(29 - i))).map((ymd) => {
               const active = ymd === date;
@@ -446,7 +445,7 @@ export default function FoodPage() {
                   key={ymd}
                   data-aktiv={active ? '1' : undefined}
                   onClick={() => setDate(ymd)}
-                  className={`flex w-8 shrink-0 flex-col items-center gap-1 rounded-lg py-1.5 transition ${
+                  className={`flex min-h-[104px] w-12 shrink-0 flex-col items-center gap-1 rounded-lg px-1 py-1.5 transition ${
                     active ? 'bg-[var(--simple-accent-soft)]' : 'hover:bg-[var(--border-muted)]/40'
                   }`}
                   title={`${ymd}${kcal > 0 ? ` · ${Math.round(kcal)} kcal` : ' · nichts erfasst'}`}
@@ -462,13 +461,24 @@ export default function FoodPage() {
                   >
                     {dayLabelShort(ymd)}
                   </span>
-                  <div className="flex h-10 w-2 items-end overflow-hidden rounded-full bg-[var(--border-muted)]">
+                  {/* Datum als dd.mm direkt über dem Balken */}
+                  <span
+                    className={`text-[9px] leading-none tabular-nums ${
+                      active
+                        ? 'text-[var(--simple-accent)]'
+                        : 'text-[var(--text-muted)] opacity-80'
+                    }`}
+                  >
+                    {ymd.slice(8, 10)}.{ymd.slice(5, 7)}.
+                  </span>
+                  {/* Balken füllt die restliche Kartenhöhe */}
+                  <div className="flex w-full flex-1 items-end overflow-hidden rounded-md bg-[var(--border-muted)]">
                     <div
-                      className="w-full rounded-full transition-[height] duration-500"
+                      className="w-full rounded-md transition-[height] duration-500"
                       style={{
-                        height: `${Math.max(kcal > 0 ? 8 : 0, anteil * 100)}%`,
+                        height: `${Math.max(kcal > 0 ? 6 : 0, anteil * 100)}%`,
                         background: 'var(--simple-accent)',
-                        opacity: active ? 1 : 0.5,
+                        opacity: active ? 1 : 0.55,
                       }}
                     />
                   </div>

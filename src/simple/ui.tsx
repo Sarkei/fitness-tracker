@@ -407,19 +407,27 @@ export function Sparkline({
   const flaeche = `0,${h} ${punkte} ${w},${h}`;
   const zielY = goal !== undefined ? y(goal) : null;
 
-  /** Achsenwert lesbar runden. */
+  /** Achsenwert lesbar runden — ganze Zahlen ohne Nachkommastelle. */
   const zeige = (v: number) => {
-    if (Math.abs(v) >= 100) return String(Math.round(v));
-    if (Math.abs(v) >= 10) return v.toFixed(0);
+    if (Math.abs(v) >= 1) return String(Math.round(v));
+    if (v === 0) return '0';
     return v.toFixed(1);
   };
 
   // Drei Hilfslinien: oben, Mitte, unten
   const linien = [max, (max + min) / 2, min];
+  // Innenabstand, damit die obere und untere Beschriftung nicht auf der
+  // Rahmenlinie klebt und die Kurve nicht am Rand abgeschnitten wird.
+  const PAD = 7;
 
   return (
     <div className="relative">
-      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="w-full" style={{ height: h }}>
+      <svg
+        viewBox={`0 ${-PAD} ${w} ${h + 2 * PAD}`}
+        preserveAspectRatio="none"
+        className="w-full"
+        style={{ height: h + 2 * PAD }}
+      >
         {linien.map((wert, i) => (
           <line
             key={`g${i}`}
@@ -459,14 +467,14 @@ export function Sparkline({
         )}
       </svg>
 
-      {/* Beschriftung der Achse — rechts neben der Kurve, damit nichts verdeckt wird */}
+      {/* Beschriftung der Achse — rechts neben der Kurve, mit Luft zum Rand */}
       <div
-        className="pointer-events-none absolute inset-y-0 right-0 flex flex-col justify-between pl-1 text-[9px] leading-none text-[var(--text-muted)]"
-        style={{ height: h }}
+        className="pointer-events-none absolute inset-x-0 flex flex-col justify-between pl-1 pr-0.5 text-[9px] leading-none text-[var(--text-muted)]"
+        style={{ top: 0, height: h + 2 * PAD, paddingTop: PAD - 4, paddingBottom: PAD - 4 }}
       >
-        <span>{zeige(max)}{einheit ? ` ${einheit}` : ''}</span>
-        <span className="opacity-70">{zeige((max + min) / 2)}</span>
-        <span>{zeige(min)}{einheit ? ` ${einheit}` : ''}</span>
+        <span className="self-end rounded-sm bg-[var(--card-bg)] px-1 py-0.5">{zeige(max)}{einheit ? ` ${einheit}` : ''}</span>
+        <span className="self-end opacity-70">{zeige((max + min) / 2)}</span>
+        <span className="self-end rounded-sm bg-[var(--card-bg)] px-1 py-0.5">{zeige(min)}{einheit ? ` ${einheit}` : ''}</span>
       </div>
     </div>
   );
