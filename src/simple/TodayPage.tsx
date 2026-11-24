@@ -43,7 +43,6 @@ import {
   trainingsSerie,
   verschiebeTage,
   zielTypAusProfil,
-  bilanzImZiel,
 } from './serien';
 
 /**
@@ -573,31 +572,12 @@ export default function TodayPage() {
         <BilanzChart bilanz={bilanz} heute={date} />
 
         {hatBilanz && (
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-muted)] pt-2.5 text-[11px] text-[var(--text-muted)]">
-            <span className="tabular-nums">
-              Ø{' '}
-              <span
-                className="font-semibold"
-                style={{
-                  color:
-                    oBilanz === null ? 'var(--foreground)' : bilanzImZiel(oBilanz, zielTyp) ? '#22c55e' : '#ef4444',
-                }}
-              >
-                {oBilanz === null ? '—' : `${oBilanz > 0 ? '+' : ''}${oBilanz}`}
-              </span>{' '}
-              kcal
-            </span>
-            <span className="text-[10px]">
+          <div className="mt-2 flex flex-wrap items-center justify-end gap-2 text-[10px] text-[var(--text-muted)]">
+            <span>
               {zielTyp === 'lose' ? 'Ziel: abnehmen' : zielTyp === 'gain' ? 'Ziel: zunehmen' : 'Ziel: halten'}
             </span>
           </div>
         )}
-        <p className="mt-1.5 text-[10.5px] leading-relaxed text-[var(--text-muted)]">
-          Ein Balken je Tag: dein Verbrauch als offenes Defizit nach unten. Mit jedem erfassten Essen wird
-          der Balken kürzer — ist mehr gegessen als verbraucht, wächst er über die Nulllinie nach oben ins
-          Positive (Überschuss). Der heutige Balken wächst mit, sobald die Uhr neue Werte liefert. Der
-          Durchschnitt zählt nur Tage, an denen mindestens die Hälfte des Ziels erfasst wurde.
-        </p>
       </Card>
 
       {showPhoto && (

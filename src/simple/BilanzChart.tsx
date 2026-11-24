@@ -6,6 +6,15 @@ const DEFIZIT = '#2f7d5a';
 /** Überschuss: Balken wächst nach oben. */
 const UEBERSCHUSS = '#d9534f';
 
+/**
+ * Energiegehalt von einem Kilo Körperfett.
+ *
+ * Üblicher Richtwert (7.000–7.700 kcal/kg). Ich nehme 7.700, weil das der Wert
+ * ist, mit dem Ernährungsrechner arbeiten — die Prognose soll nicht optimistisch
+ * schätzen.
+ */
+const KCAL_PRO_KG = 7700;
+
 /** Runde Obergrenze für die Y-Achse, damit die Beschriftung glatte Zahlen zeigt. */
 function rundeGrenze(wert: number): number {
   if (wert <= 0) return 500;
@@ -63,6 +72,31 @@ export default function BilanzChart({
 
   const mitte = HOEHE / 2;
   const skala = mitte / maxWert;
+
+  /*
+   * 7-Tage-Auswertung für die beiden Boxen unter dem Diagramm.
+   *
+   * Gerechnet wird nur mit Tagen, an denen tatsächlich etwas gegessen erfasst
+   * wurde. Tage ohne Erfassung haben zwar eine Bilanz (= voller Verbrauch), aber
+   * die ist fiktiv — wer sie mitzählt, bekommt ein Defizit von mehreren Tausend
+   * kcal pro Tag und eine Prognose, die nie eintritt.
+   */
+  const woche = useMemo(() => {
+    const letzte = tage.slice(-7);
+    const erfasst = letzte.filter((t) => t.kcal > 0);
+    const summe = erfasst.reduce((s, t) => s + t.bilanz, 0);
+    const schnitt = erfasst.length ? Math.round(summe / erfasst.length) : null;
+    /* kcal → kg: negatives Vorzeichen = abgenommen. */
+    const kg = schnitt === null ? null : schnitt / KCAL_PRO_KG;
+    return {
+      anzahl: erfasst.length,
+      bilanz: erfasst.length ? Math.round(summe) : null,
+      schnitt,
+      kg,
+      /* Wochenprognose = Tagesschnitt × 7, damit sie nicht von der Erfassungslücke abhängt. */
+      kgWoche: schnitt === null ? null : (schnitt * 7) / KCAL_PRO_KG,
+    };
+  }, [tage]);
 
   const ticksY = useMemo(() => {
     const schritt = maxWert / 2;
@@ -246,6 +280,78 @@ export default function BilanzChart({
           Überschuss
         </span>
         <span className="ml-auto text-[10px]">Balken kürzer, sobald du isst</span>
+      </div>
+
+      {/*
+        Zwei Kennzahlen-Boxen statt des langen Erklärtextes.
+        Links die tatsächliche Bilanz der letzten 7 Tage, rechts was das in
+        Körpergewicht bedeutet.
+      */}
+      <div className="mt-3 grid grid-cols-2 gap-2.5">
+        <div className="rounded-xl border border-[var(--border-muted)] bg-[var(--card-bg)] px-3 py-2.5">
+          <p className="text-[9.5px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+            7 Tage
+          </p>
+          <p
+            className="mt-1 text-[20px] font-semibold leading-none tabular-nums"
+            style={{
+              color:
+                woche.bilanz === null
+                  ? 'var(--foreground)'
+                  : woche.bilanz < 0
+                    ? DEFIZIT
+                    : woche.bilanz > 0
+                      ? UEBERSCHUSS
+                      : 'var(--foreground)',
+            }}
+          >
+            {woche.bilanz === null ? '—' : `${woche.bilanz > 0 ? '+' : ''}${fmtZahl(woche.bilanz)}`}
+            {woche.bilanz !== null && (
+              <span className="ml-1 text-[11px] font-medium text-[var(--text-muted)]">kcal</span>
+            )}
+          </p>
+          <p className="mt-1 text-[10px] leading-tight text-[var(--text-muted)]">
+            {woche.bilanz === null
+              ? 'Noch nichts erfasst'
+              : `${woche.bilanz < 0 ? 'Defizit' : 'Überschuss'} · Ø ${fmtZahl(Math.abs(woche.schnitt ?? 0))} kcal/Tag${
+                  woche.anzahl < 7 ? ` · ${woche.anzahl} von 7 Tagen erfasst` : ''
+                }`}
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-[var(--border-muted)] bg-[var(--card-bg)] px-3 py-2.5">
+          <p className="text-[9.5px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+            Prognose
+          </p>
+          <p
+            className="mt-1 text-[20px] font-semibold leading-none tabular-nums"
+            style={{
+              color:
+                woche.kgWoche === null
+                  ? 'var(--foreground)'
+                  : woche.kgWoche < 0
+                    ? DEFIZIT
+                    : woche.kgWoche > 0
+                      ? UEBERSCHUSS
+                      : 'var(--foreground)',
+            }}
+          >
+            {woche.kgWoche === null
+              ? '—'
+              : `${woche.kgWoche > 0 ? '+' : ''}${woche.kgWoche.toLocaleString('de-DE', {
+                  minimumFractionDigits: 1,
+                  maximumFractionDigits: 1,
+                })}`}
+            {woche.kgWoche !== null && (
+              <span className="ml-1 text-[11px] font-medium text-[var(--text-muted)]">kg</span>
+            )}
+          </p>
+          <p className="mt-1 text-[10px] leading-tight text-[var(--text-muted)]">
+            {woche.kgWoche === null
+              ? 'Noch keine Grundlage'
+              : `${woche.kgWoche < 0 ? 'abnehmen' : 'zunehmen'} pro Woche bei diesem Schnitt`}
+          </p>
+        </div>
       </div>
     </div>
   );
