@@ -36,6 +36,7 @@ import {
   SYNC_INTERVAL_OPTIONS,
   type IntervalsSettings,
 } from "./src/lib/intervals";
+import { anmelden, bestaetigeMfa, entschluesseln, verschluesseln } from "./src/lib/garminLogin";
 import { syncGarmin, syncGarminHeute, garminToken, syncGarminAktivitaeten, ladeEinheitZeitreihen, felderStand, type GarminCache, type GarminAktivitaet } from "./src/lib/garmin";
 import {
   deleteEvent as intervalsDeleteEvent,
@@ -6213,6 +6214,14 @@ ${JSON.stringify(userCtx, null, 2)}
     lastAutoSyncAt?: string;
     /** Zeitpunkt des letzten VOLLEN Abgleichs (Historie, Schlaf, Aktivitaeten). */
     lastVollSyncAt?: string;
+    /** Zugang ueber Garmin-Login (inoffiziell, kein Tageslimit). */
+    login?: {
+      email?: string;
+      passwort?: string;
+      tokens?: string;
+      verbundenAm?: string;
+      fehler?: string;
+    };
   };
 
   const readGarminSettings = async (userId: number): Promise<GarminSettings> => {
@@ -6778,6 +6787,137 @@ ${JSON.stringify(userCtx, null, 2)}
       });
     } catch (err: unknown) {
       res.status(500).json({ error: err instanceof Error ? err.message : "stats failed" });
+    }
+  });
+
+
+  /*
+   * Garmin-Login (inoffiziell) — zweiter Zugangsweg neben der Personal API.
+   *
+   * Vorteil: kein 100-Anfragen-Limit und Felder, die die offizielle API
+   * vorenthält (Schlafphasen, naechtlicher SpO2, Atemfrequenz, Body Battery).
+   *
+   * Die Zugangsdaten werden mit AES-256-GCM verschluesselt gespeichert; der
+   * Klartext liegt nur waehrend des Anmeldevorgangs im Speicher.
+   */
+
+  /** Status des Login-Zugangs (ohne Zugangsdaten zurueckzugeben). */
+  app.get("/api/integrations/garmin/login", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const g = await readGarminSettings(req.userId!);
+      const l = g.login;
+      if (!l?.email) {
+        res.json({ verbunden: false });
+        return;
+      }
+      // E-Mail entschluesseln, aber nur maskiert zurueckgeben.
+      let mail: string | null = null;
+      try {
+        const roh = entschluesseln(l.email);
+        const [name, domain] = roh.split("@");
+        mail = domain ? `${name.slice(0, 2)}***@${domain}` : null;
+      } catch {
+        mail = null;
+      }
+      res.json({
+        verbunden: Boolean(l.tokens),
+        email: mail,
+        verbundenAm: l.verbundenAm ?? null,
+        fehler: l.fehler ?? null,
+      });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "Status fehlgeschlagen." });
+    }
+  });
+
+  /** Schritt 1: E-Mail und Passwort. Antwortet ggf. mit "mfa". */
+  app.post("/api/integrations/garmin/login", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const email = String(req.body?.email ?? "").trim();
+      const passwort = String(req.body?.password ?? "");
+      if (!email || !passwort) {
+        res.status(400).json({ error: "E-Mail und Passwort sind nötig." });
+        return;
+      }
+
+      const ergebnis = await anmelden(req.userId!, email, passwort);
+
+      if (ergebnis.status === "fehler") {
+        res.status(401).json({ error: ergebnis.meldung });
+        return;
+      }
+
+      // Offene 2FA: Zugangsdaten trotzdem merken, aber noch keine Tokens.
+      const g = await readGarminSettings(req.userId!);
+      await writeGarminSettings(req.userId!, {
+        ...g,
+        login: {
+          ...(g.login ?? {}),
+          email: verschluesseln(email),
+          passwort: verschluesseln(passwort),
+          fehler: undefined,
+        },
+      });
+
+      if (ergebnis.status === "mfa") {
+        res.json({ ok: false, mfa: true, hinweis: ergebnis.hinweis });
+        return;
+      }
+
+      await writeGarminSettings(req.userId!, {
+        ...(await readGarminSettings(req.userId!)),
+        login: {
+          ...((await readGarminSettings(req.userId!)).login ?? {}),
+          tokens: verschluesseln(ergebnis.tokens),
+          verbundenAm: new Date().toISOString(),
+          fehler: undefined,
+        },
+      });
+      res.json({ ok: true, mfa: false });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "Anmeldung fehlgeschlagen." });
+    }
+  });
+
+  /** Schritt 2: 2FA-Code einsenden. */
+  app.post("/api/integrations/garmin/login/mfa", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const code = String(req.body?.code ?? "").trim();
+      if (!/^\d{4,8}$/.test(code)) {
+        res.status(400).json({ error: "Bitte den Code aus SMS oder App eingeben." });
+        return;
+      }
+
+      const ergebnis = await bestaetigeMfa(req.userId!, code);
+      if (ergebnis.status !== "ok") {
+        res.status(401).json({ error: ergebnis.status === "fehler" ? ergebnis.meldung : "Unbekannt." });
+        return;
+      }
+
+      const g = await readGarminSettings(req.userId!);
+      await writeGarminSettings(req.userId!, {
+        ...g,
+        login: {
+          ...(g.login ?? {}),
+          tokens: verschluesseln(ergebnis.tokens),
+          verbundenAm: new Date().toISOString(),
+          fehler: undefined,
+        },
+      });
+      res.json({ ok: true });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "Bestätigung fehlgeschlagen." });
+    }
+  });
+
+  /** Login-Zugang trennen (Zugangsdaten und Tokens löschen). */
+  app.delete("/api/integrations/garmin/login", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const g = await readGarminSettings(req.userId!);
+      await writeGarminSettings(req.userId!, { ...g, login: undefined });
+      res.json({ ok: true });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "Trennen fehlgeschlagen." });
     }
   });
 

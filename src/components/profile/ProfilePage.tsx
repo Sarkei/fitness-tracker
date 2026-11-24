@@ -19,6 +19,7 @@ import ReportHistoryView from './ReportHistoryView';
 import IntervalsConnect from './IntervalsConnect';
 import MealplannerConnect from './MealplannerConnect';
 import GarminConnect from './GarminConnect';
+import GarminLogin from './GarminLogin';
 import { Card, PageHeader } from '@/src/simple/ui';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
@@ -828,6 +829,8 @@ export default function ProfilePage() {
 
           <Gruppe titel="Datenquellen" hinweis="Woher deine Werte kommen">
             <GarminConnect />
+            {/* Zweiter Weg zur Uhr: kein Tageslimit, alle Schlafwerte. */}
+            <GarminLogin />
             <IntervalsConnect />
           </Gruppe>
 
