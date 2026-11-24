@@ -212,6 +212,12 @@ export async function addFoodEntry(entry: {
   carbs: number;
   fat: number;
   date: string;
+  /**
+   * Gegessene Menge in Portionen — bei Mealplanner-Gerichten auch
+   * Viertelschritte (0,25). Ohne Angabe bleibt das Feld leer.
+   */
+  quantity?: number;
+  unit?: string;
 }): Promise<void> {
   await api('/api/nutrition', {
     method: 'POST',

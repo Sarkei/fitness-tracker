@@ -175,27 +175,94 @@ function clientAusTokens(tokensJson: string): GarminClient {
 }
 
 /**
- * Einen Tag über den Login-Zugang holen.
+ * Pruefen, ob die Tokens noch gelten.
  *
- * Liefert dieselbe Form wie der offizielle Weg (`GarminTag`), damit die
- * Speicherung und die Ansichten unverändert bleiben.
+ * Leichter Aufruf (Profil) — damit der Takt nicht bei abgelaufenen Tokens
+ * endlos fehlschlaegt, ohne dass es jemand merkt.
  */
-export async function tagPerLogin(tokensJson: string, datum: string): Promise<Record<string, unknown> | null> {
+export async function tokensGueltig(tokensJson: string): Promise<boolean> {
+  try {
+    await clientAusTokens(tokensJson).connectapi('/userprofile-service/socialProfile');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const zahl = (v: unknown): number | undefined =>
+  typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+
+const sek = (v: unknown): number | undefined => {
+  const n = zahl(v);
+  return n != null && n > 0 ? Math.round(n) : undefined;
+};
+
+/** Alle Werte eines Tages. */
+export type LoginTag = {
+  date: string;
+  sleepSecs?: number;
+  sleepScore?: number;
+  sleepQuality?: string;
+  deepSecs?: number;
+  lightSecs?: number;
+  remSecs?: number;
+  awakeSecs?: number;
+  sleepStress?: number;
+  sleepHr?: number;
+  spo2Night?: number;
+  respirationNight?: number;
+  hrv?: number;
+  hrvStatus?: string;
+  restingHr?: number;
+  minHr?: number;
+  maxHr?: number;
+  steps?: number;
+  floors?: number;
+  distanceMeters?: number;
+  activeCalories?: number;
+  totalCalories?: number;
+  stressAvg?: number;
+  stressMax?: number;
+  bodyBatteryMin?: number;
+  bodyBatteryMax?: number;
+  vo2max?: number;
+  fitnessAge?: number;
+  weightKg?: number;
+  bodyFat?: number;
+  /** Garmin "Training Readiness" (0-100) und Einordnung. */
+  readiness?: number;
+  readinessLevel?: string;
+  /** Trainingsstatus, z. B. PRODUCTIVE, MAINTAINING. */
+  trainingStatus?: string;
+};
+
+/**
+ * Alle Werte eines Tages holen.
+ *
+ * Vier Aufrufe, die sich ergaenzen:
+ *  1. Tageszusammenfassung - Schritte, Kalorien, Puls, Stress, Body Battery, HRV
+ *  2. Schlaf - Phasen, Schlaf-Stress, Schlaf-Herzfrequenz, naechtlicher SpO2
+ *  3. Training Readiness - Score und Einordnung
+ *  4. Trainingsstatus
+ *
+ * `leicht` spart die beiden teureren Abrufe. Sie aendern sich hoechstens
+ * stuendlich, waehrend Schritte und Kalorien laufend wachsen.
+ */
+export async function tagVoll(
+  tokensJson: string,
+  datum: string,
+  opts: { leicht?: boolean } = {},
+): Promise<LoginTag> {
   const client = clientAusTokens(tokensJson);
   const garmin = new Garmin(client);
+  const tag: LoginTag = { date: datum };
 
-  try {
-    // Tageszusammenfassung über den Connect-Endpunkt — enthält Schritte,
-    // Kalorien, Puls, Stress, Body Battery, SpO₂ und Atmung in einem Aufruf.
-    const roh = (await client.connectapi(
-      `/usersummary-service/usersummary/daily?calendarDate=${datum}`,
-    )) as Record<string, unknown> | null;
-    if (!roh) return null;
+  /* 1 - Tageszusammenfassung */
+  const roh = (await client
+    .connectapi(`/usersummary-service/usersummary/daily?calendarDate=${datum}`)
+    .catch(() => null)) as Record<string, unknown> | null;
 
-    const tag: Record<string, unknown> = { date: datum };
-    const zahl = (v: unknown): number | undefined =>
-      typeof v === 'number' && Number.isFinite(v) ? v : undefined;
-
+  if (roh) {
     const schrittBlock = roh.steps as Record<string, unknown> | undefined;
     const schritte = zahl(schrittBlock?.value) ?? zahl(roh.totalSteps);
     if (schritte) tag.steps = schritte;
@@ -204,17 +271,25 @@ export async function tagPerLogin(tokensJson: string, datum: string): Promise<Re
     if (dist) tag.distanceMeters = Math.round(dist);
 
     const etagen = zahl(schrittBlock?.floorsClimbed) ?? zahl(roh.floorsClimbed);
-    if (etagen) tag.floorsClimbed = etagen;
+    if (etagen) tag.floors = etagen;
 
-    const kcal = roh.calories as Record<string, unknown> | undefined;
-    if (kcal) {
-      const aktiv = zahl(kcal.burnedActive) ?? zahl(kcal.activeKilocalories);
-      const gesamt = zahl(kcal.burnedTotal);
-      const ruhe = zahl(kcal.burnedResting);
-      if (aktiv) tag.activeCalories = Math.round(aktiv);
-      if (gesamt) tag.totalCalories = Math.round(gesamt);
-      else if (aktiv && ruhe) tag.totalCalories = Math.round(aktiv + ruhe);
-    }
+    /*
+     * Kalorien stehen je nach Alter des Tages an verschiedenen Stellen:
+     * aktuelle Tage haben einen `calories`-Block, aeltere nur die Felder
+     * `totalKilocalories` / `activeKilocalories` auf oberster Ebene.
+     * Beides muss gelesen werden, sonst bleiben alte Tage ohne Kalorien.
+     */
+    const kcalBlock = roh.calories as Record<string, unknown> | undefined;
+    const aktiv =
+      zahl(kcalBlock?.burnedActive) ??
+      zahl(kcalBlock?.activeKilocalories) ??
+      zahl(roh.activeKilocalories);
+    const gesamt =
+      zahl(kcalBlock?.burnedTotal) ?? zahl(roh.totalKilocalories) ?? zahl(roh.burnedKilocalories);
+    const ruhe = zahl(kcalBlock?.burnedResting) ?? zahl(roh.bmrKilocalories);
+    if (aktiv) tag.activeCalories = Math.round(aktiv);
+    if (gesamt) tag.totalCalories = Math.round(gesamt);
+    else if (aktiv && ruhe) tag.totalCalories = Math.round(aktiv + ruhe);
 
     const hf = roh.heartRate as Record<string, unknown> | undefined;
     if (hf) {
@@ -230,6 +305,8 @@ export async function tagPerLogin(tokensJson: string, datum: string): Promise<Re
     if (stress) {
       const avg = zahl(stress.avgStressLevel) ?? zahl(stress.averageStressLevel);
       if (avg) tag.stressAvg = avg;
+      const max = zahl(stress.maxStressLevel);
+      if (max) tag.stressMax = max;
     }
 
     const bb = roh.bodyBattery as Record<string, unknown> | undefined;
@@ -240,41 +317,21 @@ export async function tagPerLogin(tokensJson: string, datum: string): Promise<Re
       if (max != null) tag.bodyBatteryMax = Math.round(max);
     }
 
-    const spo2 = roh.spo2 as Record<string, unknown> | undefined;
-    if (spo2) {
-      const wert = zahl(spo2.averageValue);
-      if (wert) tag.spo2Avg = Math.round(wert * 10) / 10;
+    const hrvBlock = roh.hrv as Record<string, unknown> | undefined;
+    if (hrvBlock) {
+      const wert = zahl(hrvBlock.lastNightAvg) ?? zahl(hrvBlock.weeklyAvg);
+      if (wert) tag.hrv = Math.round(wert);
+      if (typeof hrvBlock.status === 'string') tag.hrvStatus = hrvBlock.status;
     }
-
-    return tag;
-  } catch {
-    return null;
   }
-}
 
-/**
- * Schlaf der letzten Nacht über den Login-Zugang.
- *
- * Diese Werte liefert die Personal API nicht: Schlafphasen, Schlaf-Stress,
- * nächtlicher SpO₂ und die Schlaf-Herzfrequenz.
- */
-export async function schlafPerLogin(
-  tokensJson: string,
-  datum: string,
-): Promise<Record<string, unknown> | null> {
-  const client = clientAusTokens(tokensJson);
-  try {
-    const roh = (await client.connectapi(
-      `/wellness-service/wellness/dailySleepData?date=${datum}&nonSleepBufferMinutes=60`,
-    )) as Record<string, unknown> | null;
-    if (!roh) return null;
+  /* 2 - Schlaf mit Phasen */
+  const schlaf = (await client
+    .connectapi(`/wellness-service/wellness/dailySleepData?date=${datum}&nonSleepBufferMinutes=60`)
+    .catch(() => null)) as Record<string, unknown> | null;
 
-    const dto = (roh.dailySleepDTO ?? {}) as Record<string, unknown>;
-    const tag: Record<string, unknown> = { date: datum };
-
-    const sek = (v: unknown): number | undefined =>
-      typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.round(v) : undefined;
-
+  if (schlaf) {
+    const dto = (schlaf.dailySleepDTO ?? {}) as Record<string, unknown>;
     const gesamt = sek(dto.sleepTimeSeconds);
     if (gesamt) tag.sleepSecs = gesamt;
 
@@ -287,25 +344,183 @@ export async function schlafPerLogin(
     const wach = sek(dto.awakeSleepSeconds);
     if (wach) tag.awakeSecs = wach;
 
-    const score = (dto.sleepScores ?? {}) as Record<string, unknown>;
-    const gesamtwert = typeof score.overall === 'number' ? score.overall : undefined;
-    if (gesamtwert) tag.sleepScore = Math.round(gesamtwert);
-    const qualitaet = typeof score.qualityType === 'string' ? score.qualityType : undefined;
-    if (qualitaet) tag.sleepQualityText = qualitaet;
+    /* Garmin liefert den Score als Objekt: { value: 70, qualifierKey: 'FAIR' }. */
+    const score = dto.sleepScores as Record<string, unknown> | undefined;
+    const block = score?.overall as { value?: number; qualifierKey?: string } | undefined;
+    if (typeof block?.value === 'number') tag.sleepScore = Math.round(block.value);
+    /*
+     * `sleep_quality` in der Datenbank ist INTEGER. Garmin liefert Text
+     * ("FAIR", "GOOD"). Deshalb hier auf eine Stufe abbilden — sonst bricht
+     * die Speicherung mit "invalid input syntax for type integer".
+     */
+    if (typeof block?.qualifierKey === 'string') tag.sleepQuality = block.qualifierKey;
 
-    return tag;
+    const stressWert = zahl(dto.avgSleepStress);
+    if (stressWert) tag.sleepStress = Math.round(stressWert);
+
+    const schlafHr = zahl(dto.sleepingHeartRate) ?? zahl(dto.avgHeartRate);
+    if (schlafHr) tag.sleepHr = Math.round(schlafHr);
+
+    /* Naechtlicher SpO2 und Atmung stecken in eigenen Bloecken. */
+    const spo2Block = schlaf.wellnessSpO2SleepSummaryDTO as Record<string, unknown> | undefined;
+    const spo2Nacht = zahl(spo2Block?.averageValue) ?? zahl(spo2Block?.averageSPO2);
+    if (spo2Nacht) tag.spo2Night = Math.round(spo2Nacht * 10) / 10;
+
+    const respBlock = schlaf.wellnessRespirationSummaryDTO as Record<string, unknown> | undefined;
+    const atemNacht = zahl(respBlock?.averageValue);
+    if (atemNacht) tag.respirationNight = Math.round(atemNacht * 10) / 10;
+  }
+
+  /* Leichter Lauf endet hier. */
+  if (opts.leicht) return tag;
+
+  /* 3 - Training Readiness */
+  const ready = (await garmin.getTrainingReadiness(datum).catch(() => null)) as
+    | Array<Record<string, unknown>>
+    | null;
+  if (Array.isArray(ready) && ready.length) {
+    const letzte = ready[ready.length - 1];
+    const score = zahl(letzte.score);
+    if (score != null) tag.readiness = Math.round(score);
+    if (typeof letzte.level === 'string') tag.readinessLevel = letzte.level;
+  }
+
+  /* 4 - Trainingsstatus */
+  const status = (await client
+    .connectapi(`/metrics-service/metrics/trainingstatus/aggregated/${datum}`)
+    .catch(() => null)) as Record<string, unknown> | null;
+  if (status && typeof status.mostRecentTrainingStatus === 'object') {
+    const block = status.mostRecentTrainingStatus as Record<string, unknown>;
+    const wert = block.trainingStatus as { trainingStatusKey?: string } | undefined;
+    if (wert?.trainingStatusKey) tag.trainingStatus = wert.trainingStatusKey;
+  }
+
+  return tag;
+}
+
+/**
+ * Volle Historie holen.
+ *
+ * Tage einzeln und abgesichert: Ein Fehler an einem Tag darf die Historie nicht
+ * kosten. Garmin hat kein Tageslimit, wir bleiben aber hoeflich.
+ */
+export async function historieVoll(
+  tokensJson: string,
+  tage: number,
+  onFortschritt?: (erledigt: number, gesamt: number) => void,
+): Promise<LoginTag[]> {
+  const anzahl = Math.max(1, Math.min(730, tage));
+  const ergebnis: LoginTag[] = [];
+
+  for (let i = 0; i < anzahl; i += 1) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const datum = d.toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' });
+    try {
+      const tag = await tagVoll(tokensJson, datum, { leicht: false });
+      if (Object.keys(tag).some((k) => k !== 'date')) ergebnis.push(tag);
+    } catch {
+      /* einzelner Tag darf ausfallen */
+    }
+    onFortschritt?.(i + 1, anzahl);
+  }
+
+  return ergebnis;
+}
+
+/**
+ * Gewicht und Koerperfett eines Tages.
+ *
+ * Eigener Aufruf, weil Wiegungen nicht taeglich vorkommen - Garmin liefert eine
+ * Liste mit Datum, Gewicht und Koerperfett.
+ */
+export async function koerperWerte(
+  tokensJson: string,
+  datum: string,
+): Promise<{ weightKg?: number; bodyFat?: number } | null> {
+  try {
+    const roh = (await clientAusTokens(tokensJson).connectapi(
+      `/weight-service/weight/dateRange?startDate=${datum}&endDate=${datum}`,
+    )) as Record<string, unknown> | null;
+    if (!roh) return null;
+    const liste = (roh.dateWeightList ?? []) as Array<Record<string, unknown>>;
+    if (!liste.length) return null;
+    const letzte = liste[liste.length - 1];
+    const ergebnis: { weightKg?: number; bodyFat?: number } = {};
+    const kg = zahl(letzte.weight) ?? zahl(letzte.weightInGrams);
+    if (kg) ergebnis.weightKg = kg > 1000 ? Math.round((kg / 1000) * 10) / 10 : Math.round(kg * 10) / 10;
+    const fett = zahl(letzte.bodyFat);
+    if (fett) ergebnis.bodyFat = Math.round(fett * 10) / 10;
+    return Object.keys(ergebnis).length ? ergebnis : null;
   } catch {
     return null;
   }
 }
 
-/** Prüfen, ob die Tokens noch gelten (leichter Aufruf). */
-export async function tokensGueltig(tokensJson: string): Promise<boolean> {
+/* --------------------------------------------------------- Zurueckschreiben */
+
+/**
+ * Gewicht in Garmin eintragen.
+ *
+ * Nur aufrufen, wenn sich der Wert wirklich geaendert hat - sonst entsteht bei
+ * jedem Takt ein neuer Eintrag und die Garmin-Historie wird unbrauchbar.
+ * Der Merker liegt in `garmin_schreibstand` (server.ts).
+ */
+export async function schreibeGewicht(tokensJson: string, datum: string, kg: number): Promise<boolean> {
   try {
-    const client = clientAusTokens(tokensJson);
-    await client.connectapi('/userprofile-service/socialProfile');
+    await clientAusTokens(tokensJson).connectapi('/weight-service/weight/dateWeight', {
+      method: 'POST',
+      json: {
+        dateTimestamp: `${datum}T12:00:00.000`,
+        weight: Math.round(kg * 1000),
+        unitKey: 'kg',
+      },
+    });
     return true;
   } catch {
     return false;
+  }
+}
+
+/** Wasser in Garmin eintragen (Milliliter, Tageswert). */
+export async function schreibeWasser(tokensJson: string, datum: string, ml: number): Promise<boolean> {
+  try {
+    await clientAusTokens(tokensJson).connectapi('/usersummary-service/usersummary/hydration/log', {
+      method: 'PUT',
+      json: {
+        calendarDate: datum,
+        valueInML: Math.round(ml),
+        goalInML: 2500,
+        sweatLossInML: 0,
+        activityIntensityLevelUpdateThreshold: 0,
+      },
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/* ------------------------------------------------------------------ Daten */
+
+/** Aktivitaeten einer Zeitspanne. */
+export async function aktivitaeten(
+  tokensJson: string,
+  tage = 90,
+): Promise<Array<Record<string, unknown>>> {
+  try {
+    const garmin = new Garmin(clientAusTokens(tokensJson));
+    const limit = Math.min(300, Math.max(20, tage * 3));
+    const roh = (await garmin.getActivities(0, limit)) as Array<Record<string, unknown>>;
+    if (!Array.isArray(roh)) return [];
+    const grenze = new Date();
+    grenze.setDate(grenze.getDate() - tage);
+    const grenzeYmd = grenze.toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' });
+    return roh.filter((a) => {
+      const datum = String(a.startTimeLocal ?? a.startTimeGMT ?? '').slice(0, 10);
+      return datum >= grenzeYmd;
+    });
+  } catch {
+    return [];
   }
 }

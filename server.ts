@@ -36,7 +36,7 @@ import {
   SYNC_INTERVAL_OPTIONS,
   type IntervalsSettings,
 } from "./src/lib/intervals";
-import { anmelden, bestaetigeMfa, entschluesseln, verschluesseln } from "./src/lib/garminLogin";
+import { anmelden, bestaetigeMfa, entschluesseln, verschluesseln, tagVoll, historieVoll, koerperWerte, aktivitaeten as garminAktivitaetenLogin, schreibeGewicht, schreibeWasser, tokensGueltig, type LoginTag } from "./src/lib/garminLogin";
 import { syncGarmin, syncGarminHeute, garminToken, syncGarminAktivitaeten, ladeEinheitZeitreihen, felderStand, type GarminCache, type GarminAktivitaet } from "./src/lib/garmin";
 import {
   deleteEvent as intervalsDeleteEvent,
@@ -247,6 +247,31 @@ async function initDb(): Promise<void> {
     `ALTER TABLE workouts ADD COLUMN IF NOT EXISTS intervals_event_id TEXT`,
     `ALTER TABLE workouts ADD COLUMN IF NOT EXISTS intervals_hash TEXT`,
     `ALTER TABLE workouts ADD COLUMN IF NOT EXISTS intervals_synced_at TIMESTAMPTZ`,
+    /*
+     * Zusatzfelder aus dem Garmin-Login: Schlafphasen, Schlaf-Stress,
+     * naechtlicher SpO2/Atmung, Training Readiness und Trainingsstatus.
+     * Die Personal API liefert diese Werte nicht.
+     */
+    `ALTER TABLE garmin_days ADD COLUMN IF NOT EXISTS deep_secs INTEGER`,
+    `ALTER TABLE garmin_days ADD COLUMN IF NOT EXISTS light_secs INTEGER`,
+    `ALTER TABLE garmin_days ADD COLUMN IF NOT EXISTS rem_secs INTEGER`,
+    `ALTER TABLE garmin_days ADD COLUMN IF NOT EXISTS awake_secs INTEGER`,
+    `ALTER TABLE garmin_days ADD COLUMN IF NOT EXISTS sleep_stress INTEGER`,
+    `ALTER TABLE garmin_days ADD COLUMN IF NOT EXISTS sleep_hr INTEGER`,
+    `ALTER TABLE garmin_days ADD COLUMN IF NOT EXISTS spo2_night REAL`,
+    `ALTER TABLE garmin_days ADD COLUMN IF NOT EXISTS respiration_night REAL`,
+    `ALTER TABLE garmin_days ADD COLUMN IF NOT EXISTS readiness INTEGER`,
+    `ALTER TABLE garmin_days ADD COLUMN IF NOT EXISTS readiness_level TEXT`,
+    `ALTER TABLE garmin_days ADD COLUMN IF NOT EXISTS training_status TEXT`,
+    /* Merker fuer Rueckschreibvorgaenge — verhindert Endlosschleifen. */
+    `CREATE TABLE IF NOT EXISTS garmin_schreibstand (
+       user_id INTEGER NOT NULL,
+       art TEXT NOT NULL,
+       schluessel TEXT NOT NULL,
+       wert TEXT NOT NULL,
+       geschrieben_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+       PRIMARY KEY (user_id, art, schluessel)
+     )`,
   ];
   for (const sql of migrations) {
     await pool.query(sql);
@@ -5920,10 +5945,17 @@ ${JSON.stringify(userCtx, null, 2)}
         res.status(400).json({ error: "Mealplanner ist nicht verbunden." });
         return;
       }
-      const antwort = await fetch(
-        `${mp.baseUrl}/api/connect/${encodeURIComponent(mp.code)}/week`,
-        { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(20_000) },
-      );
+      /*
+       * Der Mealplanner stellt fuer Kopplungen den Endpunkt
+       * /api/connect/<code>/week bereit — der Code ist der Schluessel,
+       * kein JWT. `w` ist der Wochenstart (Montag), ohne Angabe nimmt der
+       * Mealplanner die laufende Woche.
+       */
+      const code = encodeURIComponent(mp.code);
+      const antwort = await fetch(`${mp.baseUrl}/api/connect/${code}/week`, {
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(20_000),
+      });
       if (!antwort.ok) {
         res.status(antwort.status).json({ error: "Mealplanner lieferte keine Wochendaten." });
         return;
@@ -6029,10 +6061,17 @@ ${JSON.stringify(userCtx, null, 2)}
         return;
       }
       const t0 = Date.now();
-      const antwort = await fetch(
-        `${mp.baseUrl}/api/connect/${encodeURIComponent(mp.code)}/week`,
-        { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(20_000) },
-      );
+      /*
+       * Der Mealplanner stellt fuer Kopplungen den Endpunkt
+       * /api/connect/<code>/week bereit — der Code ist der Schluessel,
+       * kein JWT. `w` ist der Wochenstart (Montag), ohne Angabe nimmt der
+       * Mealplanner die laufende Woche.
+       */
+      const code = encodeURIComponent(mp.code);
+      const antwort = await fetch(`${mp.baseUrl}/api/connect/${code}/week`, {
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(20_000),
+      });
       if (!antwort.ok) {
         const meldung =
           antwort.status === 404
@@ -6248,6 +6287,97 @@ ${JSON.stringify(userCtx, null, 2)}
    * `garmin_days`, damit Statistiken über Monate möglich sind, ohne jedes Mal die
    * ganze API abzufragen.
    */
+
+  /**
+   * Tage aus dem Login-Zugang speichern.
+   *
+   * Eigene Funktion statt `speichereGarminTage`, weil hier Felder dazukommen,
+   * die es in der Personal API nicht gibt (Schlafphasen, Readiness).
+   * Vorhandene Werte werden nie ueberschrieben, wenn der neue Wert fehlt —
+   * sonst wuerde ein Tag ohne Uhr die Historie loeschen.
+   */
+  /** Garmins Textqualifier auf die Zahlenskala (Spalte sleep_quality ist INTEGER). */
+  const SCHLAF_QUALITAET: Record<string, number> = {
+    EXCELLENT: 5,
+    VERY_GOOD: 4,
+    GOOD: 4,
+    FAIR: 3,
+    POOR: 2,
+    VERY_POOR: 1,
+  };
+
+  const speichereLoginTage = async (userId: number, tage: LoginTag[]): Promise<void> => {
+    if (!tage.length) return;
+    for (const t of tage) {
+      await pool.query(
+        `INSERT INTO garmin_days (
+           user_id, date, sleep_secs, sleep_score, sleep_quality, hrv, hrv_status,
+           resting_hr, min_hr, max_hr, steps, floors, distance_m, active_kcal, total_kcal,
+           stress_avg, stress_max, bb_min, bb_max, spo2_avg, respiration, vo2max, fitness_age,
+           weight_kg, body_fat,
+           deep_secs, light_secs, rem_secs, awake_secs, sleep_stress, sleep_hr,
+           spo2_night, respiration_night, readiness, readiness_level, training_status
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,
+                   $20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36)
+         ON CONFLICT (user_id, date) DO UPDATE SET
+           sleep_secs        = COALESCE(EXCLUDED.sleep_secs, garmin_days.sleep_secs),
+           sleep_score       = COALESCE(EXCLUDED.sleep_score, garmin_days.sleep_score),
+           sleep_quality     = COALESCE(EXCLUDED.sleep_quality, garmin_days.sleep_quality),
+           hrv               = COALESCE(EXCLUDED.hrv, garmin_days.hrv),
+           hrv_status        = COALESCE(EXCLUDED.hrv_status, garmin_days.hrv_status),
+           resting_hr        = COALESCE(EXCLUDED.resting_hr, garmin_days.resting_hr),
+           min_hr            = COALESCE(EXCLUDED.min_hr, garmin_days.min_hr),
+           max_hr            = COALESCE(EXCLUDED.max_hr, garmin_days.max_hr),
+           steps             = COALESCE(EXCLUDED.steps, garmin_days.steps),
+           floors            = COALESCE(EXCLUDED.floors, garmin_days.floors),
+           distance_m        = COALESCE(EXCLUDED.distance_m, garmin_days.distance_m),
+           active_kcal       = COALESCE(EXCLUDED.active_kcal, garmin_days.active_kcal),
+           total_kcal        = COALESCE(EXCLUDED.total_kcal, garmin_days.total_kcal),
+           stress_avg        = COALESCE(EXCLUDED.stress_avg, garmin_days.stress_avg),
+           stress_max        = COALESCE(EXCLUDED.stress_max, garmin_days.stress_max),
+           bb_min            = COALESCE(EXCLUDED.bb_min, garmin_days.bb_min),
+           bb_max            = COALESCE(EXCLUDED.bb_max, garmin_days.bb_max),
+           spo2_avg          = COALESCE(EXCLUDED.spo2_avg, garmin_days.spo2_avg),
+           respiration       = COALESCE(EXCLUDED.respiration, garmin_days.respiration),
+           vo2max            = COALESCE(EXCLUDED.vo2max, garmin_days.vo2max),
+           fitness_age       = COALESCE(EXCLUDED.fitness_age, garmin_days.fitness_age),
+           weight_kg         = COALESCE(EXCLUDED.weight_kg, garmin_days.weight_kg),
+           body_fat          = COALESCE(EXCLUDED.body_fat, garmin_days.body_fat),
+           deep_secs         = COALESCE(EXCLUDED.deep_secs, garmin_days.deep_secs),
+           light_secs        = COALESCE(EXCLUDED.light_secs, garmin_days.light_secs),
+           rem_secs          = COALESCE(EXCLUDED.rem_secs, garmin_days.rem_secs),
+           awake_secs        = COALESCE(EXCLUDED.awake_secs, garmin_days.awake_secs),
+           sleep_stress      = COALESCE(EXCLUDED.sleep_stress, garmin_days.sleep_stress),
+           sleep_hr          = COALESCE(EXCLUDED.sleep_hr, garmin_days.sleep_hr),
+           spo2_night        = COALESCE(EXCLUDED.spo2_night, garmin_days.spo2_night),
+           respiration_night = COALESCE(EXCLUDED.respiration_night, garmin_days.respiration_night),
+           readiness         = COALESCE(EXCLUDED.readiness, garmin_days.readiness),
+           readiness_level   = COALESCE(EXCLUDED.readiness_level, garmin_days.readiness_level),
+           training_status   = COALESCE(EXCLUDED.training_status, garmin_days.training_status),
+           updated_at        = NOW()`,
+        [
+          userId, t.date,
+          t.sleepSecs ?? null, t.sleepScore ?? null,
+          // Text-Qualitaet auf die Zahlenskala 1-5 abbilden (Spalte ist INTEGER).
+          t.sleepQuality != null ? (SCHLAF_QUALITAET[t.sleepQuality] ?? null) : null,
+          t.hrv ?? null, t.hrvStatus ?? null,
+          t.restingHr ?? null, t.minHr ?? null, t.maxHr ?? null,
+          t.steps ?? null, t.floors ?? null, t.distanceMeters ?? null,
+          t.activeCalories ?? null, t.totalCalories ?? null,
+          t.stressAvg ?? null, t.stressMax ?? null,
+          t.bodyBatteryMin ?? null, t.bodyBatteryMax ?? null,
+          null, t.respirationNight ?? null, t.vo2max ?? null,
+          t.fitnessAge != null ? Math.round(t.fitnessAge) : null,
+          t.weightKg ?? null, t.bodyFat ?? null,
+          t.deepSecs ?? null, t.lightSecs ?? null, t.remSecs ?? null, t.awakeSecs ?? null,
+          t.sleepStress ?? null, t.sleepHr ?? null,
+          t.spo2Night ?? null, t.respirationNight ?? null,
+          t.readiness ?? null, t.readinessLevel ?? null, t.trainingStatus ?? null,
+        ],
+      );
+    }
+  };
+
   const speichereGarminTage = async (userId: number, tage: GarminCache["tage"]): Promise<void> => {
     if (!tage.length) return;
     const werte: unknown[] = [];
@@ -6801,6 +6931,64 @@ ${JSON.stringify(userCtx, null, 2)}
    * Klartext liegt nur waehrend des Anmeldevorgangs im Speicher.
    */
 
+
+  /**
+   * Volle Historie ueber den Login-Zugang nachziehen.
+   *
+   * Einmalig (oder nach Bedarf) — holt jeden Tag einzeln und schreibt ihn in
+   * `garmin_days`. Fortschritt laeuft ueber `garminSyncLaufend`, damit die
+   * Oberflaeche einen Balken zeigen kann.
+   */
+  app.post("/api/integrations/garmin/login/historie", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const g = await readGarminSettings(req.userId!);
+      if (!g.login?.tokens) {
+        res.status(400).json({ error: "Garmin-Login ist nicht verbunden." });
+        return;
+      }
+      const tage = Math.min(730, Math.max(7, Number(req.body?.tage) || 365));
+
+      // Sofort antworten, im Hintergrund weiterlaufen: 365 Tage dauern Minuten.
+      res.json({ ok: true, tage, gestartet: true });
+
+      void (async () => {
+        try {
+          const tokens = entschluesseln(g.login!.tokens!);
+          garminSyncLaufend.set(req.userId!, { schritt: 0, gesamt: tage, seit: Date.now() });
+          const alle = await historieVoll(tokens, tage, (erledigt, gesamt) =>
+            garminSyncLaufend.set(req.userId!, { schritt: erledigt, gesamt, seit: Date.now() }),
+          );
+          await speichereLoginTage(req.userId!, alle);
+
+          const frisch = await readGarminSettings(req.userId!);
+          await writeGarminSettings(req.userId!, {
+            ...frisch,
+            cache: {
+              ...(frisch.cache ?? { fetchedAt: new Date().toISOString(), tage: [], nichtVerfuegbar: [] }),
+              fetchedAt: new Date().toISOString(),
+              tage: alle as unknown as GarminCache["tage"],
+            },
+            lastError: undefined,
+            lastAutoSyncAt: new Date().toISOString(),
+            lastVollSyncAt: new Date().toISOString(),
+          });
+          garminSyncLaufend.delete(req.userId!);
+          console.log(`[garmin-login] Historie: ${alle.length} Tage uebernommen`);
+        } catch (e) {
+          garminSyncLaufend.delete(req.userId!);
+          const frisch = await readGarminSettings(req.userId!).catch(() => ({} as GarminSettings));
+          await writeGarminSettings(req.userId!, {
+            ...frisch,
+            lastError: e instanceof Error ? e.message : "Historie fehlgeschlagen.",
+          }).catch(() => {});
+          console.warn("[garmin-login] Historie:", e);
+        }
+      })();
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "Historie fehlgeschlagen." });
+    }
+  });
+
   /** Status des Login-Zugangs (ohne Zugangsdaten zurueckzugeben). */
   app.get("/api/integrations/garmin/login", requireAuth, async (req: AuthRequest, res) => {
     try {
@@ -7043,10 +7231,26 @@ ${JSON.stringify(userCtx, null, 2)}
     }
   });
 
+  /**
+   * Personal API trennen.
+   *
+   * Wichtig: nur die Felder der Personal API entfernen (Key, Cache, Zähler).
+   * Der Login-Zugang ist ein eigener Weg und bleibt bestehen — vorher wurde der
+   * ganze `garmin`-Block gelöscht, womit auch die Anmeldedaten weg waren.
+   */
   app.delete("/api/integrations/garmin", requireAuth, async (req: AuthRequest, res) => {
     try {
       await pool.query(
-        `UPDATE users SET profile_extras = profile_extras - 'garmin', updated_at=NOW() WHERE id=$1`,
+        `UPDATE users
+            SET profile_extras = jsonb_set(
+                  COALESCE(profile_extras,'{}'::jsonb),
+                  '{garmin}',
+                  COALESCE(profile_extras->'garmin','{}'::jsonb)
+                    - 'apiKey' - 'cache' - 'connectedAt' - 'displayName'
+                    - 'lastError' - 'lastAutoSyncAt' - 'lastVollSyncAt'
+                ),
+                updated_at = NOW()
+          WHERE id = $1`,
         [req.userId],
       );
       res.json({ ok: true });
@@ -7506,97 +7710,174 @@ ${JSON.stringify(userCtx, null, 2)}
    *  - voll (Historie, Schlaf, HRV, Koerper): 37 Anfragen -> alle 48 h = 18
    *  Summe 90 von 100, Luft fuer manuelle Syncs.
    */
-  const GARMIN_LEICHT_MS = 20 * 60_000;
-  const GARMIN_VOLL_MS = 48 * 60 * 60_000;
+  /*
+   * Takte.
+   *
+   * Der Login-Zugang hat kein Tageslimit wie die Personal API, deshalb sind
+   * 5 Minuten für den Tagesstand vertretbar. Was häufiger abgefragt wird, sind
+   * Schritte und Kalorien — die ändern sich laufend.
+   *
+   * Alle 30 Minuten kommt der volle Lauf dazu (Readiness, Trainingsstatus,
+   * Koerperwerte, Aktivitaeten). Diese Werte ändern sich höchstens stündlich.
+   */
+  const GARMIN_LEICHT_MS = 5 * 60_000;
+  const GARMIN_VOLL_MS = 30 * 60_000;
+  /**
+   * Garmin-Abgleich.
+   *
+   * Reihenfolge:
+   *  1. Login-Zugang, wenn verbunden — kein Tageslimit, alle Schlafwerte.
+   *  2. Personal API als Rueckfallebene, falls der Login fehlt oder die Tokens
+   *     abgelaufen sind.
+   *
+   * Der Login holt bei jedem Takt:
+   *  - den heutigen Tag (Schritte, Kalorien, Puls, Stress, Body Battery)
+   *  - den Schlaf der letzten Nacht (Phasen, Schlaf-Stress, SpO2)
+   * Alle 30 Minuten zusaetzlich Readiness und Trainingsstatus.
+   *
+   * Fehler werden gespeichert (`lastError`) und in der Oberflaeche angezeigt —
+   * ein stiller Ausfall soll nicht wieder monatelang unbemerkt bleiben.
+   */
   const garminTick = async () => {
     if (garminLaeuft) return;
     garminLaeuft = true;
     try {
       const rows = await pool.query(
         `SELECT id, profile_extras->'garmin' AS g FROM users
-          WHERE profile_extras->'garmin'->>'apiKey' IS NOT NULL`,
+          WHERE profile_extras->'garmin'->>'apiKey' IS NOT NULL
+             OR profile_extras->'garmin'->'login'->>'tokens' IS NOT NULL`,
       );
-      for (const row of rows.rows) {
-        const g = (row.g || {}) as GarminSettings;
-        if (!g.apiKey) continue;
-        /*
-         * Zwei Stufen, damit haeufige Aktualisierung im Budget bleibt.
-         *
-         * Budget: 100 Anfragen pro Tag und Nutzer (Garmin-Limit).
-         *  - leicht: 1 Anfrage (Token kommt aus dem Cache) — alle 20 Minuten = 72
-         *  - voll:  85 Anfragen — hoechstens alle 6 Stunden = 4 x 85 = 340
-         *
-         * 340 + 72 = 412 waere zu viel. Deshalb: der volle Lauf setzt den
-         * Tageszähler zurueck, und der leichte Lauf pausiert, solange das Budget
-         * fuer den Tag verbraucht ist. In der Praxis reicht ein voller Lauf
-         * morgens (Historie/Schlaf) plus leichte Laeufe ueber den Tag.
-         */
-        /*
-         * Faelligkeit getrennt pruefen.
-         *
-         * `lastVollSyncAt` ist der einzige Taktgeber fuer den vollen Lauf.
-         * Vorher stand hier als Ersatz `cache.fetchedAt` — und weil JEDER leichte
-         * Lauf den Cache neu schreibt, galt der volle Lauf danach immer als
-         * gerade gelaufen. Folge: Schlaf, HRV und Historie wurden nie wieder
-         * abgeholt, nur noch der heutige Tag.
-         */
-        const letzterVoll = Date.parse(g.lastVollSyncAt ?? "");
-        const letzterLeicht = Date.parse(g.lastAutoSyncAt ?? "");
-        const vollFaellig = !Number.isFinite(letzterVoll) || Date.now() - letzterVoll > GARMIN_VOLL_MS;
-        const leichtFaellig = !Number.isFinite(letzterLeicht) || Date.now() - letzterLeicht > GARMIN_LEICHT_MS;
-        if (!vollFaellig && !leichtFaellig) continue;
 
-        try {
-          if (vollFaellig) {
-            // Voller Lauf: Historie, Schlaf, HRV, Aktivitaeten.
-            garminSyncLaufend.set(Number(row.id), { schritt: 0, gesamt: 0, seit: Date.now() });
-            const cache = await syncGarmin(g.apiKey, 30, (f) =>
-              garminSyncLaufend.set(Number(row.id), { ...f, seit: Date.now() }),
-            );
-            garminSyncLaufend.delete(Number(row.id));
-            await writeGarminSettings(Number(row.id), {
+      for (const row of rows.rows) {
+        const userId = Number(row.id);
+        const g = (row.g || {}) as GarminSettings;
+
+        /* ---------- Weg 1: Login (bevorzugt) ---------- */
+        if (g.login?.tokens) {
+          const letzterLeicht = Date.parse(g.lastAutoSyncAt ?? '');
+          const letzterVoll = Date.parse(g.lastVollSyncAt ?? '');
+          const leichtFaellig =
+            !Number.isFinite(letzterLeicht) || Date.now() - letzterLeicht > GARMIN_LEICHT_MS;
+          const vollFaellig =
+            !Number.isFinite(letzterVoll) || Date.now() - letzterVoll > GARMIN_VOLL_MS;
+          if (!leichtFaellig && !vollFaellig) continue;
+
+          try {
+            const tokens = entschluesseln(g.login.tokens);
+            const heute = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' });
+
+            /* Heute und gestern — gestern, damit die Nacht vollstaendig ist. */
+            const tage: LoginTag[] = [];
+            const gestern = new Date();
+            gestern.setDate(gestern.getDate() - 1);
+            const gesternYmd = gestern.toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' });
+
+            tage.push(await tagVoll(tokens, heute, { leicht: !vollFaellig }));
+            const gesternTag = await tagVoll(tokens, gesternYmd, { leicht: true });
+            if (Object.keys(gesternTag).some((k) => k !== 'date')) tage.push(gesternTag);
+
+            /* Koerperwerte nur im vollen Lauf — Wiegungen sind selten. */
+            if (vollFaellig) {
+              for (const d of [heute, gesternYmd]) {
+                const koerper = await koerperWerte(tokens, d).catch(() => null);
+                if (koerper) {
+                  const ziel = tage.find((t) => t.date === d);
+                  if (ziel) Object.assign(ziel, koerper);
+                }
+              }
+            }
+
+            await speichereLoginTage(userId, tage);
+
+            /* Cache fuer die Ansichten mitschreiben. */
+            const cacheTage = [...(g.cache?.tage ?? [])];
+            for (const t of tage) {
+              const i = cacheTage.findIndex((x) => x.date === t.date);
+              if (i >= 0) cacheTage[i] = { ...cacheTage[i], ...t } as GarminCache['tage'][number];
+              else cacheTage.push(t as unknown as GarminCache['tage'][number]);
+            }
+            cacheTage.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+
+            await writeGarminSettings(userId, {
               ...g,
-              cache,
-              displayName: cache.displayName ?? g.displayName,
+              cache: {
+                ...(g.cache ?? { fetchedAt: new Date().toISOString(), tage: [], nichtVerfuegbar: [] }),
+                fetchedAt: new Date().toISOString(),
+                tage: cacheTage,
+              },
               lastError: undefined,
               lastAutoSyncAt: new Date().toISOString(),
-              lastVollSyncAt: new Date().toISOString(),
+              ...(vollFaellig ? { lastVollSyncAt: new Date().toISOString() } : {}),
             });
-            await speichereGarminTage(Number(row.id), cache.tage).catch(() => {});
-            const aktivitaetenBg = await syncGarminAktivitaeten(g.apiKey, 40).catch(() => []);
-            await speichereGarminAktivitaeten(Number(row.id), aktivitaetenBg).catch(() => {});
-          } else {
-            // Leichter Lauf: nur der heutige Tag, eine Anfrage.
-            const tagHeute = await syncGarminHeute(g.apiKey);
-            if (tagHeute) {
-              await speichereGarminTage(Number(row.id), [tagHeute]).catch(() => {});
-              /*
-               * Den Tageswert auch im Cache ersetzen — die Ansichten lesen aus
-               * `cache.tage`, nicht aus der Tabelle.
-               */
-              const tage = [...(g.cache?.tage ?? [])];
-              const i = tage.findIndex((t) => t.date === tagHeute.date);
-              if (i >= 0) tage[i] = { ...tage[i], ...tagHeute };
-              else tage.push(tagHeute);
-              await writeGarminSettings(Number(row.id), {
-                ...g,
-                cache: { ...(g.cache ?? { fetchedAt: new Date().toISOString(), tage: [], nichtVerfuegbar: [] }), tage },
-                lastError: undefined,
-                lastAutoSyncAt: new Date().toISOString(),
-              });
+
+            /* Aktivitaeten im vollen Lauf nachziehen. */
+            if (vollFaellig) {
+              const liste = await garminAktivitaetenLogin(tokens, 40).catch(() => []);
+              if (liste.length) {
+                await speichereGarminAktivitaeten(
+                  userId,
+                  liste.map((a) => ({
+                    activityId: Number(a.activityId ?? 0),
+                    date: String(a.startTimeLocal ?? a.startTimeGMT ?? '').slice(0, 10),
+                    name: String(a.activityName ?? a.name ?? 'Aktivität'),
+                    type: String((a.activityType as { typeKey?: string } | undefined)?.typeKey ?? 'other'),
+                    distanceM: Number(a.distance ?? 0) || undefined,
+                    durationSecs: Number(a.duration ?? a.movingDuration ?? 0) || undefined,
+                    movingSecs: Number(a.movingDuration ?? 0) || undefined,
+                    avgHr: Number(a.averageHR ?? 0) || undefined,
+                    maxHr: Number(a.maxHR ?? 0) || undefined,
+                    calories: Number(a.calories ?? 0) || undefined,
+                    elevationM: Number(a.elevationGain ?? 0) || undefined,
+                  })),
+                ).catch(() => {});
+              }
             }
+
+            continue; // Login hat geliefert — Personal API nicht mehr nötig.
+          } catch (e) {
+            /*
+             * Login fehlgeschlagen: Zustand merken und auf die Personal API
+             * ausweichen, sofern ein Key da ist. Kein automatischer Neu-Login —
+             * sonst sperrt Garmin die IP.
+             */
+            const meldung = e instanceof Error ? e.message : 'Login-Abgleich fehlgeschlagen.';
+            await writeGarminSettings(userId, { ...g, lastError: meldung }).catch(() => {});
+            console.warn('[garmin-login]', userId, meldung);
+            if (!g.apiKey) continue;
           }
-        } catch (e) {
-          garminSyncLaufend.delete(Number(row.id));
-          await writeGarminSettings(Number(row.id), {
+        }
+
+        /* ---------- Weg 2: Personal API (Rueckfallebene) ---------- */
+        if (!g.apiKey) continue;
+        const letzter = Date.parse(g.cache?.fetchedAt ?? g.lastAutoSyncAt ?? '');
+        if (Number.isFinite(letzter) && Date.now() - letzter < GARMIN_LEICHT_MS) continue;
+        try {
+          const cache = await syncGarmin(g.apiKey, 30, (f) =>
+            garminSyncLaufend.set(userId, { ...f, seit: Date.now() }),
+          );
+          garminSyncLaufend.delete(userId);
+          await writeGarminSettings(userId, {
             ...g,
-            lastError: e instanceof Error ? e.message : "Garmin-Abgleich fehlgeschlagen.",
+            cache,
+            displayName: cache.displayName ?? g.displayName,
+            lastError: undefined,
+            lastAutoSyncAt: new Date().toISOString(),
+            lastVollSyncAt: new Date().toISOString(),
+          });
+          await speichereGarminTage(userId, cache.tage).catch(() => {});
+          const aktivitaetenBg = await syncGarminAktivitaeten(g.apiKey, 40).catch(() => []);
+          await speichereGarminAktivitaeten(userId, aktivitaetenBg).catch(() => {});
+        } catch (e) {
+          garminSyncLaufend.delete(userId);
+          await writeGarminSettings(userId, {
+            ...g,
+            lastError: e instanceof Error ? e.message : 'Garmin-Abgleich fehlgeschlagen.',
             lastAutoSyncAt: new Date().toISOString(),
           }).catch(() => {});
         }
       }
     } catch (e) {
-      console.warn("[garmin] Hintergrund-Abgleich:", e);
+      console.warn('[garmin] Hintergrund-Abgleich:', e);
     } finally {
       garminLaeuft = false;
     }

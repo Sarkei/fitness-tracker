@@ -46,7 +46,16 @@ function schrittText(schritt: { text?: string } | string): string {
 export default function MealplannerRezeptSheet({ gericht, kategorie, datum, onClose, onSaved }: Props) {
   const [rezept, setRezept] = useState<MealplannerRezept | null>(null);
   const [laedt, setLaedt] = useState(true);
-  const [portionen, setPortionen] = useState(1);
+  /*
+   * Portionen in Viertelschritten, von 0,25 bis zur Anzahl, die im Mealplanner
+   * fuer dieses Gericht hinterlegt ist (mindestens 1).
+   *
+   * Tims Vorgabe: auch eine Viertelportion soll erfassbar sein — man isst
+   * manchmal nur die Haelfte oder ein Viertel eines Gerichts.
+   */
+  const maxPortionen = Math.max(1, Number(gericht.portionen) || 1);
+  const schritt = 0.25;
+  const [portionen, setPortionen] = useState(Math.min(1, maxPortionen));
   const [speichert, setSpeichert] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
 
@@ -98,6 +107,9 @@ export default function MealplannerRezeptSheet({ gericht, kategorie, datum, onCl
         carbs: gesamt.carbs,
         fat: gesamt.fat,
         date: datum,
+        // Menge mitschreiben, damit im Verlauf steht, wie viel gegessen wurde.
+        quantity: portionen,
+        unit: 'Portion',
       });
       onSaved();
       onClose();
@@ -203,22 +215,27 @@ export default function MealplannerRezeptSheet({ gericht, kategorie, datum, onCl
           <div className="flex items-center justify-between gap-3">
             <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
               Portionen
+              <span className="ml-1 font-normal normal-case tracking-normal text-[var(--muted)]">
+                (bis {maxPortionen.toLocaleString("de-DE")})
+              </span>
             </span>
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setPortionen((p) => Math.max(1, p - 1))}
-                disabled={portionen <= 1 || speichert}
+                onClick={() => setPortionen((p) => Math.max(schritt, Math.round((p - schritt) * 100) / 100))}
+                disabled={portionen <= schritt || speichert}
                 className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border-muted)] text-[var(--text-primary)] transition disabled:opacity-40"
                 aria-label="Eine Portion weniger"
               >
                 <Minus className="h-4 w-4" />
               </button>
-              <span className="w-8 text-center text-sm font-semibold tabular-nums">{portionen}</span>
+              <span className="w-12 text-center text-sm font-semibold tabular-nums">
+                {portionen.toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+              </span>
               <button
                 type="button"
-                onClick={() => setPortionen((p) => Math.min(10, p + 1))}
-                disabled={portionen >= 10 || speichert}
+                onClick={() => setPortionen((p) => Math.min(maxPortionen, Math.round((p + schritt) * 100) / 100))}
+                disabled={portionen >= maxPortionen || speichert}
                 className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border-muted)] text-[var(--text-primary)] transition disabled:opacity-40"
                 aria-label="Eine Portion mehr"
               >
@@ -257,7 +274,9 @@ export default function MealplannerRezeptSheet({ gericht, kategorie, datum, onCl
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--simple-accent)] px-4 py-3 text-[12px] font-semibold text-white transition disabled:opacity-50"
           >
             {speichert ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {portionen === 1 ? '1 Portion eintragen' : `${portionen} Portionen eintragen`}
+            {portionen === 1
+              ? '1 Portion eintragen'
+              : `${portionen.toLocaleString('de-DE', { maximumFractionDigits: 2 })} Portionen eintragen`}
           </button>
         </div>
       </div>
