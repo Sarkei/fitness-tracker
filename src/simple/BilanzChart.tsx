@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { wochentagKurz, type BilanzTag } from './serien';
 
 /** Defizit: Balken wächst nach unten. */
@@ -31,6 +31,13 @@ function fmtDatum(ymd: string): string {
   return `${d}.${m}.${y}`;
 }
 
+/** „Freitag, 24.11.2026" für die Tagesansicht. */
+function fmtDatumLang(ymd: string): string {
+  const d = new Date(`${ymd}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return fmtDatum(ymd);
+  return d.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
 const HOEHE = 220;
 const ACHSE_BREITE = 54;
 
@@ -59,6 +66,13 @@ export default function BilanzChart({
   hoechstens?: number;
 }) {
   const tage = useMemo(() => bilanz.slice(-hoechstens), [bilanz, hoechstens]);
+
+  /*
+   * Tippen auf einen Balken öffnet darunter die Tageswerte: was gegessen, was
+   * verbraucht und was in Summe übrig oder zu viel ist. Nochmal tippen schließt
+   * die Ansicht wieder.
+   */
+  const [gewaehlt, setGewaehlt] = useState<string | null>(null);
 
   /*
    * Maßstab: die größte Bilanz eines Tages, nach oben wie nach unten.
@@ -97,6 +111,8 @@ export default function BilanzChart({
       kgWoche: schnitt === null ? null : (schnitt * 7) / KCAL_PRO_KG,
     };
   }, [tage]);
+
+  const gewaehltTag = useMemo(() => tage.find((t) => t.ymd === gewaehlt) ?? null, [tage, gewaehlt]);
 
   const ticksY = useMemo(() => {
     const schritt = maxWert / 2;
@@ -155,10 +171,15 @@ export default function BilanzChart({
               /* Nur zeichnen, wenn es einen Wert gibt — kein Strich bei 0. */
               const sichtbar = hoehe >= 1;
 
+              const istGewaehlt = gewaehlt === tag.ymd;
+
               return (
-                <div
+                <button
                   key={tag.ymd}
-                  className="group relative flex-1"
+                  type="button"
+                  onClick={() => setGewaehlt((g) => (g === tag.ymd ? null : tag.ymd))}
+                  aria-pressed={istGewaehlt}
+                  className="group relative flex-1 cursor-pointer border-0 bg-transparent p-0"
                   title={[
                     fmtDatum(tag.ymd),
                     `gegessen ${fmtZahl(tag.kcal)} kcal`,
@@ -181,6 +202,19 @@ export default function BilanzChart({
                     />
                   )}
 
+                  {/* Gewählter Tag: feine Linie am Fuß, keine Fläche — sonst sieht
+                      die Markierung aus wie ein zweiter Balken. */}
+                  {istGewaehlt && (
+                    <div
+                      className="pointer-events-none absolute inset-x-0 rounded-full"
+                      style={{
+                        bottom: 0,
+                        height: 2,
+                        background: 'var(--simple-accent)',
+                      }}
+                    />
+                  )}
+
                   {/* Heute: feiner Rahmen um die Tagesspalte */}
                   {istHeute && (
                     <div
@@ -190,7 +224,7 @@ export default function BilanzChart({
                       }}
                     />
                   )}
-                </div>
+                </button>
               );
             })}
           </div>
@@ -201,7 +235,7 @@ export default function BilanzChart({
       <div className="mt-2 flex" style={{ paddingLeft: ACHSE_BREITE }}>
         <div className="flex min-w-0 flex-1 gap-1.5">
           {tage.map((tag) => {
-            const aktiv = tag.ymd === heute;
+            const aktiv = tag.ymd === heute || tag.ymd === gewaehlt;
             return (
               <div key={`x-${tag.ymd}`} className="min-w-0 flex-1 text-center">
                 <p
@@ -226,6 +260,85 @@ export default function BilanzChart({
         </div>
       </div>
 
+      {/* Tageswerte zum angetippten Balken */}
+      {gewaehltTag && (() => {
+        const t = gewaehltTag;
+        const summe = t.kcal - t.verbrannt;
+        const ueberschuss = t.bilanz > 0;
+        const bilanzFarbe = t.bilanz === 0 ? 'var(--text-primary)' : ueberschuss ? UEBERSCHUSS : DEFIZIT;
+        const status = !t.hatDaten
+          ? 'nichts erfasst'
+          : t.vollstaendig
+            ? 'vollständig erfasst'
+            : 'unvollständig erfasst';
+        /* Bei Garmin ist das Budget schon der Verbrauch — sonst Ziel + Training. */
+        const garminFall = Math.abs(t.budget - t.verbrannt) < 1;
+        const kg = t.bilanz / KCAL_PRO_KG;
+
+        return (
+          <div
+            className="mt-3 rounded-xl border p-3"
+            style={{
+              borderColor: 'color-mix(in srgb, var(--simple-accent) 35%, var(--border-muted))',
+              background: 'color-mix(in srgb, var(--simple-accent) 5%, transparent)',
+            }}
+          >
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="text-[12px] font-semibold">{fmtDatumLang(t.ymd)}</p>
+              <span className="text-[10px] text-[var(--text-muted)]">
+                {t.ymd === heute ? 'heute · ' : ''}
+                {status}
+              </span>
+            </div>
+
+            <div className="mt-2.5 grid grid-cols-3 gap-2">
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--text-muted)]">Gegessen</p>
+                <p className="mt-0.5 text-[15px] font-bold tabular-nums leading-none">
+                  {t.kcal > 0 ? fmtZahl(t.kcal) : '—'}
+                </p>
+                <p className="text-[9px] text-[var(--text-muted)]">kcal</p>
+              </div>
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--text-muted)]">Verbraucht</p>
+                <p className="mt-0.5 text-[15px] font-bold tabular-nums leading-none">
+                  {t.verbrannt > 0 ? fmtZahl(t.verbrannt) : '—'}
+                </p>
+                <p className="text-[9px] text-[var(--text-muted)]">kcal</p>
+              </div>
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--text-muted)]">
+                  {ueberschuss ? 'Überschuss' : 'Defizit'}
+                </p>
+                <p className="mt-0.5 text-[15px] font-bold tabular-nums leading-none" style={{ color: bilanzFarbe }}>
+                  {t.hatDaten ? fmtZahl(Math.abs(t.bilanz)) : '—'}
+                </p>
+                <p className="text-[9px] text-[var(--text-muted)]">kcal</p>
+              </div>
+            </div>
+
+            <p className="mt-2.5 text-[10px] leading-relaxed text-[var(--text-muted)]">
+              {t.hatDaten ? (
+                <>
+                  {fmtZahl(t.kcal)} gegessen − {fmtZahl(t.verbrannt)} verbraucht ={' '}
+                  <span className="font-semibold" style={{ color: summe > 0 ? UEBERSCHUSS : DEFIZIT }}>
+                    {summe > 0 ? '+' : '−'}
+                    {fmtZahl(Math.abs(summe))} kcal
+                  </span>
+                  {garminFall ? '' : ` (Budget ${fmtZahl(t.budget)} = Ziel ${fmtZahl(t.ziel)} + Training ${fmtZahl(t.verbrannt)})`}
+                  {'. '}
+                  {Math.abs(kg) >= 0.01
+                    ? `Das entspricht etwa ${Math.abs(kg).toFixed(2).replace('.', ',')} kg Fett${ueberschuss ? 'zunahme' : 'verlust'}.`
+                    : ''}
+                </>
+              ) : (
+                <>Für diesen Tag ist nichts erfasst — der Balken zeigt den vollen Verbrauch als Defizit.</>
+              )}
+            </p>
+          </div>
+        );
+      })()}
+
       {/* Achsen-Titel */}
       <div
         className="mt-1 flex items-center justify-between text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--text-muted)]"
@@ -234,6 +347,12 @@ export default function BilanzChart({
         <span>kcal</span>
         <span>Tag</span>
       </div>
+
+      {!gewaehltTag && (
+        <p className="mt-2 text-center text-[9.5px] text-[var(--text-muted)]">
+          Auf einen Balken tippen zeigt Gegessen, Verbrauch und Bilanz des Tages.
+        </p>
+      )}
 
       {/* Zahlen zum Ablesen */}
       <details className="mt-3 border-t border-[var(--border-muted)] pt-2.5">
