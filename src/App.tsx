@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import ResetPasswordScreen from './components/auth/ResetPasswordScreen';
 import { useAuth } from './lib/AuthContext';
 import Shell from './components/layout/Shell';
@@ -30,6 +30,12 @@ function RouteFallback() {
       <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand border-t-transparent" />
     </div>
   );
+}
+
+/** Alte /wellness-Links auf /health umbiegen — inklusive Unterseite. */
+function WellnessUmleitung() {
+  const { pathname } = useLocation();
+  return <Navigate to={pathname.replace('/wellness', '/health')} replace />;
 }
 
 const AppContent = () => {
@@ -152,8 +158,8 @@ const AppContent = () => {
             </RouteErrorBoundary>
           }
         />
-        {/* Alter Pfad: bleibt als Umleitung, damit gespeicherte Links weiter funktionieren. */}
-        <Route path="/wellness/*" element={<Navigate to="/health" replace />} />
+        {/* Alter Pfad: bleibt als Umleitung und behält die Unterseite bei. */}
+        <Route path="/wellness/*" element={<WellnessUmleitung />} />
         <Route
           path="/profile"
           element={
