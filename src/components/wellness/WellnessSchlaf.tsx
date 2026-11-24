@@ -2,8 +2,9 @@
  * Wellness: Schlaf. Nur Schlaf: Dauer, Score, Verlauf, Tagesliste.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Moon } from 'lucide-react';
+import { api } from '@/src/lib/api';
 import { Card, Sparkline } from '@/src/simple/ui';
 import { WellnessToolbar, useWellness } from './WellnessProvider';
 import { KennzahlSheet, KlickKachel } from './KennzahlSheet';
@@ -13,6 +14,43 @@ import { alsHHMM, mittel, schlafBewertung, schlafFarben, schlafStufe, schlafStun
 export default function WellnessSchlaf() {
   const { daten, zeitraum } = useWellness();
   const tage = daten.tage;
+
+  /*
+   * Tabelle "Nacht fuer Nacht" immer ueber 30 Naechte.
+   *
+   * Sie hing am Zeitraum-Filter — bei "Heute" blieb deshalb eine einzige Zeile
+   * stehen. Die Bewertungen sollen aber unabhaengig vom Filter ablesbar sein.
+   */
+  const [historie, setHistorie] = useState<Array<{
+    date: string;
+    sleepSecs?: number | null;
+    sleepScore?: number | null;
+  }>>([]);
+
+  useEffect(() => {
+    let abgebrochen = false;
+    api<{ tage?: Array<{ date: string; sleepSecs?: number | null; sleepScore?: number | null }> }>(
+      '/api/integrations/intervals/wellness?days=30',
+    )
+      .then((r) => {
+        if (abgebrochen) return;
+        const liste = Array.isArray(r.tage) ? r.tage : [];
+        setHistorie(liste.filter((t) => t.sleepSecs != null && t.sleepSecs > 0));
+      })
+      .catch(() => {});
+    return () => {
+      abgebrochen = true;
+    };
+  }, []);
+
+  /**
+   * Anzahl der Felder in "Letzte Naechte": bei Heute/7 Tagen genau 7 (ohne
+   * Scrollen), bei groesseren Zeitraeumen entsprechend mehr.
+   */
+  const anzahlNaechte = zeitraum <= 7 ? 7 : zeitraum;
+
+  /** Fuer die Tabelle: 30 Naechte, sonst der gefilterte Zeitraum. */
+  const tabellenTage = historie.length ? historie : tage;
   /** Bei "Heute" gibt es keine Serie — dann nur reelle Werte der letzten Nacht. */
   const nurHeute = zeitraum === 1;
   const [detail, setDetail] = useState<'dauer' | 'score' | null>(null);
@@ -63,7 +101,17 @@ export default function WellnessSchlaf() {
     <div className="space-y-4">
       <WellnessToolbar />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {/*
+        Bei "Heute" gibt es nur zwei Werte (Dauer, Score). Die laufen dann je
+        ueber die volle Breite — vorher standen sie in einem 4er-Raster halb
+        leer nebeneinander.
+      */}
+      {/*
+        Zwei Kacheln ueber die volle Breite: Dauer und Score je zur Haelfte.
+        Darunter die vier Phasen je zu einem Viertel — jede Zeile spannt den
+        ganzen Bereich.
+      */}
+      <div className="grid grid-cols-2 gap-3">
         <KlickKachel
           label="Letzte Nacht"
           value={
@@ -113,7 +161,8 @@ export default function WellnessSchlaf() {
       {/* Schlafphasen der letzten Nacht — Kacheln oben, Balken darunter */}
       {hatPhasen && (
         <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {/* Vier Phasen nebeneinander, je ein Viertel der Breite. */}
+          <div className="grid grid-cols-4 gap-2 sm:gap-3">
             <KlickKachel
               label="Tiefschlaf"
               value={letztePhasen?.tief != null ? (stundenAlsHHMM(letztePhasen.tief) ?? '—') : '—'}
@@ -302,7 +351,7 @@ export default function WellnessSchlaf() {
       <Card className="p-5">
         <div className="mb-2 flex items-center justify-between">
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-            Letzte Nächte
+            Letzte 7 Nächte
           </p>
           <div className="flex items-center gap-2 text-[9px] text-[var(--text-muted)]">
             {[3, 2, 1, 0].map((stufe) => {
@@ -313,11 +362,29 @@ export default function WellnessSchlaf() {
             })}
           </div>
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          {[...tage]
+        {/*
+          Sieben Felder fuellen die Breite genau aus (je 1/7), alles darueber
+          laesst sich waagerecht scrollen. Vorher wurden die Felder umgebrochen
+          und liessen Luecken.
+
+          min-w-max + w-[calc(100%/7)] sorgt dafuer, dass genau sieben in die
+          Karte passen — unabhaengig vom gewaehlten Zeitraum.
+        */}
+        {/*
+          Wie viele Naechte gezeigt werden:
+            Heute / 7 Tage -> genau 7, ohne Scrollen (jedes Feld ein Siebtel)
+            14/30/90 Tage -> entsprechend mehr, dann waagerecht scrollbar.
+          So passt die Zeile bei kleinen Zeitraeumen exakt in die Karte.
+        */}
+        <div
+          className={`-mx-1 flex gap-1.5 px-1 pb-1 ${
+            anzahlNaechte > 7 ? 'overflow-x-auto [scrollbar-width:thin]' : ''
+          }`}
+        >
+          {[...tabellenTage]
             .reverse()
             .filter((t) => schlafStunden(t.sleepSecs) != null)
-            .slice(0, 28)
+            .slice(0, anzahlNaechte)
             .map((t) => {
               const stufe = schlafStufe(t.sleepScore);
               const f = schlafFarben(stufe);
@@ -330,14 +397,20 @@ export default function WellnessSchlaf() {
                   title={`${tagNr}.${monat}. · ${alsHHMM(t.sleepSecs) ?? schlafStunden(t.sleepSecs)?.toFixed(1)} h · Score ${
                     t.sleepScore != null ? Math.round(t.sleepScore) : '—'
                   }`}
-                  className="flex flex-col items-center gap-1 transition hover:opacity-80"
+                  className="flex shrink-0 flex-col items-center gap-1 transition hover:opacity-80"
+                  style={{
+                    width:
+                      anzahlNaechte <= 7
+                        ? 'calc((100% - 6 * 0.375rem) / 7)'
+                        : 'calc((100% - 13 * 0.375rem) / 14)',
+                  }}
                 >
                   {/* Datum ausserhalb der Box — sonst stehen zwei nackte Zahlen uebereinander. */}
                   <span className="text-[9px] tabular-nums text-[var(--text-muted)]">
                     {tagNr}.{monat}.
                   </span>
                   <span
-                    className={`flex h-8 w-11 items-center justify-center rounded-md border text-[12px] font-semibold tabular-nums ${f.bg} ${f.text} ${f.rand}`}
+                    className={`flex h-8 w-full items-center justify-center rounded-md border text-[12px] font-semibold tabular-nums ${f.bg} ${f.text} ${f.rand}`}
                   >
                     {t.sleepScore != null ? Math.round(t.sleepScore) : '—'}
                   </span>
@@ -349,7 +422,7 @@ export default function WellnessSchlaf() {
 
       <Card className="p-5">
         <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-          Nacht für Nacht
+          Nacht für Nacht · 30 Tage
         </p>
         {/* Scrollbar unsichtbar: sie lag über der rechten Spalte (Bewertung). */}
         <div className="max-h-80 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -363,7 +436,7 @@ export default function WellnessSchlaf() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border-muted)]">
-              {[...tage].reverse().map((t) => {
+              {[...tabellenTage].reverse().map((t) => {
                 const h = schlafStunden(t.sleepSecs);
                 if (h == null) return null;
                 return (
