@@ -232,6 +232,19 @@ export default function GarminConnect() {
                 {arbeitet ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
                 Sync
               </button>
+              {/*
+                Key ersetzen: Garmin-Keys laufen ab. Vorher war das Eingabefeld
+                nur bei getrennter Verbindung sichtbar - ein abgelaufener Key
+                liess sich damit gar nicht austauschen.
+              */}
+              <button
+                type="button"
+                onClick={() => setOffen((v) => !v)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-muted)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-muted)] transition hover:text-[var(--foreground)]"
+                title="Neuen API-Key eintragen"
+              >
+                Key ändern
+              </button>
               <button
                 type="button"
                 onClick={() => void trennen()}
@@ -254,11 +267,11 @@ export default function GarminConnect() {
         </div>
       </div>
 
-      {offen && !status?.connected && (
+      {offen && (
         <div className="mt-3 space-y-2 border-t border-[var(--border-muted)] pt-3">
           <label className="block">
             <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
-              Personal API Key
+              {status?.connected ? 'Neuen Personal API Key eintragen' : 'Personal API Key'}
             </span>
             <input
               value={key}
