@@ -504,242 +504,47 @@ export default function ProfilePage() {
             ))}
           </div>
 
-        <div className="w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] p-6 text-left space-y-4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
-              {t('profile.settings.section')}
-            </p>
-            <div>
-              <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)] mb-2">{t('profile.settings.name')}</p>
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="text"
-                  autoComplete="given-name"
-                  value={nameFirst}
-                  onChange={e => setNameFirst(e.target.value)}
-                  placeholder={t('auth.placeholderFirstName')}
-                  className="min-h-[44px] bg-[var(--background)] border border-[var(--line)] rounded-xl px-3 text-xs font-bold text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)]"
-                  minLength={2}
-                  required
-                />
-                <input
-                  type="text"
-                  autoComplete="family-name"
-                  value={nameLast}
-                  onChange={e => setNameLast(e.target.value)}
-                  placeholder={t('auth.placeholderLastName')}
-                  className="min-h-[44px] bg-[var(--background)] border border-[var(--line)] rounded-xl px-3 text-xs font-bold text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)]"
-                  minLength={2}
-                  required
-                />
-              </div>
-              {nameError && (
-                <p className="mt-2 text-[10px] font-bold text-red-500">{nameError}</p>
-              )}
-              <button
-                type="button"
-                disabled={nameSaving}
-                onClick={() => void handleSaveName()}
-                className="mt-2 w-full min-h-[44px] rounded-xl ui-btn-brand text-[10px] font-semibold uppercase tracking-[0.12em] disabled:opacity-50"
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { label: 'Gewicht', wert: profile?.measurements?.weight, einheit: 'kg' },
+              { label: 'Körpergröße', wert: profile?.measurements?.height, einheit: 'cm' },
+              { label: 'Tagesziel', wert: profile?.goals?.dailyCalories, einheit: 'kcal' },
+              { label: 'Schritte', wert: profile?.goals?.dailySteps, einheit: '/Tag' },
+            ].map((k) => (
+              <div
+                key={k.label}
+                className="rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5"
               >
-                {nameSaving ? <Loader2 size={16} className="animate-spin mx-auto" /> : t('profile.settings.nameSave')}
-              </button>
-            </div>
-            <div>
-              <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)] mb-2">{t('profile.settings.language')}</p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => void setLocale('de')}
-                  className={cn(
-                    'flex-1 min-h-[44px] rounded-xl text-[10px] font-semibold uppercase tracking-[0.12em] border transition-colors',
-                    locale === 'de'
-                      ? 'border-2 border-brand bg-brand/15 text-[var(--text-primary)]'
-                      : 'bg-[var(--background)] border-[var(--line)] text-[var(--text-muted)] hover:border-brand'
-                  )}
-                >
-                  DE
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void setLocale('en')}
-                  className={cn(
-                    'flex-1 min-h-[44px] rounded-xl text-[10px] font-semibold uppercase tracking-[0.12em] border transition-colors',
-                    locale === 'en'
-                      ? 'border-2 border-brand bg-brand/15 text-[var(--text-primary)]'
-                      : 'bg-[var(--background)] border-[var(--line)] text-[var(--text-muted)] hover:border-brand'
-                  )}
-                >
-                  EN
-                </button>
-              </div>
-            </div>
-            <div>
-              <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)] mb-2">{t('profile.theme')}</p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => void setThemeMode('light')}
-                  className={cn(
-                    'flex-1 min-h-[44px] rounded-xl text-[10px] font-semibold uppercase tracking-[0.12em] border transition-colors flex items-center justify-center gap-2',
-                    (profile.themePreference ?? 'dark') === 'light'
-                      ? 'border-2 border-brand bg-brand/15 text-[var(--text-primary)]'
-                      : 'bg-[var(--background)] border-[var(--line)] text-[var(--text-muted)] hover:border-brand'
-                  )}
-                >
-                  <Sun size={16} />
-                  {t('profile.theme.light')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void setThemeMode('dark')}
-                  className={cn(
-                    'flex-1 min-h-[44px] rounded-xl text-[10px] font-semibold uppercase tracking-[0.12em] border transition-colors flex items-center justify-center gap-2',
-                    (profile.themePreference !== 'light')
-                      ? 'border-2 border-brand bg-brand/15 text-[var(--text-primary)]'
-                      : 'bg-[var(--background)] border-[var(--line)] text-[var(--text-muted)] hover:border-brand'
-                  )}
-                >
-                  <Moon size={16} />
-                  {t('profile.theme.dark')}
-                </button>
-              </div>
-            </div>
-            <div>
-              <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)] mb-2">{t('profile.fasting.section')}</p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => void setFastingEnabled(true)}
-                  className={cn(
-                    'flex-1 min-h-[44px] rounded-xl text-[10px] font-semibold uppercase tracking-[0.12em] border transition-colors flex items-center justify-center gap-2',
-                    fastingEnabled
-                      ? 'border-2 border-brand bg-brand/15 text-[var(--text-primary)]'
-                      : 'bg-[var(--background)] border-[var(--line)] text-[var(--text-muted)] hover:border-brand'
-                  )}
-                >
-                  <Moon size={16} />
-                  {t('profile.fasting.on')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void setFastingEnabled(false)}
-                  className={cn(
-                    'flex-1 min-h-[44px] rounded-xl text-[10px] font-semibold uppercase tracking-[0.12em] border transition-colors flex items-center justify-center gap-2',
-                    !fastingEnabled
-                      ? 'border-2 border-brand bg-brand/15 text-[var(--text-primary)]'
-                      : 'bg-[var(--background)] border-[var(--line)] text-[var(--text-muted)] hover:border-brand'
-                  )}
-                >
-                  {t('profile.fasting.off')}
-                </button>
-              </div>
-              <p className="mt-1.5 text-[10px] text-[var(--text-muted)]">{t('profile.fasting.hint')}</p>
-            </div>
-            <div>
-              <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)] mb-2">{t('profile.settings.focus')}</p>
-              <select
-                value={profile.navigationFocus ?? 'hybrid'}
-                onChange={e =>
-                  void updateProfile({
-                    navigationFocus: e.target.value as NavigationFocus,
-                  } as Record<string, unknown>)
-                }
-                className="w-full min-h-[44px] bg-[var(--background)] border border-[var(--line)] rounded-xl px-4 text-xs font-bold text-[var(--text-primary)]"
-              >
-                <option value="hybrid">{t('onb.focus.hybrid')}</option>
-                <option value="workout">{t('onb.focus.workout')}</option>
-                <option value="nutrition">{t('onb.focus.nutrition')}</option>
-              </select>
-            </div>
-        </div>
-
-        {archive && (
-            <motion.section
-              ref={archivePanelRef}
-              id="profile-archive-panel"
-              role="region"
-              aria-label={
-                archive === 'transformation'
-                  ? t('profile.transformation')
-                  : archive === 'liked'
-                    ? t('profile.liked')
-                    : t('profile.myPosts')
-              }
-              layout
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.25 }}
-              className="mt-6 w-full text-left rounded-[1.75rem] border-2 border-[var(--line)] bg-[var(--surface)] shadow-lg overflow-hidden max-h-[min(72vh,720px)] flex flex-col"
-            >
-              <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--line)] bg-[var(--background)]">
-                <p className="text-xs text-[11px] font-semibold text-[var(--text-primary)] truncate">
-                  {archive === 'transformation'
-                    ? t('profile.transformation')
-                    : archive === 'liked'
-                      ? t('profile.liked')
-                      : t('profile.myPosts')}
+                <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                  {k.label}
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setArchive(null)}
-                  className="shrink-0 p-2 rounded-xl border border-[var(--line)] bg-[var(--surface)] text-[var(--text-primary)] hover:opacity-90"
-                  aria-label={t('profile.closePanel')}
-                >
-                  <X size={18} strokeWidth={2.25} />
-                </button>
+                <p className="mt-0.5 text-[15px] font-semibold tabular-nums">
+                  {k.wert != null ? Number(k.wert).toLocaleString('de-DE') : '—'}
+                  {k.wert != null && (
+                    <span className="ml-0.5 text-[10px] font-normal text-[var(--muted)]">{k.einheit}</span>
+                  )}
+                </p>
               </div>
-              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 sm:px-4 py-4">
-                {archiveLoading && (
-                  <div className="flex items-center justify-center gap-2 py-16 text-[var(--text-muted)]">
-                    <Loader2 className="animate-spin" size={22} />
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.12em]">{t('profile.loadingShort')}</span>
-                  </div>
-                )}
-                {!archiveLoading && archive === 'transformation' && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {[...(profile.checkIns || [])].reverse().map(c => (
-                      <div
-                        key={c.id}
-                        className="rounded-xl border border-[var(--line)] overflow-hidden bg-[var(--background)] hover:border-brand/30 transition-colors"
-                      >
-                        {c.photoURL ? (
-                          <img src={c.photoURL} alt="" className="w-full aspect-[4/5] object-cover" />
-                        ) : (
-                          <div className="aspect-[4/5] flex items-center justify-center text-[var(--text-muted)] text-[10px]">—</div>
-                        )}
-                        <div className="p-2">
-                          <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--text-primary)]">{c.date}</p>
-                          {c.weight != null && <p className="text-xs font-bold mt-1">{c.weight} kg</p>}
-                          {c.note && <p className="text-[10px] mt-1 text-[var(--text-muted)] line-clamp-3">{c.note}</p>}
-                        </div>
-                      </div>
-                    ))}
-                    {(profile.checkIns?.length ?? 0) === 0 && (
-                      <p className="col-span-full text-center text-[var(--text-muted)] text-sm py-12">{t('profile.noCheckins')}</p>
-                    )}
-                  </div>
-                )}
-                {!archiveLoading && (archive === 'liked' || archive === 'posts') && (
-                  <div className="space-y-3 w-full">
-                    {archivePosts.map(p => (
-                      <article
-                        key={p.id}
-                        className="rounded-xl border border-[var(--line)] p-4 bg-[var(--background)] hover:border-brand/25 transition-colors"
-                      >
-                        <p className="text-[10px] text-[var(--text-muted)] mb-1">{p.userName}</p>
-                        <p className="text-sm text-[var(--text-primary)] whitespace-pre-wrap leading-relaxed">{p.content}</p>
-                      </article>
-                    ))}
-                    {archivePosts.length === 0 && (
-                      <p className="text-center text-[var(--text-muted)] text-sm py-12">{t('profile.empty')}</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            </motion.section>
-        )}
+            ))}
+          </div>
+
+          <Card className="space-y-2 p-4">
+            <p className="text-[11.5px] font-semibold">Einstellungen</p>
+            <p className="text-[10.5px] leading-relaxed text-[var(--muted)]">
+              Name, Sprache, Erscheinungsmodus und Fasten findest du im Tab „Konto".
+            </p>
+            <button
+              type="button"
+              onClick={() => setTab('account')}
+              className="min-h-[36px] rounded-lg border border-[var(--border-muted)] px-3 text-[11px] font-semibold text-[var(--simple-accent)]"
+            >
+              Zu den Einstellungen
+            </button>
+          </Card>
+
         </div>
       )}
+
       {tab === 'koerper' && (
         <div className="space-y-6">
       {/* ── Biometrics Quick Stats ── */}

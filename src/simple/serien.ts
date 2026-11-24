@@ -240,16 +240,26 @@ export function kcalBilanz(
      * wie bisher aus Trainingsminuten geschaetzt.
      */
     const garminWert = garminKcalProTag?.get(ymd);
-    const verbrannt =
-      garminWert != null && garminWert > 0
-        ? Math.round(garminWert)
-        : (verbrauchtMap.get(ymd) ?? 0) + (istHeute ? Math.round(aktivKcalHeute) : 0);
+    /*
+     * Zwei verschiedene Groessen — nicht vermischen:
+     *
+     *  - `verbrannt` ist bei Garmin der GESAMTverbrauch (Grundumsatz + Aktivitaet).
+     *    Dann ist das Profilziel schon enthalten und darf nicht nochmals abgezogen
+     *    werden. Bilanz = Gegessen - Verbrauch.
+     *  - Ohne Garmin ist `verbrannt` nur die Trainings-Schaetzung. Dann gilt
+     *    Bilanz = Gegessen - Ziel - Training.
+     */
+    const hatGarmin = garminWert != null && garminWert > 0;
+    const verbrannt = hatGarmin
+      ? Math.round(garminWert)
+      : (verbrauchtMap.get(ymd) ?? 0) + (istHeute ? Math.round(aktivKcalHeute) : 0);
+    const budget = hatGarmin ? verbrannt : ziel + verbrannt;
     return {
       ymd,
       kcal,
       ziel,
       verbrannt,
-      bilanz: kcal - ziel - verbrannt,
+      bilanz: kcal - budget,
       hatDaten: kcal > 0,
       vollstaendig: ziel > 0 && kcal >= ziel * 0.5,
     };

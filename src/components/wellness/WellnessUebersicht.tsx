@@ -168,6 +168,25 @@ export default function WellnessUebersicht() {
           unit="/min"
           onClick={() => navigate('/wellness/koerper')}
         />
+        {/* Verbrauch heute — Garmin-Gesamtwert, waechst ueber den Tag. */}
+        <KlickKachel
+          label="Verbrauch"
+          value={
+            (() => {
+              const t = [...tage].reverse().find((x) => x.totalCalories != null && x.totalCalories > 0);
+              return t?.totalCalories != null ? Math.round(t.totalCalories).toLocaleString('de-DE') : '—';
+            })()
+          }
+          unit="kcal"
+          hint={
+            (() => {
+              const t = [...tage].reverse().find((x) => x.totalCalories != null && x.totalCalories > 0);
+              const aktiv = t?.activeCalories != null ? Math.round(t.activeCalories) : null;
+              return aktiv != null ? `${aktiv} aktiv` : undefined;
+            })()
+          }
+          onClick={() => navigate('/wellness/kalorien')}
+        />
         <KlickKachel
           label="VO₂max"
           value={vo2 != null ? Math.round(vo2) : '—'}
