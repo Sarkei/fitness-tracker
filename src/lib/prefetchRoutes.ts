@@ -5,6 +5,9 @@
 const MAIN_ROUTE_IMPORTS = [
   () => import('../simple/TodayPage'),
   () => import('../simple/TrainingPage'),
+  /* Plan und Health werden oft direkt angesteuert — vorladen spart das Warten. */
+  () => import('../simple/TrainingsplanPage'),
+  () => import('../components/wellness/WellnessPage'),
   () => import('../simple/FoodPage'),
   () => import('../components/workout/WorkoutPage'),
   () => import('../components/nutrition/NutritionPage'),
