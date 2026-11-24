@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, ChevronRight, Dumbbell, Moon, Target } from 'lucide-react';
+import { Camera, ChevronRight, Dumbbell, Moon } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { FastingCard } from '../components/dashboard/FastingCard';
 import EinheitDetailModal, { type EinheitDaten } from '../components/wellness/EinheitDetailModal';
@@ -332,19 +332,12 @@ export default function TodayPage() {
         </Card>
       )}
 
-      {/* Serien auf einen Blick */}
-      <div className="grid grid-cols-3 gap-2 lg:gap-3">
+      {/* Serien auf einen Blick — nur die nackten Zahlen, ohne Erklärtext */}
+      <div className="grid grid-cols-2 gap-3">
         <StatTile
           label="Fasten-Serie"
           value={fasten.tage}
           unit={fasten.tage === 1 ? 'Tag' : 'Tage'}
-          hint={
-            goals.fasting
-              ? fasten.tage > 0
-                ? `am Stück seit ${fmtKurz(fasten.seit)}`
-                : 'startet heute'
-              : 'kein Fastenplan aktiv'
-          }
           tone={fasten.tage > 0 ? 'accent' : 'muted'}
           icon={<Moon className="h-3.5 w-3.5" />}
         />
@@ -352,27 +345,8 @@ export default function TodayPage() {
           label="Trainings-Serie"
           value={serie.aktuell}
           unit={serie.aktuell === 1 ? 'Einheit' : 'Einheiten'}
-          hint={
-            /*
-             * Ohne hinterlegten Plan gibt es kein "Geplantes" — dann ist nur die
-             * Zahl der Trainingstage aussagekraeftig, nicht ein Verhaeltnis.
-             */
-            planWochen.length === 0
-              ? `${serie.absolviert} ${serie.absolviert === 1 ? 'Trainingstag' : 'Trainingstage'} in 30 Tagen`
-              : serie.geplant > 0
-                ? `ohne Auslassen · ${serie.absolviert}/${serie.geplant} in 30 Tagen`
-                : 'kein Plan hinterlegt'
-          }
           tone={serie.aktuell > 0 ? 'accent' : 'muted'}
           icon={<Dumbbell className="h-3.5 w-3.5" />}
-        />
-        <StatTile
-          label="Beste Serie"
-          value={serie.laengste}
-          unit="am Stück"
-          hint={planWochen.length === 0 ? "längste Kette aufeinanderfolgender Tage" : "längste Kette ohne Auslassen"}
-          tone="default"
-          icon={<Target className="h-3.5 w-3.5" />}
         />
       </div>
 
