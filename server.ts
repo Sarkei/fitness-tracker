@@ -6879,6 +6879,9 @@ ${JSON.stringify(userCtx, null, 2)}
         displayName: cache.displayName ?? g.displayName,
         lastError: undefined,
         lastAutoSyncAt: new Date().toISOString(),
+        // Manueller Sync ist immer ein VOLLER Lauf - sonst denkt der Takt,
+        // es sei nur der leichte gewesen und holt die Historie nie.
+        lastVollSyncAt: new Date().toISOString(),
       });
       await speichereGarminTage(req.userId!, cache.tage).catch((e) =>
         console.warn("[garmin] Historie:", e),
@@ -7388,7 +7391,16 @@ ${JSON.stringify(userCtx, null, 2)}
          * fuer den Tag verbraucht ist. In der Praxis reicht ein voller Lauf
          * morgens (Historie/Schlaf) plus leichte Laeufe ueber den Tag.
          */
-        const letzterVoll = Date.parse(g.lastVollSyncAt ?? g.cache?.fetchedAt ?? "");
+        /*
+         * Faelligkeit getrennt pruefen.
+         *
+         * `lastVollSyncAt` ist der einzige Taktgeber fuer den vollen Lauf.
+         * Vorher stand hier als Ersatz `cache.fetchedAt` — und weil JEDER leichte
+         * Lauf den Cache neu schreibt, galt der volle Lauf danach immer als
+         * gerade gelaufen. Folge: Schlaf, HRV und Historie wurden nie wieder
+         * abgeholt, nur noch der heutige Tag.
+         */
+        const letzterVoll = Date.parse(g.lastVollSyncAt ?? "");
         const letzterLeicht = Date.parse(g.lastAutoSyncAt ?? "");
         const vollFaellig = !Number.isFinite(letzterVoll) || Date.now() - letzterVoll > GARMIN_VOLL_MS;
         const leichtFaellig = !Number.isFinite(letzterLeicht) || Date.now() - letzterLeicht > GARMIN_LEICHT_MS;
