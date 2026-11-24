@@ -36,7 +36,7 @@ import {
   SYNC_INTERVAL_OPTIONS,
   type IntervalsSettings,
 } from "./src/lib/intervals";
-import { syncGarmin, syncGarminAktivitaeten, ladeEinheitZeitreihen, felderStand, type GarminCache, type GarminAktivitaet } from "./src/lib/garmin";
+import { syncGarmin, garminToken, syncGarminAktivitaeten, ladeEinheitZeitreihen, felderStand, type GarminCache, type GarminAktivitaet } from "./src/lib/garmin";
 import {
   deleteEvent as intervalsDeleteEvent,
   syncWorkout as intervalsSyncWorkout,
@@ -6834,6 +6834,22 @@ ${JSON.stringify(userCtx, null, 2)}
       const g = await readGarminSettings(req.userId!);
       if (!g.apiKey) {
         res.status(400).json({ error: "Garmin ist nicht verbunden." });
+        return;
+      }
+      /*
+       * Vorab pruefen, ob der Key noch gilt. Ein abgelaufener Key fuehrte
+       * frueher zu einem "erfolgreichen" Abgleich mit alten Cache-Werten -
+       * die App zeigte dann ewig denselben Stand, ohne Fehlermeldung.
+       */
+      try {
+        await garminToken(g.apiKey);
+      } catch (e) {
+        const meldung =
+          e instanceof Error
+            ? e.message
+            : "Der Garmin-Zugang ist abgelaufen. Bitte einen neuen API-Key eintragen.";
+        await writeGarminSettings(req.userId!, { ...g, lastError: meldung }).catch(() => {});
+        res.status(401).json({ error: meldung, keyAbgelaufen: true });
         return;
       }
       const t0 = Date.now();

@@ -164,18 +164,41 @@ function tageZurueck(tage: number): { von: string; bis: string } {
   return { von: ymd(von), bis: ymd(bis) };
 }
 
-/** Ein GET gegen die Personal API. */
+/**
+ * Ein GET gegen die Personal API.
+ *
+ * Wichtig: Ein Fehler wird NICHT still verschluckt. Vorher gab die Funktion bei
+ * jedem Problem `null` zurueck — ein abgelaufener API-Key sah damit wie ein
+ * erfolgreicher Abgleich aus, und die App zeigte ewig die alten Cache-Werte,
+ * ohne dass irgendwo ein Fehler auftauchte.
+ */
+export class GarminApiFehler extends Error {
+  constructor(public status: number | null, pfad: string, zusatz?: string) {
+    super(
+      status === 401 || status === 403
+        ? 'Der Garmin-Zugang ist abgelaufen. Bitte in den Einstellungen einen neuen API-Key eintragen.'
+        : zusatz ?? `Garmin-Abruf fehlgeschlagen (${status ?? 'keine Antwort'}) bei ${pfad}`,
+    );
+    this.name = 'GarminApiFehler';
+  }
+}
+
 async function hole<T>(token: string, pfad: string): Promise<T | null> {
+  let res: Response;
   try {
-    const res = await fetch(`${BASE}${pfad}`, {
+    res = await fetch(`${BASE}${pfad}`, {
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
       signal: AbortSignal.timeout(25_000),
     });
-    if (!res.ok) return null;
-    return (await res.json()) as T;
-  } catch {
-    return null;
+  } catch (e) {
+    throw new GarminApiFehler(null, pfad, `Netzwerkfehler: ${(e as Error).message}`);
   }
+  // 204 = keine Daten fuer diesen Tag — das ist kein Fehler.
+  if (res.status === 204) return null;
+  if (!res.ok) {
+    throw new GarminApiFehler(res.status, pfad);
+  }
+  return (await res.json()) as T;
 }
 
 /** Ein Messpunkt einer Einheit: Zeit, Puls, Pace, Höhe, Kadenz … */
