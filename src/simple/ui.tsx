@@ -377,6 +377,7 @@ export function Sparkline({
   einheit,
   minY,
   maxY,
+  achseAlsHHMM,
 }: {
   values: number[];
   height?: number;
@@ -389,6 +390,11 @@ export function Sparkline({
   minY?: number;
   /** Obere Achsengrenze erzwingen. */
   maxY?: number;
+  /**
+   * Achsenwerte als Stunden:Minuten statt Dezimalzahlen — fuer Schlafdauer und
+   * Schlafphasen. Die Werte kommen weiterhin in Stunden an.
+   */
+  achseAlsHHMM?: boolean;
 }) {
   if (values.length < 2) return <div style={{ height }} />;
 
@@ -412,8 +418,17 @@ export function Sparkline({
   const flaeche = `0,${h} ${punkte} ${w},${h}`;
   const zielY = goal !== undefined ? y(goal) : null;
 
-  /** Achsenwert lesbar runden — ganze Zahlen ohne Nachkommastelle. */
+  /**
+   * Achsenwert lesbar runden. Bei `achseAlsHHMM` als Stunden:Minuten, sonst
+   * ganze Zahlen ohne Nachkommastelle.
+   */
   const zeige = (v: number) => {
+    if (achseAlsHHMM) {
+      const gesamt = Math.round(v * 60);
+      const hh = Math.floor(gesamt / 60);
+      const mm = gesamt % 60;
+      return `${hh}:${String(mm).padStart(2, '0')}`;
+    }
     if (Math.abs(v) >= 1) return String(Math.round(v));
     if (v === 0) return '0';
     return v.toFixed(1);
@@ -425,8 +440,14 @@ export function Sparkline({
   // Rahmenlinie klebt und die Kurve nicht am Rand abgeschnitten wird.
   const PAD = 7;
 
+  /*
+   * Achsenbeschriftung ausserhalb des Diagramms: Die Werte standen vorher als
+   * absolute Ebene ueber der Kurve und waren kaum lesbar. Jetzt bekommt das
+   * Diagramm eine feste Spalte rechts daneben — die Linie beruehrt kein Label.
+   */
   return (
-    <div className="relative">
+    <div className="flex items-stretch gap-2">
+      <div className="relative min-w-0 flex-1">
       <svg
         viewBox={`0 ${-PAD} ${w} ${h + 2 * PAD}`}
         preserveAspectRatio="none"
@@ -471,15 +492,17 @@ export function Sparkline({
           />
         )}
       </svg>
+      </div>
 
-      {/* Beschriftung der Achse — rechts neben der Kurve, mit Luft zum Rand */}
+      {/* Achsenwerte — eigene Spalte rechts, ausserhalb der Zeichenflaeche */}
       <div
-        className="pointer-events-none absolute inset-x-0 flex flex-col justify-between pl-1 pr-0.5 text-[9px] leading-none text-[var(--text-muted)]"
-        style={{ top: 0, height: h + 2 * PAD, paddingTop: PAD - 4, paddingBottom: PAD - 4 }}
+        className="flex shrink-0 flex-col justify-between text-right text-[9px] leading-none tabular-nums text-[var(--text-muted)]"
+        style={{ height: h + 2 * PAD }}
+        aria-hidden
       >
-        <span className="self-end rounded-sm bg-[var(--card-bg)] px-1 py-0.5">{zeige(max)}{einheit ? ` ${einheit}` : ''}</span>
-        <span className="self-end opacity-70">{zeige((max + min) / 2)}</span>
-        <span className="self-end rounded-sm bg-[var(--card-bg)] px-1 py-0.5">{zeige(min)}{einheit ? ` ${einheit}` : ''}</span>
+        <span>{zeige(max)}{einheit ? ` ${einheit}` : ''}</span>
+        <span className="opacity-60">{zeige((max + min) / 2)}</span>
+        <span>{zeige(min)}{einheit ? ` ${einheit}` : ''}</span>
       </div>
     </div>
   );

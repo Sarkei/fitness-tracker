@@ -101,6 +101,27 @@ export function schlafStunden(sekunden?: number | null): number | null {
   return Math.round((sekunden / 3600) * 10) / 10;
 }
 
+
+/**
+ * Sekunden als Stundenangabe in hh:mm — „8:06 h" statt „8.1".
+ *
+ * Tims Vorgabe: Schlafdauer und Schlafphasen in Stunden und Minuten, keine
+ * Gleitkommazahlen. 29220 s sind 8:07, nicht 8.1.
+ */
+export function alsHHMM(sekunden?: number | null): string | null {
+  if (sekunden == null || !Number.isFinite(sekunden) || sekunden <= 0) return null;
+  const gesamt = Math.round(sekunden / 60);
+  const h = Math.floor(gesamt / 60);
+  const m = gesamt % 60;
+  return `${h}:${String(m).padStart(2, '0')}`;
+}
+
+/** Dezimalstunden als hh:mm — für Werte, die schon in Stunden vorliegen. */
+export function stundenAlsHHMM(stunden?: number | null): string | null {
+  if (stunden == null || !Number.isFinite(stunden) || stunden <= 0) return null;
+  return alsHHMM(Math.round(stunden * 3600));
+}
+
 /** Form-Bewertung aus TSB (Trainingsstress-Bilanz). */
 export function formLabel(tsb?: number | null): { text: string; tone: 'gut' | 'mittel' | 'schlecht' | 'leer' } {
   if (tsb == null || !Number.isFinite(tsb)) return { text: '—', tone: 'leer' };

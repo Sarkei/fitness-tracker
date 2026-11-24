@@ -8,7 +8,7 @@ import { Card, Sparkline } from '@/src/simple/ui';
 import { WellnessToolbar, useWellness } from './WellnessProvider';
 import { KennzahlSheet, KlickKachel } from './KennzahlSheet';
 import { Tagesdetail, TagesZeile } from './Tagesdetail';
-import { mittel, schlafBewertung, schlafFarben, schlafStufe, schlafStunden } from '@/src/lib/wellness';
+import { alsHHMM, mittel, schlafBewertung, schlafFarben, schlafStufe, schlafStunden, stundenAlsHHMM } from '@/src/lib/wellness';
 
 export default function WellnessSchlaf() {
   const { daten, zeitraum } = useWellness();
@@ -64,11 +64,22 @@ export default function WellnessSchlaf() {
       <WellnessToolbar />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <KlickKachel label="Letzte Nacht" value={letzteNacht ?? '—'} unit="h" hint="geschlafen" onClick={() => setDetail('dauer')} />
+        <KlickKachel
+          label="Letzte Nacht"
+          value={
+            (() => {
+              const s = [...tage].reverse().find((t) => t.sleepSecs)?.sleepSecs;
+              return alsHHMM(s) ?? '—';
+            })()
+          }
+          unit="h"
+          hint="geschlafen"
+          onClick={() => setDetail('dauer')}
+        />
         {!nurHeute && (
           <KlickKachel
             label="Nächte im Schnitt"
-            value={schnitt != null ? schnitt.toFixed(1) : '—'}
+            value={schnitt != null ? (stundenAlsHHMM(schnitt) ?? '—') : '—'}
             unit="h"
             hint={`${naechte.filter((s) => s).length} Nächte`}
             onClick={() => setDetail('dauer')}
@@ -105,19 +116,19 @@ export default function WellnessSchlaf() {
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <KlickKachel
               label="Tiefschlaf"
-              value={letztePhasen?.tief != null ? letztePhasen.tief.toFixed(1) : '—'}
+              value={letztePhasen?.tief != null ? (stundenAlsHHMM(letztePhasen.tief) ?? '—') : '—'}
               unit="h"
               onClick={() => setDetail('dauer')}
             />
             <KlickKachel
               label="REM-Schlaf"
-              value={letztePhasen?.rem != null ? letztePhasen.rem.toFixed(1) : '—'}
+              value={letztePhasen?.rem != null ? (stundenAlsHHMM(letztePhasen.rem) ?? '—') : '—'}
               unit="h"
               onClick={() => setDetail('dauer')}
             />
             <KlickKachel
               label="Leichtschlaf"
-              value={letztePhasen?.leicht != null ? letztePhasen.leicht.toFixed(1) : '—'}
+              value={letztePhasen?.leicht != null ? (stundenAlsHHMM(letztePhasen.leicht) ?? '—') : '—'}
               unit="h"
               onClick={() => setDetail('dauer')}
             />
@@ -153,7 +164,7 @@ export default function WellnessSchlaf() {
                       <div
                         key={t.label}
                         style={{ width: `${(t.wert / gesamt) * 100}%`, background: t.farbe }}
-                        title={`${t.label}: ${t.wert.toFixed(1)} h`}
+                        title={`${t.label}: ${stundenAlsHHMM(t.wert) ?? t.wert.toFixed(1)} h`}
                       />
                     ))}
                   </div>
@@ -166,7 +177,7 @@ export default function WellnessSchlaf() {
                         />
                         <span className="text-[var(--text-muted)]">{t.label}</span>
                         <span className="font-semibold tabular-nums">
-                          {t.wert.toFixed(1)} h · {Math.round((t.wert / gesamt) * 100)} %
+                          {stundenAlsHHMM(t.wert) ?? t.wert.toFixed(1)} h · {Math.round((t.wert / gesamt) * 100)} %
                         </span>
                       </span>
                     ))}
@@ -200,10 +211,12 @@ export default function WellnessSchlaf() {
                         values={phasenReihe.map((p) => p[feld] ?? 0)}
                         height={36}
                         color={farbe}
+                        einheit="h"
+                        achseAlsHHMM
                       />
                     </div>
                     <span className="w-14 shrink-0 text-right text-[11px] font-semibold tabular-nums">
-                      {schnittPhase != null ? `${schnittPhase.toFixed(1)} h` : '—'}
+                      {schnittPhase != null ? `${stundenAlsHHMM(schnittPhase) ?? schnittPhase.toFixed(1)} h` : '—'}
                     </span>
                   </div>
                 );
@@ -223,7 +236,7 @@ export default function WellnessSchlaf() {
           <Moon className="h-3.5 w-3.5 text-[var(--simple-accent)]" />
           <p className="text-[12.5px] font-semibold text-[var(--foreground)]">Schlafdauer im Verlauf</p>
         </div>
-        <Sparkline values={reihe} height={90} einheit="h" />
+        <Sparkline values={reihe} height={90} einheit="h" achseAlsHHMM />
       </Card>
       )}
 
@@ -314,7 +327,7 @@ export default function WellnessSchlaf() {
                   key={t.date}
                   type="button"
                   onClick={() => setTagOffen(t.date)}
-                  title={`${tagNr}.${monat}. · ${schlafStunden(t.sleepSecs)?.toFixed(1)} h · Score ${
+                  title={`${tagNr}.${monat}. · ${alsHHMM(t.sleepSecs) ?? schlafStunden(t.sleepSecs)?.toFixed(1)} h · Score ${
                     t.sleepScore != null ? Math.round(t.sleepScore) : '—'
                   }`}
                   className="flex flex-col items-center gap-1 transition hover:opacity-80"
@@ -356,7 +369,7 @@ export default function WellnessSchlaf() {
                 return (
                   <TagesZeile key={t.date} onClick={() => setTagOffen(t.date)}>
                     <td className="py-1.5 text-[var(--text-muted)]">{t.date}</td>
-                    <td className="py-1.5 text-right tabular-nums">{h.toFixed(1)} h</td>
+                    <td className="py-1.5 text-right tabular-nums">{alsHHMM(t.sleepSecs) ?? `${h.toFixed(1)}`} h</td>
                     <td className="py-1.5 text-right tabular-nums">
                       {t.sleepScore != null ? Math.round(t.sleepScore) : '—'}
                     </td>
