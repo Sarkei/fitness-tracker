@@ -510,7 +510,13 @@ export default function TrainingPage() {
         {/* Rechte Spalte: füllt die Höhe der linken Karte, damit beide Unterkanten abschließen */}
         <div className="flex h-full flex-col gap-4">
           <Card className="p-5">
-            <SectionTitle>Diese Woche</SectionTitle>
+            <SectionTitle
+              action={
+                <GhostButton onClick={() => navigate('/plan')}>Plan bearbeiten</GhostButton>
+              }
+            >
+              Diese Woche
+            </SectionTitle>
             <div className="space-y-2.5">
               <ProgressBar
                 value={letzte7.length}

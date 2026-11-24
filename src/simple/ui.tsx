@@ -191,7 +191,7 @@ export function GhostButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-semibold transition disabled:opacity-40 ${
+      className={`inline-flex min-h-[38px] items-center justify-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-semibold transition disabled:opacity-40 ${
         active
           ? 'border-[var(--simple-accent)] text-[var(--foreground)]'
           : 'border-[var(--border-muted)] text-[var(--text-muted)] hover:text-[var(--foreground)]'

@@ -57,6 +57,16 @@ export default function TodayPage() {
    * tauchen sonst nirgends auf — genau die fehlten hier.
    */
   const [einheiten, setEinheiten] = useState<Array<Record<string, unknown>>>([]);
+  /**
+   * Garmin-Verbrauch von heute: `gesamt` = Grundumsatz + Aktivitaet, waechst ueber
+   * den Tag. Damit steigt das Kalorienbudget auf der Startseite mit.
+   */
+  const [garminHeute, setGarminHeute] = useState<{
+    gesamt: number | null;
+    aktiv: number | null;
+    passiv: number | null;
+    schnitt: number | null;
+  } | null>(null);
   const [einheitOffen, setEinheitOffen] = useState<EinheitDaten | null>(null);
 
   useEffect(() => {
@@ -74,6 +84,43 @@ export default function TodayPage() {
       .catch(() => {});
     return () => {
       abgebrochen = true;
+    };
+  }, []);
+
+  /**
+   * Verbrauch der Uhr holen und alle 15 Minuten auffrischen, damit das Budget
+   * ueber den Tag mitwaechst - ohne dass die Seite neu geladen werden muss.
+   */
+  useEffect(() => {
+    let abgebrochen = false;
+    const holen = () => {
+      api<{
+        verbunden?: boolean;
+        gesamt?: number | null;
+        aktiv?: number | null;
+        passiv?: number | null;
+        schnitt?: { gesamt?: number | null };
+        verlauf?: Array<{ date: string; total: number }>;
+      }>('/api/integrations/garmin/heute')
+        .then((r) => {
+          if (abgebrochen || !r.verbunden) return;
+          if (Array.isArray(r.verlauf)) {
+            setGarminTage(r.verlauf.map((v) => ({ date: String(v.date), total: Number(v.total) || 0 })));
+          }
+          setGarminHeute({
+            gesamt: r.gesamt ?? null,
+            aktiv: r.aktiv ?? null,
+            passiv: r.passiv ?? null,
+            schnitt: r.schnitt?.gesamt ?? null,
+          });
+        })
+        .catch(() => {});
+    };
+    holen();
+    const timer = window.setInterval(holen, 15 * 60_000);
+    return () => {
+      abgebrochen = true;
+      window.clearInterval(timer);
     };
   }, []);
 
@@ -136,8 +183,32 @@ export default function TodayPage() {
       }, 0),
     [einheiten],
   );
-  /** Budget des Tages: Ziel plus Aktivkalorien. */
-  const budgetHeute = Math.round(goalKcal + aktivKcalHeute);
+  /*
+   * Budget des Tages.
+   *
+   * Mit Garmin: Der Gesamtverbrauch der Uhr (Grundumsatz + Aktivitaet) ist das
+   * Budget und waechst ueber den Tag mit. Das Profilziel ist dann nur noch die
+   * Markierung, an der man sich orientiert.
+   *
+   * Ohne Garmin: wie bisher Profilziel plus Aktivkalorien aus den Einheiten.
+   */
+  const garminGesamt = garminHeute?.gesamt != null && garminHeute.gesamt > 0 ? Math.round(garminHeute.gesamt) : null;
+
+  /**
+   * Verbrauch je Tag aus der Garmin-Historie — damit auch die Balken der
+   * Kalorienbilanz den echten Verbrauch zeigen und dynamisch ausschlagen.
+   */
+  const [garminTage, setGarminTage] = useState<Array<{ date: string; total: number }>>([]);
+  const garminBilanzMap = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const t of garminTage) {
+      if (t.total > 0) m.set(t.date.slice(0, 10), t.total);
+    }
+    return m;
+  }, [garminTage]);
+  const budgetHeute = garminGesamt ?? Math.round(goalKcal + aktivKcalHeute);
+  /** Profilziel als reine Markierung. */
+  const zielMarke = Math.round(goalKcal);
   const koerpergewicht = Number(
     (profile as unknown as { measurements?: { weight?: number } } | null)?.measurements?.weight,
   );
@@ -170,8 +241,8 @@ export default function TodayPage() {
   );
   const serie = useMemo(() => trainingsSerie(workouts, planWochen, date), [workouts, planWochen, date]);
   const bilanz = useMemo(
-    () => kcalBilanz(monatEntries, workouts, goalKcal, 14, date, koerpergewicht, aktivKcalHeute),
-    [monatEntries, workouts, goalKcal, date, koerpergewicht, aktivKcalHeute],
+    () => kcalBilanz(monatEntries, workouts, goalKcal, 14, date, koerpergewicht, aktivKcalHeute, garminBilanzMap),
+    [monatEntries, workouts, goalKcal, date, koerpergewicht, aktivKcalHeute, garminBilanzMap],
   );
   const oBilanz = useMemo(() => bilanzDurchschnitt(bilanz), [bilanz]);
   const hatBilanz = bilanz.some((t) => t.hatDaten);
@@ -333,8 +404,18 @@ export default function TodayPage() {
                   </p>
                   <p className="mt-0.5 text-[10px] leading-tight tabular-nums text-[var(--text-muted)]">
                     {Math.round(budgetHeute).toLocaleString('de-DE')} Budget
-                    {aktivKcalHeute > 0 && (
-                      <> · {Math.round(goalKcal).toLocaleString('de-DE')} + {Math.round(aktivKcalHeute)} Aktivität</>
+                    {garminGesamt != null ? (
+                      <>
+                        {' · Uhr '}
+                        {garminGesamt.toLocaleString('de-DE')}
+                        {garminHeute?.passiv != null && garminHeute?.aktiv != null
+                          ? ` (${garminHeute.passiv} + ${garminHeute.aktiv})`
+                          : ''}
+                      </>
+                    ) : (
+                      aktivKcalHeute > 0 && (
+                        <> · {zielMarke.toLocaleString('de-DE')} + {Math.round(aktivKcalHeute)} Aktivität</>
+                      )
                     )}
                     {' − '}
                     {Math.round(sum.kcal).toLocaleString('de-DE')} gegessen

@@ -14,6 +14,7 @@ const TrainingPage = lazy(() => import('./simple/TrainingPage'));
 const FoodPage = lazy(() => import('./simple/FoodPage'));
 const EinheitPage = lazy(() => import('./simple/EinheitPage'));
 const ProgressPage = lazy(() => import('./simple/ProgressPage'));
+const TrainingsplanPage = lazy(() => import('./simple/TrainingsplanPage'));
 const WorkoutPage = lazy(() => import('./components/workout/WorkoutPage'));
 const NutritionPage = lazy(() => import('./components/nutrition/NutritionPage'));
 const CoachHubPage = lazy(() => import('./components/coach/CoachHubPage'));
@@ -92,6 +93,14 @@ const AppContent = () => {
           element={
             <RouteErrorBoundary title="Fortschritt konnte nicht geladen werden">
               <ProgressPage />
+            </RouteErrorBoundary>
+          }
+        />
+        <Route
+          path="/plan"
+          element={
+            <RouteErrorBoundary title="Trainingsplan konnte nicht geladen werden">
+              <TrainingsplanPage />
             </RouteErrorBoundary>
           }
         />

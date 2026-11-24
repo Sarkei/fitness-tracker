@@ -93,6 +93,7 @@ function Linie({
   hoehe = 130,
   formatWert,
   xLabels,
+  zeiten,
 }: {
   werte: Array<number | null>;
   farbe: string;
@@ -100,7 +101,16 @@ function Linie({
   hoehe?: number;
   formatWert?: (v: number) => string;
   xLabels?: [string, string];
+  /**
+   * Zeitmarke je Messpunkt in Sekunden seit Start. Damit lassen sich
+   * Zwischenmarkierungen auf der X-Achse beschriften und beim Antippen der
+   * genaue Zeitpunkt anzeigen.
+   */
+  zeiten?: number[];
 }) {
+  /** Angetippter bzw. ueberfahrener Messpunkt (Index), null wenn keiner. */
+  const [aktiv, setAktiv] = useState<number | null>(null);
+
   const echte = werte.filter((v): v is number => v != null && Number.isFinite(v));
   if (echte.length < 2) {
     return (
@@ -137,9 +147,55 @@ function Linie({
 
   const zeige = formatWert ?? ((v: number) => (Math.abs(v) >= 100 ? String(Math.round(v)) : v.toFixed(1)));
 
+  /* ---- Zeitachse: Zwischenmarkierungen und Abfrage per Tippen ---- */
+
+  /** Sekunden als m:ss oder h:mm:ss. */
+  const alsZeit = (sek: number) => {
+    const x = Math.max(0, Math.round(sek));
+    const hh = Math.floor(x / 3600);
+    const mm = Math.floor((x % 3600) / 60);
+    const ss = x % 60;
+    return hh > 0
+      ? `${hh}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
+      : `${mm}:${String(ss).padStart(2, '0')}`;
+  };
+
+  const hatZeiten = Array.isArray(zeiten) && zeiten.length === werte.length;
+  /* Vier Marken auf der Zeitachse: Start, zwei Zwischenwerte, Ziel. */
+  const marken = hatZeiten
+    ? [0, 0.33, 0.66, 1].map((anteil) => {
+        const idx = Math.min(werte.length - 1, Math.max(0, Math.round(anteil * (werte.length - 1))));
+        return { idx, x: idx * schritt, text: alsZeit(Number(zeiten![idx]) || 0) };
+      })
+    : [];
+
+  const aktiverIdx = aktiv;
+  const aktiverWert = aktiverIdx != null ? werte[aktiverIdx] : null;
+  const aktivX = aktiverIdx != null ? aktiverIdx * schritt : 0;
+
   return (
     <div className="relative">
-      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="w-full" style={{ height: h }}>
+      <svg
+        viewBox={`0 0 ${w} ${h}`}
+        preserveAspectRatio="none"
+        className="w-full"
+        style={{ height: h, touchAction: 'pan-y' }}
+        onPointerMove={(e) => {
+          if (!hatZeiten) return;
+          const r = e.currentTarget.getBoundingClientRect();
+          const anteil = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+          setAktiv(Math.round(anteil * (werte.length - 1)));
+        }}
+        onPointerLeave={() => setAktiv(null)}
+        onTouchStart={(e) => {
+          if (!hatZeiten) return;
+          const t = e.touches[0];
+          const r = e.currentTarget.getBoundingClientRect();
+          const anteil = Math.min(1, Math.max(0, (t.clientX - r.left) / r.width));
+          setAktiv(Math.round(anteil * (werte.length - 1)));
+        }}
+        onTouchEnd={() => setAktiv(null)}
+      >
         {[hi, (hi + lo) / 2, lo].map((linie, i) => (
           <line
             key={i}
@@ -153,6 +209,22 @@ function Linie({
             vectorEffect="non-scaling-stroke"
           />
         ))}
+        {/* Senkrechte Zwischenmarkierungen auf der Zeitachse */}
+        {marken.map((m, i) => (
+          <line
+            key={`m${i}`}
+            x1={m.x}
+            x2={m.x}
+            y1={0}
+            y2={h}
+            stroke="var(--border-muted)"
+            strokeWidth={1}
+            strokeDasharray="2 4"
+            opacity={0.6}
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
+
         {abschnitte.map((p, i) => (
           <polyline
             key={i}
@@ -165,6 +237,31 @@ function Linie({
             strokeLinecap="round"
           />
         ))}
+
+        {/* Fadenkreuz am angetippten Punkt mit Wert */}
+        {aktiverWert != null && Number.isFinite(aktiverWert) && (
+          <>
+            <line
+              x1={aktivX}
+              x2={aktivX}
+              y1={0}
+              y2={h}
+              stroke={farbe}
+              strokeWidth={1}
+              opacity={0.85}
+              vectorEffect="non-scaling-stroke"
+            />
+            <circle
+              cx={aktivX}
+              cy={y(aktiverWert)}
+              r={3}
+              fill={farbe}
+              stroke="var(--card-bg)"
+              strokeWidth={1.5}
+              vectorEffect="non-scaling-stroke"
+            />
+          </>
+        )}
       </svg>
 
       {/* Achsenwerte rechts, damit nichts verdeckt wird */}
@@ -177,11 +274,35 @@ function Linie({
         <span>{zeige(lo)}{einheit ? ` ${einheit}` : ''}</span>
       </div>
 
-      {xLabels && (
-        <div className="mt-1 flex justify-between text-[9px] text-[var(--text-muted)]">
-          <span>{xLabels[0]}</span>
-          <span>{xLabels[1]}</span>
+      {/* Wert und Zeitpunkt des angetippten Punkts */}
+      {aktiverWert != null && Number.isFinite(aktiverWert) && (
+        <div className="pointer-events-none absolute left-0 top-0 rounded-md bg-[var(--card-bg)]/95 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums shadow-sm">
+          {zeige(aktiverWert)}
+          {einheit ? ` ${einheit}` : ''}
+          {hatZeiten ? ` · ${alsZeit(Number(zeiten![aktiverIdx!]) || 0)}` : ''}
         </div>
+      )}
+
+      {/* Zeitachse: vier Marken, damit man weiss, wann was passiert ist */}
+      {marken.length > 0 ? (
+        <div className="relative mt-1 h-3 text-[9px] tabular-nums text-[var(--text-muted)]">
+          {marken.map((m, i) => (
+            <span
+              key={i}
+              className="absolute -translate-x-1/2"
+              style={{ left: `${(m.idx / Math.max(1, werte.length - 1)) * 100}%` }}
+            >
+              {m.text}
+            </span>
+          ))}
+        </div>
+      ) : (
+        xLabels && (
+          <div className="mt-1 flex justify-between text-[9px] text-[var(--text-muted)]">
+            <span>{xLabels[0]}</span>
+            <span>{xLabels[1]}</span>
+          </div>
+        )
       )}
     </div>
   );
@@ -247,6 +368,8 @@ export default function EinheitPage() {
     return [zeitText(punkte[0].t), zeitText(punkte[punkte.length - 1].t)] as [string, string];
   }, [punkte]);
 
+  /** Zeitmarke je Messpunkt in Sekunden — Grundlage der X-Achse. */
+  const zeiten = useMemo(() => punkte.map((p) => Number(p.t) || 0), [punkte]);
   const puls = useMemo(() => punkte.map((p) => p.hr ?? null), [punkte]);
   const pace = useMemo(
     () => punkte.map((p) => (p.speed && p.speed > 0.3 ? 1000 / (p.speed * 60) : null)),
@@ -347,7 +470,7 @@ export default function EinheitPage() {
             <p className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold">
               <Heart className="h-3.5 w-3.5 text-[#dc5a4a]" /> Herzfrequenz
             </p>
-            <Linie werte={puls} farbe="#dc5a4a" einheit="bpm" xLabels={zeitraum} />
+            <Linie werte={puls} farbe="#dc5a4a" einheit="bpm" xLabels={zeitraum} zeiten={zeiten} />
           </section>
         )}
 
@@ -372,7 +495,7 @@ export default function EinheitPage() {
             <p className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold">
               <Mountain className="h-3.5 w-3.5 text-[#9cc7ae]" /> Höhenprofil
             </p>
-            <Linie werte={hoehe} farbe="#9cc7ae" einheit="m" xLabels={zeitraum} />
+            <Linie werte={hoehe} farbe="#9cc7ae" einheit="m" xLabels={zeitraum} zeiten={zeiten} />
           </section>
         )}
 
@@ -381,7 +504,7 @@ export default function EinheitPage() {
             <p className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold">
               <Clock className="h-3.5 w-3.5 text-[#4d9f6b]" /> Kadenz
             </p>
-            <Linie werte={kadenz} farbe="#4d9f6b" einheit="spm" xLabels={zeitraum} />
+            <Linie werte={kadenz} farbe="#4d9f6b" einheit="spm" xLabels={zeitraum} zeiten={zeiten} />
           </section>
         )}
 
@@ -390,7 +513,7 @@ export default function EinheitPage() {
             <p className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold">
               <Zap className="h-3.5 w-3.5 text-[#d98a2b]" /> Leistung
             </p>
-            <Linie werte={leistung} farbe="#d98a2b" einheit="W" xLabels={zeitraum} />
+            <Linie werte={leistung} farbe="#d98a2b" einheit="W" xLabels={zeitraum} zeiten={zeiten} />
           </section>
         )}
 
@@ -399,7 +522,7 @@ export default function EinheitPage() {
             <p className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold">
               <MapPin className="h-3.5 w-3.5 text-[var(--text-muted)]" /> Body Battery
             </p>
-            <Linie werte={akku} farbe="var(--text-muted)" einheit="%" xLabels={zeitraum} />
+            <Linie werte={akku} farbe="var(--text-muted)" einheit="%" xLabels={zeitraum} zeiten={zeiten} />
           </section>
         )}
 

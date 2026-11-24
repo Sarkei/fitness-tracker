@@ -489,6 +489,51 @@ async function initDb(): Promise<void> {
     )
   `);
 
+
+  /*
+   * Manuelle Trainingsplaene.
+   *
+   * Tims Vorgabe: Auch ohne Coach soll man einen Plan bauen koennen — Workouts
+   * anlegen (Gym, Laufen, Rad, hybrid, Triathlon, EMOM, HIIT, Zirkel, frei) und
+   * per Drag & Drop auf Wochentage legen, auch mehrfach.
+   *
+   * `workouts` haelt die Vorlagen (die Bausteine), `plan_slots` die Zuordnung
+   * Vorlage -> Datum. So kann dasselbe Workout an mehreren Tagen haengen, und ein
+   * Tag kann mehrere Workouts haben.
+   */
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS trainings (
+      id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id       INTEGER NOT NULL,
+      name          TEXT NOT NULL,
+      art           VARCHAR(24) NOT NULL DEFAULT 'gym',
+      notiz         TEXT,
+      /* Struktur: Uebungen mit Saetzen, Supersaetzen und Intervall-Vorgaben. */
+      inhalt        JSONB NOT NULL DEFAULT '{}'::jsonb,
+      dauer_min     INTEGER,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS trainings_plan (
+      id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id       INTEGER NOT NULL,
+      trainings_id  UUID NOT NULL REFERENCES trainings(id) ON DELETE CASCADE,
+      datum         DATE NOT NULL,
+      reihenfolge   INTEGER NOT NULL DEFAULT 0,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      /* Dasselbe Workout nur einmal je Tag — mehrfach ueber mehrere Tage ist ok. */
+      UNIQUE (user_id, trainings_id, datum)
+    )
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS trainings_plan_user_datum_idx
+      ON trainings_plan (user_id, datum)
+  `);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS coach_weekly_reports (
       id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -6343,6 +6388,161 @@ ${JSON.stringify(userCtx, null, 2)}
     });
   };
 
+
+  /*
+   * Manuelle Trainings und Wochenplan.
+   *
+   * Ein `training` ist eine Vorlage (Gym, Laufen, EMOM, HIIT …). `trainings_plan`
+   * ordnet Vorlagen Datumsangaben zu — dasselbe Workout an mehreren Tagen, mehrere
+   * Workouts an einem Tag. Drag & Drop im Frontend ruft PUT /api/trainings/plan.
+   */
+
+  app.get("/api/trainings", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const r = await pool.query(
+        `SELECT id, name, art, notiz, inhalt, dauer_min, created_at, updated_at
+           FROM trainings WHERE user_id = $1 ORDER BY created_at DESC`,
+        [req.userId!],
+      );
+      res.json({ trainings: r.rows });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "load failed" });
+    }
+  });
+
+  app.post("/api/trainings", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const name = String(req.body?.name ?? "").trim();
+      if (!name) {
+        res.status(400).json({ error: "Name fehlt." });
+        return;
+      }
+      const art = String(req.body?.art ?? "gym").slice(0, 24);
+      const inhalt = req.body?.inhalt ?? {};
+      const dauer = req.body?.dauerMin != null ? Number(req.body.dauerMin) : null;
+      const r = await pool.query(
+        `INSERT INTO trainings (user_id, name, art, notiz, inhalt, dauer_min)
+         VALUES ($1,$2,$3,$4,$5,$6)
+         RETURNING id, name, art, notiz, inhalt, dauer_min, created_at, updated_at`,
+        [req.userId!, name, art, req.body?.notiz ?? null, inhalt, dauer],
+      );
+      res.status(201).json({ training: r.rows[0] });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "save failed" });
+    }
+  });
+
+  app.put("/api/trainings/:id", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const r = await pool.query(
+        `UPDATE trainings
+            SET name = COALESCE($3, name),
+                art = COALESCE($4, art),
+                notiz = COALESCE($5, notiz),
+                inhalt = COALESCE($6, inhalt),
+                dauer_min = COALESCE($7, dauer_min),
+                updated_at = NOW()
+          WHERE id = $1 AND user_id = $2
+          RETURNING id, name, art, notiz, inhalt, dauer_min, created_at, updated_at`,
+        [
+          req.params.id,
+          req.userId!,
+          req.body?.name ?? null,
+          req.body?.art ?? null,
+          req.body?.notiz ?? null,
+          req.body?.inhalt ?? null,
+          req.body?.dauerMin ?? null,
+        ],
+      );
+      if (!r.rowCount) {
+        res.status(404).json({ error: "Training nicht gefunden." });
+        return;
+      }
+      res.json({ training: r.rows[0] });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "save failed" });
+    }
+  });
+
+  app.delete("/api/trainings/:id", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      await pool.query(`DELETE FROM trainings WHERE id = $1 AND user_id = $2`, [
+        req.params.id,
+        req.userId!,
+      ]);
+      res.json({ ok: true });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "delete failed" });
+    }
+  });
+
+  /** Plan-Eintraege eines Zeitraums (Standard: aktuelle Woche ab Montag). */
+  app.get("/api/trainings/plan", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const von = String(req.query.von ?? "");
+      const bis = String(req.query.bis ?? "");
+      const r = await pool.query(
+        `SELECT p.id, p.datum::text AS datum, p.reihenfolge,
+                t.id AS trainings_id, t.name, t.art, t.inhalt, t.dauer_min
+           FROM trainings_plan p
+           JOIN trainings t ON t.id = p.trainings_id
+          WHERE p.user_id = $1
+            AND ($2::date IS NULL OR p.datum >= $2::date)
+            AND ($3::date IS NULL OR p.datum <= $3::date)
+          ORDER BY p.datum, p.reihenfolge`,
+        [req.userId!, von || null, bis || null],
+      );
+      res.json({ eintraege: r.rows });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "load failed" });
+    }
+  });
+
+  /** Workout auf einen Tag legen — auch mehrere. */
+  app.post("/api/trainings/plan", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const trainingsId = String(req.body?.trainingsId ?? "");
+      const datum = String(req.body?.datum ?? "");
+      if (!trainingsId || !datum) {
+        res.status(400).json({ error: "Training und Datum noetig." });
+        return;
+      }
+      // Eigentuemer pruefen — fremde Vorlagen darf man nicht einplanen.
+      const eigner = await pool.query(
+        `SELECT 1 FROM trainings WHERE id = $1 AND user_id = $2`,
+        [trainingsId, req.userId!],
+      );
+      if (!eigner.rowCount) {
+        res.status(404).json({ error: "Training nicht gefunden." });
+        return;
+      }
+      const r = await pool.query(
+        `INSERT INTO trainings_plan (user_id, trainings_id, datum, reihenfolge)
+         VALUES ($1,$2,$3::date,
+                 COALESCE((SELECT MAX(reihenfolge)+1 FROM trainings_plan
+                            WHERE user_id = $1 AND datum = $3::date), 0))
+         ON CONFLICT (user_id, trainings_id, datum) DO NOTHING
+         RETURNING id, datum::text AS datum, reihenfolge`,
+        [req.userId!, trainingsId, datum],
+      );
+      res.status(201).json({ eintrag: r.rows[0] ?? null });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "save failed" });
+    }
+  });
+
+  app.delete("/api/trainings/plan/:id", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      await pool.query(`DELETE FROM trainings_plan WHERE id = $1 AND user_id = $2`, [
+        req.params.id,
+        req.userId!,
+      ]);
+      res.json({ ok: true });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "delete failed" });
+    }
+  });
+
   app.get("/api/integrations/garmin/activities", requireAuth, async (req: AuthRequest, res) => {
     try {
       const g = await readGarminSettings(req.userId!);
@@ -6442,6 +6642,72 @@ ${JSON.stringify(userCtx, null, 2)}
    * Liest aus `garmin_days` (nicht aus der API), damit auch ältere Zeiträume schnell
    * kommen und die Werte nach einem API-Ausfall erhalten bleiben.
    */
+
+  /**
+   * Kalorienverbrauch von heute — fuer das mitwachsende Tagesbudget.
+   *
+   * Garmin trennt in Grundumsatz (passiv) und Aktivkalorien; `total_kcal` ist die
+   * Summe beider und waechst ueber den Tag. Tims Vorgabe: Das Kalorienziel soll
+   * auf Start- und Essensseite mitwachsen, sobald Garmin verbunden ist — nicht
+   * das fixe Profilziel zeigen.
+   */
+  app.get("/api/integrations/garmin/heute", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const heute = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" });
+      const r = await pool.query(
+        `SELECT total_kcal, active_kcal, steps
+           FROM garmin_days WHERE user_id = $1 AND date = $2 LIMIT 1`,
+        [req.userId!, heute],
+      );
+      const g = await readGarminSettings(req.userId!);
+
+      // Durchschnitt der letzten vollstaendigen Tage — fuer den Vergleich.
+      const schnitt = await pool.query(
+        `SELECT AVG(total_kcal)::int AS total, AVG(active_kcal)::int AS aktiv, COUNT(*)::int AS tage
+           FROM garmin_days
+          WHERE user_id = $1 AND date < $2 AND total_kcal IS NOT NULL AND total_kcal > 0`,
+        [req.userId!, heute],
+      );
+
+      const zeile = r.rows[0] as { total_kcal?: number; active_kcal?: number; steps?: number } | undefined;
+      const total = zeile?.total_kcal ?? null;
+      const aktiv = zeile?.active_kcal ?? null;
+
+      // Verlauf der letzten Tage fuer die Bilanzbalken — echter Verbrauch.
+      const verlauf = await pool.query(
+        `SELECT date::text AS date, total_kcal::int AS total
+           FROM garmin_days
+          WHERE user_id = $1 AND date >= ($2::date - INTERVAL '13 days')
+            AND date <= $2::date AND total_kcal IS NOT NULL AND total_kcal > 0
+          ORDER BY date`,
+        [req.userId!, heute],
+      );
+
+      res.json({
+        verbunden: Boolean(g.apiKey),
+        datum: heute,
+        /** Verbrauch je Tag — Grundlage fuer die Bilanzbalken. */
+        verlauf: verlauf.rows,
+        /** Gesamtverbrauch heute (Grundumsatz + Aktivitaet), waechst ueber den Tag. */
+        gesamt: total,
+        /** Davon durch Bewegung. */
+        aktiv,
+        /** Grundumsatz = gesamt - aktiv. */
+        passiv: total != null && aktiv != null ? Math.max(0, total - aktiv) : null,
+        schritte: zeile?.steps ?? null,
+        /** Durchschnitt vollstaendiger Vortage — als Vergleichsmarke. */
+        schnitt: {
+          gesamt: schnitt.rows[0]?.total ?? null,
+          aktiv: schnitt.rows[0]?.aktiv ?? null,
+          tage: schnitt.rows[0]?.tage ?? 0,
+        },
+        stand: g.cache?.fetchedAt ?? null,
+      });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "load failed" });
+    }
+  });
+
   app.get("/api/integrations/garmin/stats", requireAuth, async (req: AuthRequest, res) => {
     try {
       const tage = Math.min(365, Math.max(7, Number(req.query.days) || 30));

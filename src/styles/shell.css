@@ -559,3 +559,21 @@ html:not(.dark) .coach-bubble-me {
   .app-iconbtn,
   .app-card { transition: none; }
 }
+
+/* Mobil: Navigationspillen auf 40px Tippflaeche (waren 33px). */
+@media (max-width: 639px) {
+  .app-nav-item {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+/* Mobilmenue: Eintraege auf 40px Tippflaeche (waren 33px). */
+.app-mobile-nav a,
+.app-mobile-nav button,
+.app-mobile-nav__item {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+}

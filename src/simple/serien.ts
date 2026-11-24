@@ -181,6 +181,13 @@ export function kcalBilanz(
    * Zählt nur für den heutigen Tag — Vergangenes wird nicht nachträglich aufgefüllt.
    */
   aktivKcalHeute = 0,
+  /**
+   * Garmin-Gesamtverbrauch je Tag (Grundumsatz + Aktivitaet) als ymd->kcal.
+   *
+   * Tims Vorgabe: Die Bilanz soll den echten Verbrauch der Uhr nutzen, nicht die
+   * Schaetzung aus Trainingsminuten. Liegt ein Wert vor, gewinnt er.
+   */
+  garminKcalProTag?: Map<Ymd, number>,
 ): BilanzTag[] {
   // Grobe Schätzung: 7 kcal pro Minute Krafttraining bei ~80 kg, proportional zum Gewicht.
   const gewicht = koerpergewichtKg && koerpergewichtKg > 0 ? koerpergewichtKg : 80;
@@ -207,7 +214,16 @@ export function kcalBilanz(
     // Aktivitäten von der Uhr zählen nur heute. Vergangene Tage bleiben so, wie sie
     // erfasst wurden — sonst würde die Historie rückwirkend aufgefüllt.
     const istHeute = ymd === heute;
-    const verbrannt = (verbrauchtMap.get(ymd) ?? 0) + (istHeute ? Math.round(aktivKcalHeute) : 0);
+    /*
+     * Vorrang fuer den Garmin-Wert: Er enthaelt Grundumsatz und Aktivitaet und
+     * waechst heute ueber den Tag mit. Nur wenn kein Garmin-Wert vorliegt, wird
+     * wie bisher aus Trainingsminuten geschaetzt.
+     */
+    const garminWert = garminKcalProTag?.get(ymd);
+    const verbrannt =
+      garminWert != null && garminWert > 0
+        ? Math.round(garminWert)
+        : (verbrauchtMap.get(ymd) ?? 0) + (istHeute ? Math.round(aktivKcalHeute) : 0);
     return {
       ymd,
       kcal,

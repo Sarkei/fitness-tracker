@@ -91,8 +91,17 @@ export default function FoodPage() {
   const tageLeiste = useRef<HTMLDivElement | null>(null);
   const [entries, setEntries] = useState<FoodEntry[]>([]);
   const [monat, setMonat] = useState<FoodEntry[]>([]);
-  /** Kalorienverbrauch von der Uhr: Aktivkalorien des heutigen Tages. */
-  const [verbrauch, setVerbrauch] = useState<{ aktiv: number } | null>(null);
+  /**
+   * Kalorienverbrauch von der Uhr. `gesamt` ist Grundumsatz plus Aktivitaet und
+   * waechst ueber den Tag — das Tagesziel richtet sich danach, sobald Garmin
+   * verbunden ist (Tims Vorgabe: Markierung statt fixem Ziel).
+   */
+  const [verbrauch, setVerbrauch] = useState<{
+    aktiv: number;
+    gesamt: number | null;
+    passiv: number | null;
+    schnitt: number | null;
+  } | null>(null);
   const [trainingDay, setTrainingDay] = useState(false);
   const [sheetFor, setSheetFor] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
@@ -126,14 +135,26 @@ export default function FoodPage() {
        * Grundumsatz; die Aktivkalorien kommen obendrauf. Ohne diesen Abruf sieht
        * man an einem Lauftag nicht, warum mehr Kalorien offen sind.
        */
-      api<{ aktivitaeten?: Array<Record<string, unknown>> }>('/api/integrations/garmin/activities?limit=20')
+      api<{
+        verbunden?: boolean;
+        gesamt?: number | null;
+        aktiv?: number | null;
+        passiv?: number | null;
+        schnitt?: { gesamt?: number | null };
+      }>('/api/integrations/garmin/heute')
         .then((r) => {
-          const liste = Array.isArray(r.aktivitaeten) ? r.aktivitaeten : [];
-          const heutige = liste.filter(
-            (e) => String(e.date ?? e.start_date_local ?? '').slice(0, 10) === todayYmd(),
-          );
-          const aktiv = heutige.reduce((a, e) => a + (Number(e.calories) || 0), 0);
-          setVerbrauch(aktiv > 0 ? { aktiv: Math.round(aktiv) } : null);
+          const gesamt = r.gesamt ?? null;
+          const aktiv = Number(r.aktiv ?? 0);
+          if (!r.verbunden || (gesamt == null && aktiv <= 0)) {
+            setVerbrauch(null);
+            return;
+          }
+          setVerbrauch({
+            aktiv: Math.round(aktiv),
+            gesamt: gesamt != null ? Math.round(gesamt) : null,
+            passiv: r.passiv != null ? Math.round(r.passiv) : null,
+            schnitt: r.schnitt?.gesamt != null ? Math.round(r.schnitt.gesamt) : null,
+          });
         })
         .catch(() => {});
 
@@ -194,7 +215,23 @@ export default function FoodPage() {
    * Uhr verbrauchten Aktivkalorien. Ring, „noch übrig" und die Aufschlüsselung
    * müssen dieselbe Zahl verwenden — sonst widersprechen sie sich.
    */
-  const goalKcal = Math.round(basisKcal * kcalBoost) + (verbrauch?.aktiv ?? 0);
+  /*
+   * Tagesbudget.
+   *
+   * Mit Garmin: `gesamt` ist Grundumsatz plus Aktivitaet und waechst ueber den Tag.
+   * Das Profilziel dient dann nur noch als Markierung — der Verbrauch der Uhr
+   * bestimmt das Budget.
+   *
+   * Ohne Garmin: wie bisher Profilziel (mit Trainingszuschlag) plus Aktivitaeten
+   * aus den Einheiten.
+   */
+  const garminGesamt = verbrauch?.gesamt ?? null;
+  const goalKcal =
+    garminGesamt != null && garminGesamt > 0
+      ? Math.round(garminGesamt)
+      : Math.round(basisKcal * kcalBoost) + (verbrauch?.aktiv ?? 0);
+  /** Profilziel als reine Markierung — zeigt, wo die Vorgabe lag. */
+  const zielMarke = Math.round(basisKcal * kcalBoost);
   const remaining = Math.round(goalKcal - sum.kcal);
   const ueber = sum.kcal > goalKcal;
   const isToday = date === todayYmd();
@@ -372,15 +409,18 @@ export default function FoodPage() {
             </div>
           </div>
 
-          {/* Tagesbilanz offenlegen: Grundumsatz + Aktivkalorien = Bedarf, davon gegessen abziehen. */}
+          {/*
+            Tagesbilanz offenlegen. Mit Garmin: Grundumsatz + Aktivitaet = Verbrauch
+            der Uhr, das ist das Budget. Ohne: Profilziel als Grundumsatz.
+          */}
           {verbrauch && (
             <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl border border-[var(--border-muted)] bg-[var(--background)] px-3 py-2.5">
               <div>
                 <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
-                  Grundumsatz
+                  {verbrauch.passiv != null ? 'Grundumsatz' : 'Ziel'}
                 </p>
                 <p className="mt-0.5 text-[13.5px] font-semibold tabular-nums">
-                  {basisKcal.toLocaleString('de-DE')}
+                  {(verbrauch.passiv ?? basisKcal).toLocaleString('de-DE')}
                 </p>
               </div>
               <div>
@@ -400,6 +440,15 @@ export default function FoodPage() {
                 </p>
               </div>
             </div>
+          )}
+
+          {/* Steigt der Verbrauch ueber den Tag, waechst das Budget mit. */}
+          {verbrauch?.gesamt != null && (
+            <p className="mt-2 text-[10.5px] leading-relaxed text-[var(--text-muted)]">
+              Verbrauch heute {verbrauch.gesamt.toLocaleString('de-DE')} kcal
+              {verbrauch.schnitt != null ? ` · Schnitt ${verbrauch.schnitt.toLocaleString('de-DE')} kcal` : ''}
+              {' '}· Ziel {zielMarke.toLocaleString('de-DE')} kcal als Markierung
+            </p>
           )}
 
           {trainingDay && (
