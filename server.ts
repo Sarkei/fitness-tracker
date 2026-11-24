@@ -6792,7 +6792,21 @@ ${JSON.stringify(userCtx, null, 2)}
         res.status(400).json({ error: "Garmin-API-Key fehlt." });
         return;
       }
-      // Erst prüfen, dann speichern — ein falscher Key landet nicht in der DB.
+      /*
+       * Key zuerst auf Gültigkeit pruefen — dann speichern.
+       *
+       * Vorher wurde erst der volle Abgleich gefahren und der Key erst danach
+       * gespeichert. Scheiterte irgendein Endpunkt, war der Key weg und man
+       * musste ihn erneut erzeugen. Jetzt: gueltiger Key wird gespeichert, auch
+       * wenn einzelne Endpunkte keine Daten liefern.
+       */
+      await garminToken(apiKey);
+      await writeGarminSettings(req.userId!, {
+        apiKey,
+        connectedAt: new Date().toISOString(),
+        lastError: undefined,
+      });
+
       garminSyncLaufend.set(req.userId!, { schritt: 0, gesamt: 0, seit: Date.now() });
       const cache = await syncGarmin(apiKey, 30, (f) =>
         garminSyncLaufend.set(req.userId!, { ...f, seit: Date.now() }),

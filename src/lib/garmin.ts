@@ -195,8 +195,24 @@ async function hole<T>(token: string, pfad: string): Promise<T | null> {
   }
   // 204 = keine Daten fuer diesen Tag — das ist kein Fehler.
   if (res.status === 204) return null;
-  if (!res.ok) {
+
+  /*
+   * Nur ein Auth-Fehler bricht den ganzen Abgleich ab.
+   *
+   * 401/403 heisst: der Key gilt nicht mehr — dann sind ALLE Abrufe sinnlos.
+   *
+   * Andere Fehler (400, 404, 500) betreffen genau diesen einen Endpunkt. Sie
+   * duerfen den Rest nicht mitreissen: Garmins `dailyHeartRate` antwortet je
+   * nach Konto mit 400, und vorher hat das den kompletten Sync verhindert und
+   * sogar das Speichern des Keys blockiert. Solche Antworten gelten als
+   * "keine Daten" und werden geloggt.
+   */
+  if (res.status === 401 || res.status === 403) {
     throw new GarminApiFehler(res.status, pfad);
+  }
+  if (!res.ok) {
+    console.warn(`[garmin] ${pfad} -> HTTP ${res.status} (übersprungen)`);
+    return null;
   }
   return (await res.json()) as T;
 }
