@@ -11,11 +11,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Bike,
   CalendarDays,
+  ChevronDown,
+  ChevronUp,
+  Copy,
   Dumbbell,
   Flame,
   Footprints,
   GripVertical,
   Layers,
+  Pencil,
   Plus,
   Repeat,
   Timer,
@@ -30,6 +34,7 @@ import ExercisePaletteModal from '@/src/components/workout/ExercisePaletteModal'
 import type { LibraryExercise } from '@/src/lib/exerciseLibrary';
 import { Card, GhostButton, SectionTitle } from '@/src/simple/ui';
 import { todayYmd } from './simpleApi';
+import { VORLAGEN, type Vorlage } from './planVorlagen';
 
 /** Art des Trainings — bestimmt den Editor und das Symbol. */
 export type TrainingsArt =
@@ -156,6 +161,14 @@ export default function TrainingsplanPage() {
   const [editor, setEditor] = useState<Training | null>(null);
   /** Art-Auswahl vor dem Anlegen: ohne Wahl oeffnet sich kein Editor. */
   const [artWahl, setArtWahl] = useState(false);
+  /** Vorlagen-Bibliothek offen? */
+  const [vorlagen, setVorlagen] = useState(false);
+  /** Tagesauswahl: welches Workout soll auf welchen Tag? (Handy-freundlich) */
+  const [tagWahl, setTagWahl] = useState<Training | null>(null);
+  /** Umgekehrt: Tag steht fest, Workout wird gewählt. */
+  const [waehleTag, setWaehleTag] = useState<string | null>(null);
+  /** Läuft gerade eine Vorlage oder das Kopieren? */
+  const [arbeitet, setArbeitet] = useState<string | null>(null);
   /** Welches Training wird gerade gezogen (Drag & Drop). */
   const [zieht, setZieht] = useState<string | null>(null);
   /** Tag, ueber dem gerade gezogen wird — fuer die Hervorhebung. */
@@ -199,6 +212,83 @@ export default function TrainingsplanPage() {
       await laden();
     } catch (e) {
       setFehler(e instanceof Error ? e.message : 'Konnte nicht einplanen.');
+    }
+  };
+
+  /** Alle Einplanungen dieser Woche eine Woche weiter kopieren. */
+  const kopiereWoche = async () => {
+    if (!plan.length) {
+      setFehler('Diese Woche ist noch leer — es gibt nichts zu kopieren.');
+      return;
+    }
+    setArbeitet('kopie');
+    setFehler(null);
+    try {
+      for (const e of plan) {
+        await api('/api/trainings/plan', {
+          method: 'POST',
+          body: JSON.stringify({ trainingsId: e.trainings_id, datum: plusTage(e.datum, 7) }),
+        });
+      }
+      setWoche(plusTage(woche, 7));
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : 'Konnte nicht kopieren.');
+    } finally {
+      setArbeitet(null);
+    }
+  };
+
+  /**
+   * Fertige Vorlage übernehmen: legt alle Workouts an und verteilt sie auf die
+   * Tage dieser Woche. Bestehende Einplanungen bleiben unberührt.
+   */
+  const legeVorlageAn = async (v: Vorlage) => {
+    setArbeitet(v.id);
+    setFehler(null);
+    try {
+      const ids = new Map<string, string>();
+      for (const w of v.workouts) {
+        const antwort = await api<{ training: { id: string } }>('/api/trainings', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: w.name,
+            art: w.art,
+            notiz: `Vorlage: ${v.titel}`,
+            dauerMin: w.dauer ?? null,
+            inhalt: {
+              uebungen: w.uebungen.map((ue) => ({
+                id: neueId(),
+                name: ue.name,
+                supersatz: null,
+                saetze: Array.from({ length: ue.saetze }, () => ({
+                  id: neueId(),
+                  wiederholungen: ue.wdh,
+                  gewicht: ue.gewicht ?? null,
+                  typ: 'normal' as SatzTyp,
+                })),
+              })),
+              intervall: w.intervall ?? { runden: null, arbeitSek: null, pauseSek: null, stationen: null },
+            },
+          }),
+        });
+        ids.set(w.key, antwort.training.id);
+      }
+      for (const eintrag of v.plan) {
+        const id = ids.get(eintrag.workout);
+        if (!id) continue;
+        for (const tag of eintrag.tage) {
+          await api('/api/trainings/plan', {
+            method: 'POST',
+            body: JSON.stringify({ trainingsId: id, datum: plusTage(woche, tag) }),
+          });
+        }
+      }
+      setVorlagen(false);
+      await laden();
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : 'Vorlage konnte nicht angelegt werden.');
+    } finally {
+      setArbeitet(null);
     }
   };
 
@@ -253,9 +343,17 @@ export default function TrainingsplanPage() {
           <GhostButton onClick={() => navigate('/training', { state: { coachWizard: true } })}>
             <Zap className="h-3.5 w-3.5" /> Von Coach erstellen lassen
           </GhostButton>
-          <GhostButton onClick={() => setWoche(plusTage(woche, -7))}>← Woche</GhostButton>
-          <GhostButton onClick={() => setWoche(montagVon(todayYmd()))}>Heute</GhostButton>
-          <GhostButton onClick={() => setWoche(plusTage(woche, 7))}>Woche →</GhostButton>
+          <GhostButton onClick={() => setVorlagen(true)}>
+            <Copy className="h-3.5 w-3.5" /> Vorlagen
+          </GhostButton>
+          <GhostButton onClick={() => void kopiereWoche()} disabled={arbeitet === 'kopie'}>
+            <Copy className="h-3.5 w-3.5" /> {arbeitet === 'kopie' ? 'Kopiere …' : 'Woche kopieren'}
+          </GhostButton>
+          <div className="flex items-center gap-1.5">
+            <GhostButton onClick={() => setWoche(plusTage(woche, -7))}>← Woche</GhostButton>
+            <GhostButton onClick={() => setWoche(montagVon(todayYmd()))}>Heute</GhostButton>
+            <GhostButton onClick={() => setWoche(plusTage(woche, 7))}>Woche →</GhostButton>
+          </div>
         </div>
       </div>
 
@@ -264,6 +362,53 @@ export default function TrainingsplanPage() {
           {fehler}
         </p>
       )}
+
+      {/*
+       * Wochenkennzahlen: dieselben Zahlen, die man in Gym-Apps sucht, ohne die
+       * Einheiten einzeln aufzuklappen.
+       */}
+      {(() => {
+        const alle = plan.map((e) => {
+          const tr = trainings.find((t) => t.id === e.trainings_id);
+          const uebungen = tr?.inhalt?.uebungen ?? [];
+          const saetze = uebungen.reduce((a, x) => a + x.saetze.length, 0);
+          const volumen = uebungen.reduce(
+            (a, x) => a + x.saetze.reduce((b, sy) => b + (sy.wiederholungen ?? 0) * (sy.gewicht ?? 0), 0),
+            0,
+          );
+          return { einheiten: 1, uebungen: uebungen.length, saetze, volumen, minuten: tr?.dauer_min ?? 0 };
+        });
+        const summe = alle.reduce(
+          (a, x) => ({
+            einheiten: a.einheiten + x.einheiten,
+            uebungen: a.uebungen + x.uebungen,
+            saetze: a.saetze + x.saetze,
+            volumen: a.volumen + x.volumen,
+            minuten: a.minuten + x.minuten,
+          }),
+          { einheiten: 0, uebungen: 0, saetze: 0, volumen: 0, minuten: 0 },
+        );
+        return (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {[
+              { label: 'Einheiten', wert: String(summe.einheiten), einheit: 'diese Woche' },
+              { label: 'Übungen', wert: String(summe.uebungen), einheit: 'in Summe' },
+              { label: 'Sätze', wert: String(summe.saetze), einheit: 'geplant' },
+              {
+                label: 'Volumen',
+                wert: summe.volumen > 0 ? `${Math.round(summe.volumen).toLocaleString('de-DE')}` : '—',
+                einheit: summe.volumen > 0 ? 'kg bewegt' : 'ohne Gewichte',
+              },
+            ].map((k) => (
+              <div key={k.label} className="rounded-xl border border-[var(--border-muted)] bg-[var(--card-bg)] px-3 py-2">
+                <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--text-muted)]">{k.label}</p>
+                <p className="mt-0.5 text-[16px] font-bold leading-none tabular-nums">{k.wert}</p>
+                <p className="text-[9.5px] text-[var(--text-muted)]">{k.einheit}</p>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* Wochenansicht Montag bis Sonntag */}
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-7">
@@ -299,6 +444,13 @@ export default function TrainingsplanPage() {
                   {WOCHENTAGE[i]}
                 </span>
                 <span className="text-[10px] tabular-nums text-[var(--text-muted)]">
+                  {(() => {
+                    const uebungen = eintraege.reduce((a, e) => {
+                      const tr = trainings.find((t) => t.id === e.trainings_id);
+                      return a + (tr?.inhalt?.uebungen?.length ?? 0);
+                    }, 0);
+                    return uebungen > 0 ? `${uebungen} Übungen · ` : '';
+                  })()}
                   {datum.slice(8, 10)}.{datum.slice(5, 7)}.
                 </span>
               </div>
@@ -333,6 +485,13 @@ export default function TrainingsplanPage() {
                 {eintraege.length === 0 && (
                   <p className="text-[9.5px] italic text-[var(--text-muted)]">frei</p>
                 )}
+                <button
+                  type="button"
+                  onClick={() => setWaehleTag(datum)}
+                  className="w-full rounded-lg border border-dashed border-[var(--border-muted)] py-1 text-[10px] font-semibold text-[var(--text-muted)] transition hover:border-[var(--simple-accent)] hover:text-[var(--simple-accent)]"
+                >
+                  + Workout
+                </button>
               </div>
             </div>
           );
@@ -372,7 +531,7 @@ export default function TrainingsplanPage() {
                   <Icon className="h-3.5 w-3.5 shrink-0 text-[var(--simple-accent)]" />
                   <button
                     type="button"
-                    onClick={() => setEditor(t)}
+                    onClick={() => setTagWahl(t)}
                     className="min-w-0 flex-1 text-left"
                   >
                     <p className="truncate text-[11.5px] font-semibold">{t.name}</p>
@@ -381,6 +540,14 @@ export default function TrainingsplanPage() {
                       {t.inhalt?.uebungen?.length ? ` · ${t.inhalt.uebungen.length} Übungen` : ''}
                       {t.dauer_min ? ` · ${t.dauer_min} min` : ''}
                     </p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditor(t)}
+                    aria-label={`${t.name} bearbeiten`}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[var(--text-muted)] transition hover:bg-[var(--border-muted)]"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
                   </button>
                   <button
                     type="button"
@@ -400,6 +567,140 @@ export default function TrainingsplanPage() {
           den Tag wählen. Dasselbe Workout darf an mehreren Tagen liegen.
         </p>
       </Card>
+
+      {/* Tagesauswahl: Workout → Tag */}
+      {tagWahl && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center">
+          <div className="w-full max-w-md rounded-t-2xl border border-[var(--border-muted)] bg-[var(--card-bg)] p-4 sm:rounded-2xl">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-[13px] font-semibold">{tagWahl.name} einplanen</p>
+              <button type="button" onClick={() => setTagWahl(null)} aria-label="Schliessen">
+                <X className="h-4 w-4 text-[var(--text-muted)]" />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {tageDerWoche.map((datum, i) => {
+                const anzahl = plan.filter((p) => p.datum === datum).length;
+                return (
+                  <button
+                    key={datum}
+                    type="button"
+                    onClick={() => {
+                      void aufTagLegen(tagWahl.id, datum);
+                      setTagWahl(null);
+                    }}
+                    className="rounded-xl border border-[var(--border-muted)] bg-[var(--background)] px-2 py-2.5 text-center transition hover:border-[var(--simple-accent)]"
+                  >
+                    <span className="block text-[11px] font-semibold">{WOCHENTAGE[i]}</span>
+                    <span className="block text-[9.5px] tabular-nums text-[var(--text-muted)]">
+                      {datum.slice(8, 10)}.{datum.slice(5, 7)}.
+                    </span>
+                    {anzahl > 0 && (
+                      <span className="mt-0.5 block text-[9px] text-[var(--simple-accent)]">{anzahl} geplant</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Workout-Auswahl: Tag → Workout */}
+      {waehleTag && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center">
+          <div className="w-full max-w-md rounded-t-2xl border border-[var(--border-muted)] bg-[var(--card-bg)] p-4 sm:rounded-2xl">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-[13px] font-semibold">
+                Was kommt am {waehleTag.slice(8, 10)}.{waehleTag.slice(5, 7)}.?
+              </p>
+              <button type="button" onClick={() => setWaehleTag(null)} aria-label="Schliessen">
+                <X className="h-4 w-4 text-[var(--text-muted)]" />
+              </button>
+            </div>
+            {trainings.length === 0 ? (
+              <div className="space-y-2">
+                <p className="text-[11.5px] text-[var(--text-muted)]">Noch kein Workout angelegt.</p>
+                <GhostButton
+                  onClick={() => {
+                    setWaehleTag(null);
+                    setArtWahl(true);
+                  }}
+                >
+                  <Plus className="mr-1 h-3 w-3" /> Workout anlegen
+                </GhostButton>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {trainings.map((t) => {
+                  const Icon = artIcon(t.art);
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => {
+                        void aufTagLegen(t.id, waehleTag);
+                        setWaehleTag(null);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-lg border border-[var(--border-muted)] bg-[var(--background)] px-2.5 py-2 text-left transition hover:border-[var(--simple-accent)]"
+                    >
+                      <Icon className="h-3.5 w-3.5 shrink-0 text-[var(--simple-accent)]" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[12px] font-semibold">{t.name}</span>
+                        <span className="block text-[9.5px] text-[var(--text-muted)]">
+                          {artLabel(t.art)}
+                          {t.inhalt?.uebungen?.length ? ` · ${t.inhalt.uebungen.length} Übungen` : ''}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Vorlagen */}
+      {vorlagen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center">
+          <div className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-t-2xl border border-[var(--border-muted)] bg-[var(--card-bg)] p-4 sm:rounded-2xl">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-[13px] font-semibold">Vorlage übernehmen</p>
+              <button type="button" onClick={() => setVorlagen(false)} aria-label="Schliessen">
+                <X className="h-4 w-4 text-[var(--text-muted)]" />
+              </button>
+            </div>
+            <p className="mb-3 text-[10.5px] leading-relaxed text-[var(--text-muted)]">
+              Legt die Workouts an und verteilt sie auf diese Woche. Danach frei änderbar — nichts ist fest verdrahtet.
+            </p>
+            <div className="space-y-2">
+              {VORLAGEN.map((v) => (
+                <div
+                  key={v.id}
+                  className="rounded-xl border border-[var(--border-muted)] bg-[var(--background)] p-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[12.5px] font-semibold">{v.titel}</p>
+                      <p className="text-[9.5px] font-semibold uppercase tracking-[0.08em] text-[var(--simple-accent)]">
+                        {v.aufwand}
+                      </p>
+                    </div>
+                    <GhostButton onClick={() => void legeVorlageAn(v)} disabled={arbeitet !== null}>
+                      {arbeitet === v.id ? 'Lege an …' : 'Übernehmen'}
+                    </GhostButton>
+                  </div>
+                  <p className="mt-1 text-[10.5px] leading-relaxed text-[var(--text-muted)]">{v.beschreibung}</p>
+                  <p className="mt-1 text-[9.5px] text-[var(--text-muted)]">
+                    {v.workouts.map((w) => `${w.name} (${w.uebungen.length} Übungen)`).join(' · ')}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {artWahl && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center">
@@ -604,6 +905,55 @@ function EditorSheet({
                 </button>
                 <button
                   type="button"
+                  onClick={() =>
+                    setUebungen(
+                      uebungen.flatMap((x, i2) => {
+                        if (i2 !== idx) return [x];
+                        if (i2 === 0) return [x, uebungen[1]].filter(Boolean);
+                        return [uebungen[i2 - 1], x];
+                      }) as Uebung[],
+                    )
+                  }
+                  disabled={idx === 0}
+                  aria-label="Übung nach oben"
+                  className="shrink-0 text-[var(--text-muted)] disabled:opacity-30"
+                >
+                  <ChevronUp className="h-3 w-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (idx >= uebungen.length - 1) return;
+                    const kopie = [...uebungen];
+                    [kopie[idx], kopie[idx + 1]] = [kopie[idx + 1], kopie[idx]];
+                    setUebungen(kopie);
+                  }}
+                  disabled={idx === uebungen.length - 1}
+                  aria-label="Übung nach unten"
+                  className="shrink-0 text-[var(--text-muted)] disabled:opacity-30"
+                >
+                  <ChevronDown className="h-3 w-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setUebungen([
+                      ...uebungen.slice(0, idx + 1),
+                      {
+                        ...u,
+                        id: neueId(),
+                        saetze: u.saetze.map((sy) => ({ ...sy, id: neueId() })),
+                      },
+                      ...uebungen.slice(idx + 1),
+                    ])
+                  }
+                  aria-label="Übung duplizieren"
+                  className="shrink-0 text-[var(--text-muted)]"
+                >
+                  <Copy className="h-3 w-3" />
+                </button>
+                <button
+                  type="button"
                   onClick={() => setUebungen(uebungen.filter((x) => x.id !== u.id))}
                   aria-label="Übung entfernen"
                   className="shrink-0 text-[var(--text-muted)]"
@@ -719,13 +1069,33 @@ function EditorSheet({
           ))}
         </div>
 
-        <button
-          type="button"
-          onClick={() => setUebungen([...uebungen, neueUebung()])}
-          className="mt-2 inline-flex items-center gap-1 rounded-lg border border-[var(--border-muted)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--simple-accent)]"
-        >
-          <Plus className="h-3 w-3" /> Übung
-        </button>
+        {/* Summe des Workouts — dieselben Kennzahlen wie auf der Plan-Seite */}
+        {uebungen.length > 0 && (() => {
+          const saetze = uebungen.reduce((a, x) => a + x.saetze.length, 0);
+          const volumen = uebungen.reduce(
+            (a, x) => a + x.saetze.reduce((b, sy) => b + (sy.wiederholungen ?? 0) * (sy.gewicht ?? 0), 0),
+            0,
+          );
+          return (
+            <p className="mt-2 text-[10px] text-[var(--text-muted)]">
+              {uebungen.length} Übungen · {saetze} Sätze
+              {volumen > 0 ? ` · ${Math.round(volumen).toLocaleString('de-DE')} kg Volumen` : ''}
+            </p>
+          );
+        })()}
+
+        {/* Notiz zum Workout (Ausführungshinweise) */}
+        <div className="mt-3">
+          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
+            Notiz
+          </label>
+          <input
+            value={t.notiz ?? ''}
+            onChange={(e) => setT((alt) => ({ ...alt, notiz: e.target.value || null }))}
+            placeholder="z. B. langsam ablassen, letzter Satz bis zum Versagen"
+            className="w-full rounded-lg border border-[var(--border-muted)] bg-[var(--background)] px-2.5 py-2 text-[11.5px]"
+          />
+        </div>
 
         <div className="mt-3">
           <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
