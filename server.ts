@@ -7148,9 +7148,9 @@ ${JSON.stringify(userCtx, null, 2)}
       let garminNichtVerfuegbar = g.cache?.nichtVerfuegbar ?? [];
       let garminFehler: string | null = g.lastError ?? null;
 
-      // Garmin bei Bedarf nachziehen (der 5-Minuten-Takt erledigt das im Hintergrund).
+      // Garmin bei Bedarf nachziehen (der 10-Minuten-Takt erledigt das im Hintergrund).
       const letzterGarmin = Date.parse(g.cache?.fetchedAt ?? "");
-      if (g.apiKey && (!Number.isFinite(letzterGarmin) || Date.now() - letzterGarmin > 5 * 60_000)) {
+      if (g.apiKey && (!Number.isFinite(letzterGarmin) || Date.now() - letzterGarmin > 10 * 60_000)) {
         try {
           const cache = await syncGarmin(g.apiKey, Math.max(30, tage));
           garminTage = cache.tage;
@@ -7364,10 +7364,9 @@ ${JSON.stringify(userCtx, null, 2)}
       for (const row of rows.rows) {
         const g = (row.g || {}) as GarminSettings;
         if (!g.apiKey) continue;
-        // Nicht öfter als alle 5 Minuten — der Takt unten ist schon 5 Minuten,
-        // dieser Schutz fängt manuelle Syncs und Neustarts ab.
+        // Nicht oefter als alle 10 Minuten — faengt manuelle Syncs und Neustarts ab.
         const letzter = Date.parse(g.cache?.fetchedAt ?? g.lastAutoSyncAt ?? "");
-        if (Number.isFinite(letzter) && Date.now() - letzter < 5 * 60_000) continue;
+        if (Number.isFinite(letzter) && Date.now() - letzter < 10 * 60_000) continue;
         try {
           garminSyncLaufend.set(Number(row.id), { schritt: 0, gesamt: 0, seit: Date.now() });
           const cache = await syncGarmin(g.apiKey, 30, (f) =>
@@ -7400,7 +7399,14 @@ ${JSON.stringify(userCtx, null, 2)}
     }
   };
 
-  const garminTimer = setInterval(() => void garminTick(), 5 * 60_000);
+  /*
+   * Garmin-Abgleich alle 10 Minuten.
+   *
+   * Garmins Personal API erlaubt 100 Anfragen pro Tag und Nutzer. Bei 5 Minuten
+   * waeren es 288 — zu viel. 10 Minuten ergeben 144 und liegen im Rahmen; das
+   * reicht, weil die Uhr ohnehin nicht im Minutentakt synchronisiert.
+   */
+  const garminTimer = setInterval(() => void garminTick(), 10 * 60_000);
   garminTimer.unref?.();
   setTimeout(() => void garminTick(), 30_000).unref?.();
 
