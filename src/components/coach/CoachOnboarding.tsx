@@ -792,8 +792,10 @@ export default function CoachOnboarding({ planType, onComplete, onClose }: Props
 
   return overlayPortal(
     <div className={mobileSheetOverlayClass()}>
+      {/* Kein Einblenden: Tim wollte das Fenster sofort klar sehen, nicht erst
+          halbtransparent aufpoppen. Nur das Schliessen bleibt animiert. */}
       <motion.div
-        initial={{ opacity: 0 }}
+        initial={false}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
@@ -801,7 +803,7 @@ export default function CoachOnboarding({ planType, onComplete, onClose }: Props
         aria-hidden
       />
 
-      <motion.div initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }}
+      <motion.div initial={false} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }}
         className={cn(
           mobileSheetPanelClass(),
           'flex max-h-[min(92dvh,calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)))] max-w-2xl flex-col overflow-hidden rounded-t-[2rem] border border-[var(--border-muted)] bg-[var(--card-bg)] shadow-2xl lg:rounded-[2rem] touch-manipulation',
@@ -831,7 +833,8 @@ export default function CoachOnboarding({ planType, onComplete, onClose }: Props
         {/* Body */}
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch] scroll-pb-6 p-5 pt-5 md:p-7 md:pt-6 pb-[max(2rem,env(safe-area-inset-bottom))]">
           <AnimatePresence mode="wait">
-            <motion.div key={step} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} className="space-y-5">
+            {/* Auch der Inhalt steht sofort da, statt beim Oeffnen einzublenden. */}
+            <motion.div key={step} initial={false} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} className="space-y-5">
 
               {/* ── WORKOUT STEPS ── */}
 

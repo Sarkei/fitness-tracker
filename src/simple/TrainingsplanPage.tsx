@@ -26,6 +26,8 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/src/lib/api';
+import ExercisePaletteModal from '@/src/components/workout/ExercisePaletteModal';
+import type { LibraryExercise } from '@/src/lib/exerciseLibrary';
 import { Card, GhostButton, SectionTitle } from '@/src/simple/ui';
 import { todayYmd } from './simpleApi';
 
@@ -54,6 +56,13 @@ export const ARTEN: Array<{ id: TrainingsArt; label: string; icon: typeof Dumbbe
   { id: 'zirkel', label: 'Zirkel', icon: Repeat, hinweis: 'Stationen in Runden' },
   { id: 'frei', label: 'Frei', icon: Flame, hinweis: 'Ohne festes Schema' },
 ];
+
+/**
+ * Vier Arten stehen beim Anlegen zur Wahl — Tim wollte zuerst gefragt werden,
+ * was fuer ein Workout entsteht. Die uebrigen Arten (Gym, Laufen, Rad …) bleiben
+ * im Datenmodell, werden hier aber nicht mehr angeboten.
+ */
+export const NEUE_ARTEN: TrainingsArt[] = ['emom', 'hiit', 'zirkel', 'frei'];
 
 /** Satztyp — warmup zaehlt nicht als Arbeitssatz. */
 export type SatzTyp = 'warmup' | 'normal' | 'top';
@@ -145,6 +154,8 @@ export default function TrainingsplanPage() {
   const [fehler, setFehler] = useState<string | null>(null);
   /** Geoeffneter Editor: neue Vorlage oder bestehende. */
   const [editor, setEditor] = useState<Training | null>(null);
+  /** Art-Auswahl vor dem Anlegen: ohne Wahl oeffnet sich kein Editor. */
+  const [artWahl, setArtWahl] = useState(false);
   /** Welches Training wird gerade gezogen (Drag & Drop). */
   const [zieht, setZieht] = useState<string | null>(null);
   /** Tag, ueber dem gerade gezogen wird — fuer die Hervorhebung. */
@@ -332,18 +343,7 @@ export default function TrainingsplanPage() {
       <Card className="space-y-3 p-4">
         <div className="flex items-center justify-between gap-2">
           <p className="text-[12.5px] font-semibold">Meine Workouts</p>
-          <GhostButton
-            onClick={() =>
-              setEditor({
-                id: '',
-                name: '',
-                art: 'gym',
-                notiz: null,
-                inhalt: { uebungen: [neueUebung()] },
-                dauer_min: null,
-              })
-            }
-          >
+          <GhostButton onClick={() => setArtWahl(true)}>
             <Plus className="mr-1 h-3 w-3" /> Neues Workout
           </GhostButton>
         </div>
@@ -401,6 +401,48 @@ export default function TrainingsplanPage() {
         </p>
       </Card>
 
+      {artWahl && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center">
+          <div className="w-full max-w-md rounded-t-2xl border border-[var(--border-muted)] bg-[var(--card-bg)] p-4 sm:rounded-2xl">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-[13px] font-semibold">Was für ein Workout?</p>
+              <button type="button" onClick={() => setArtWahl(false)} aria-label="Schliessen">
+                <X className="h-4 w-4 text-[var(--text-muted)]" />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {NEUE_ARTEN.map((id) => {
+                const art = ARTEN.find((a) => a.id === id);
+                if (!art) return null;
+                const Icon = art.icon;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => {
+                      setArtWahl(false);
+                      setEditor({
+                        id: '',
+                        name: art.label,
+                        art: id,
+                        notiz: null,
+                        inhalt: { uebungen: [], intervall: { runden: null, arbeitSek: null, pauseSek: null, stationen: null } },
+                        dauer_min: null,
+                      });
+                    }}
+                    className="flex flex-col items-start gap-1 rounded-xl border border-[var(--border-muted)] bg-[var(--background)] p-3 text-left transition hover:border-[var(--simple-accent)]"
+                  >
+                    <Icon className="h-4 w-4 text-[var(--simple-accent)]" />
+                    <span className="text-[12px] font-semibold">{art.label}</span>
+                    <span className="text-[10px] leading-snug text-[var(--text-muted)]">{art.hinweis}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {editor && (
         <EditorSheet
           training={editor}
@@ -425,10 +467,23 @@ function EditorSheet({
   const [t, setT] = useState<Training>(() => ({
     ...training,
     inhalt: {
-      uebungen: training.inhalt?.uebungen?.length ? training.inhalt.uebungen : [neueUebung()],
+      /* Neu: leer starten — Übungen kommen aus dem Katalog, nicht als leere Zeile. */
+      uebungen: training.inhalt?.uebungen ?? [],
       intervall: training.inhalt?.intervall ?? { runden: null, arbeitSek: null, pauseSek: null, stationen: null },
     },
   }));
+  /** Übungskatalog (ExerciseDB) offen? */
+  const [katalog, setKatalog] = useState(false);
+
+  /** Aus dem Katalog gewählte Übungen als Zeilen übernehmen. */
+  const uebernehmeAusKatalog = (liste: LibraryExercise[]) => {
+    setT((alt) => {
+      const vorhanden = alt.inhalt.uebungen ?? [];
+      const neu = liste.map((ex) => ({ ...neueUebung(), name: ex.name }));
+      return { ...alt, inhalt: { ...alt.inhalt, uebungen: [...vorhanden, ...neu] } };
+    });
+    setKatalog(false);
+  };
 
   const istIntervall = ['emom', 'hiit', 'zirkel'].includes(t.art);
   const uebungen = t.inhalt.uebungen ?? [];
@@ -455,30 +510,15 @@ function EditorSheet({
           </button>
         </div>
 
-        {/* Art zuerst — sie bestimmt die Felder darunter */}
-        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
-          Art
-        </p>
-        <div className="mb-3 flex flex-wrap gap-1.5">
-          {ARTEN.map((a) => {
-            const Icon = a.icon;
-            const aktiv = t.art === a.id;
-            return (
-              <button
-                key={a.id}
-                type="button"
-                onClick={() => setT((alt) => ({ ...alt, art: a.id }))}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] font-semibold transition ${
-                  aktiv
-                    ? 'border-[var(--simple-accent)] bg-[var(--simple-accent)] text-white'
-                    : 'border-[var(--border-muted)] text-[var(--text-muted)]'
-                }`}
-              >
-                <Icon className="h-3 w-3" />
-                {a.label}
-              </button>
-            );
-          })}
+        {/* Art wurde beim Anlegen gewählt — hier nur noch sichtbar. */}
+        <div className="mb-3 flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--simple-accent)] px-2.5 py-1.5 text-[11px] font-semibold text-white">
+            {(() => {
+              const Icon = artIcon(t.art);
+              return <Icon className="h-3 w-3" />;
+            })()}
+            {artLabel(t.art)}
+          </span>
         </div>
 
         <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
@@ -519,10 +559,18 @@ function EditorSheet({
           </div>
         )}
 
-        {/* Uebungen mit Saetzen */}
-        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
-          Übungen
-        </p>
+        {/* Uebungen mit Saetzen — Auswahl aus dem ExerciseDB-Katalog */}
+        <div className="mb-1.5 flex items-center justify-between">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">Übungen</p>
+          <GhostButton onClick={() => setKatalog(true)}>
+            <Plus className="mr-1 h-3 w-3" /> Übungen hinzufügen
+          </GhostButton>
+        </div>
+        {uebungen.length === 0 && (
+          <p className="mb-2 rounded-lg border border-dashed border-[var(--border-muted)] px-3 py-3 text-[11px] text-[var(--text-muted)]">
+            Noch keine Übung. Über „Übungen hinzufügen" öffnest du den Katalog und filterst nach Muskelgruppe.
+          </p>
+        )}
         <div className="space-y-2">
           {uebungen.map((u, idx) => (
             <div key={u.id} className="rounded-xl border border-[var(--border-muted)] bg-[var(--background)] p-2">
@@ -710,6 +758,13 @@ function EditorSheet({
           </button>
         </div>
       </div>
+
+      <ExercisePaletteModal
+        open={katalog}
+        onClose={() => setKatalog(false)}
+        onPickMultiple={uebernehmeAusKatalog}
+        multiSelect
+      />
     </div>
   );
 }
