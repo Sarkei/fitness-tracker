@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, ChevronRight, Dumbbell, Flame, Moon, Target } from 'lucide-react';
+import { Camera, ChevronRight, Dumbbell, Moon, Target } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { FastingCard } from '../components/dashboard/FastingCard';
 import EinheitDetailModal, { type EinheitDaten } from '../components/wellness/EinheitDetailModal';
@@ -37,7 +37,6 @@ import { toYmd } from './analytics';
 import BilanzChart from './BilanzChart';
 import AktualisierenKnopf from './AktualisierenKnopf';
 import {
-  bilanzDurchschnitt,
   fastenSerie,
   kcalBilanz,
   trainingsSerie,
@@ -257,7 +256,6 @@ export default function TodayPage() {
     () => kcalBilanz(monatEntries, workouts, goalKcal, 14, date, koerpergewicht, aktivKcalHeute, garminBilanzMap),
     [monatEntries, workouts, goalKcal, date, koerpergewicht, aktivKcalHeute, garminBilanzMap],
   );
-  const oBilanz = useMemo(() => bilanzDurchschnitt(bilanz), [bilanz]);
   const hatBilanz = bilanz.some((t) => t.hatDaten);
 
   return (
@@ -335,7 +333,7 @@ export default function TodayPage() {
       )}
 
       {/* Serien auf einen Blick */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-3 gap-2 lg:gap-3">
         <StatTile
           label="Fasten-Serie"
           value={fasten.tage}
@@ -375,22 +373,6 @@ export default function TodayPage() {
           hint={planWochen.length === 0 ? "längste Kette aufeinanderfolgender Tage" : "längste Kette ohne Auslassen"}
           tone="default"
           icon={<Target className="h-3.5 w-3.5" />}
-        />
-        <StatTile
-          label="Ø Bilanz"
-          value={oBilanz === null ? '—' : `${oBilanz > 0 ? '+' : ''}${oBilanz}`}
-          unit={oBilanz === null ? undefined : 'kcal'}
-          hint={
-            oBilanz === null
-              ? 'noch keine Mahlzeiten erfasst'
-              : oBilanz < 0
-                ? 'im Defizit'
-                : oBilanz > 0
-                  ? 'im Überschuss'
-                  : 'genau im Ziel'
-          }
-          tone={oBilanz === null ? 'muted' : oBilanz > 0 ? 'warn' : 'accent'}
-          icon={<Flame className="h-3.5 w-3.5" />}
         />
       </div>
 
