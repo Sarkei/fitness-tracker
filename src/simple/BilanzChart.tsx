@@ -45,8 +45,18 @@ export default function BilanzChart({
   const tage = useMemo(() => bilanz.slice(-hoechstens), [bilanz, hoechstens]);
 
   const maxWert = useMemo(() => {
-    // Maßstab ist das Tagesbudget (Ziel + Aktivität), damit der volle Balken passt.
-    const budgets = tage.map((t) => t.ziel + t.verbrannt);
+    /*
+     * Maßstab ist das Tagesbudget.
+     *
+     * Achtung: Mit Garmin ist `verbrannt` bereits der GESAMTverbrauch
+     * (Grundumsatz + Aktivitaet) — das Ziel ist darin enthalten. Wer hier
+     * `ziel + verbrannt` rechnet, verdoppelt das Budget und die Achse lief
+     * bis ±7.000 kcal, obwohl der Tag bei ~1.900 liegt.
+     *
+     * Ohne Garmin ist `verbrannt` nur die Trainings-Schaetzung, dann gilt
+     * weiterhin Ziel + Training.
+     */
+    const budgets = tage.map((t) => (t.verbrannt > t.ziel ? t.verbrannt : t.ziel + t.verbrannt));
     const ueberzogen = tage.filter((t) => t.hatDaten).map((t) => Math.abs(t.bilanz));
     return rundeGrenze(Math.max(500, ...budgets, ...ueberzogen));
   }, [tage]);
