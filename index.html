@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="de" class="dark">
   <head>
     <link rel="icon" href="/favicon-32.png" sizes="32x32" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -19,6 +19,22 @@
     <meta name="theme-color" content="#101312" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#f6f7f5" media="(prefers-color-scheme: light)" />
     <title>Fitness-Tracker</title>
+    <!--
+      Theme vor dem ersten Bild setzen. Vorher kam die Klasse erst aus React,
+      dadurch blitzte die Seite 300 ms lang hell/durchsichtig auf und wurde erst
+      danach „solid". Muss inline und synchron im Kopf stehen.
+    -->
+    <script>
+      (function () {
+        try {
+          var gespeichert = localStorage.getItem('vrtx_theme');
+          var dunkel = gespeichert === 'dark' || (gespeichert !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) || !gespeichert;
+          document.documentElement.classList.toggle('dark', dunkel);
+        } catch (e) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

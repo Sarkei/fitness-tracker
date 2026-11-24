@@ -215,29 +215,6 @@ export default function TrainingsplanPage() {
     }
   };
 
-  /** Alle Einplanungen dieser Woche eine Woche weiter kopieren. */
-  const kopiereWoche = async () => {
-    if (!plan.length) {
-      setFehler('Diese Woche ist noch leer — es gibt nichts zu kopieren.');
-      return;
-    }
-    setArbeitet('kopie');
-    setFehler(null);
-    try {
-      for (const e of plan) {
-        await api('/api/trainings/plan', {
-          method: 'POST',
-          body: JSON.stringify({ trainingsId: e.trainings_id, datum: plusTage(e.datum, 7) }),
-        });
-      }
-      setWoche(plusTage(woche, 7));
-    } catch (e) {
-      setFehler(e instanceof Error ? e.message : 'Konnte nicht kopieren.');
-    } finally {
-      setArbeitet(null);
-    }
-  };
-
   /**
    * Fertige Vorlage übernehmen: legt alle Workouts an und verteilt sie auf die
    * Tage dieser Woche. Bestehende Einplanungen bleiben unberührt.
@@ -334,7 +311,12 @@ export default function TrainingsplanPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <SectionTitle>Trainingsplan</SectionTitle>
+        <div>
+          <SectionTitle>Wochenplan</SectionTitle>
+          <p className="mt-0.5 text-[10.5px] text-[var(--text-muted)]">
+            Montag bis Sonntag · wiederholt sich jede Woche
+          </p>
+        </div>
         <div className="flex flex-wrap items-center gap-1.5">
           {/*
            * Tim baut den Plan hier von Hand. Wer keine Lust auf Kacheln hat, laesst
@@ -346,14 +328,6 @@ export default function TrainingsplanPage() {
           <GhostButton onClick={() => setVorlagen(true)}>
             <Copy className="h-3.5 w-3.5" /> Vorlagen
           </GhostButton>
-          <GhostButton onClick={() => void kopiereWoche()} disabled={arbeitet === 'kopie'}>
-            <Copy className="h-3.5 w-3.5" /> {arbeitet === 'kopie' ? 'Kopiere …' : 'Woche kopieren'}
-          </GhostButton>
-          <div className="flex items-center gap-1.5">
-            <GhostButton onClick={() => setWoche(plusTage(woche, -7))}>← Woche</GhostButton>
-            <GhostButton onClick={() => setWoche(montagVon(todayYmd()))}>Heute</GhostButton>
-            <GhostButton onClick={() => setWoche(plusTage(woche, 7))}>Woche →</GhostButton>
-          </div>
         </div>
       </div>
 

@@ -378,7 +378,11 @@ body {
   background-color: var(--bg);
   color: var(--ink);
   font-family: var(--font-sans);
-  @apply transition-colors duration-300;
+  /*
+   * Kein Farbübergang mehr: Durch die 300-ms-Animation wirkte jeder Seitenaufbau
+   * kurz durchsichtig. Das Theme steht schon vor dem ersten Bild (Skript in
+   * index.html), also gibt es nichts mehr zu überblenden.
+   */
   min-height: 100dvh;
   min-height: -webkit-fill-available;
 }

@@ -6620,11 +6620,57 @@ ${JSON.stringify(userCtx, null, 2)}
     }
   });
 
+  /**
+   * Wochenplan wiederholen.
+   *
+   * Der Plan ist ein Muster Montag–Sonntag: Sobald eine Woche leer ist, wird das
+   * Muster der letzten gefüllten Woche auf denselben Wochentag der aktuellen
+   * Woche kopiert. Damit muss niemand Wochen durchklicken oder kopieren — der
+   * Plan läuft weiter, bis er geändert wird.
+   */
+  async function wiederholeWochenplan(userId: number, von: string, bis: string): Promise<void> {
+    if (!von) return;
+    const vorhanden = await pool.query(
+      `SELECT 1 FROM trainings_plan WHERE user_id = $1 AND datum BETWEEN $2::date AND COALESCE($3::date, $2::date) LIMIT 1`,
+      [userId, von, bis || von],
+    );
+    if (vorhanden.rowCount) return;
+
+    /* Letzte gefüllte Woche vor dem Zeitraum — daraus wird das Muster geholt. */
+    const quelle = await pool.query(
+      `WITH letzte AS (
+         SELECT date_trunc('week', max(datum))::date AS montag
+           FROM trainings_plan
+          WHERE user_id = $1 AND datum < $2::date
+       )
+       SELECT p.trainings_id, p.reihenfolge,
+              (p.datum - letzte.montag) AS tag_offset
+         FROM trainings_plan p, letzte
+        WHERE p.user_id = $1
+          AND letzte.montag IS NOT NULL
+          AND p.datum >= letzte.montag
+          AND p.datum < letzte.montag + 7`,
+      [userId, von],
+    );
+    if (!quelle.rowCount) return;
+
+    for (const z of quelle.rows as Array<{ trainings_id: string; reihenfolge: number; tag_offset: number }>) {
+      await pool.query(
+        `INSERT INTO trainings_plan (user_id, trainings_id, datum, reihenfolge)
+         VALUES ($1, $2, date_trunc('week', $3::date)::date + $4::int, $5)
+         ON CONFLICT (user_id, trainings_id, datum) DO NOTHING`,
+        [userId, z.trainings_id, von, z.tag_offset, z.reihenfolge],
+      );
+    }
+  }
+
   /** Plan-Eintraege eines Zeitraums (Standard: aktuelle Woche ab Montag). */
   app.get("/api/trainings/plan", requireAuth, async (req: AuthRequest, res) => {
     try {
       const von = String(req.query.von ?? "");
       const bis = String(req.query.bis ?? "");
+      /* Woche leer? Dann das Wochenmuster übernehmen, damit der Plan weiterläuft. */
+      await wiederholeWochenplan(req.userId!, von, bis);
       const r = await pool.query(
         `SELECT p.id, p.datum::text AS datum, p.reihenfolge,
                 t.id AS trainings_id, t.name, t.art, t.inhalt, t.dauer_min
