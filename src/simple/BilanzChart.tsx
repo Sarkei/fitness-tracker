@@ -1,17 +1,15 @@
 import { useMemo } from 'react';
 import { wochentagKurz, type BilanzTag } from './serien';
 
-/** Verbrauch (Balken nach unten). */
-const VERBRAUCH = '#2f7d5a';
-/** Gegessen (Balken nach oben). */
-const GEGESSEN = '#c9741f';
-const GRUEN = '#22c55e';
-const ROT = '#ef4444';
+/** Defizit: Balken wächst nach unten. */
+const DEFIZIT = '#2f7d5a';
+/** Überschuss: Balken wächst nach oben. */
+const UEBERSCHUSS = '#d9534f';
 
 /** Runde Obergrenze für die Y-Achse, damit die Beschriftung glatte Zahlen zeigt. */
 function rundeGrenze(wert: number): number {
   if (wert <= 0) return 500;
-  const stufen = [500, 750, 1000, 1250, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 6000];
+  const stufen = [500, 750, 1000, 1250, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 6000, 7000];
   return stufen.find((s) => s >= wert) ?? Math.ceil(wert / 1000) * 1000;
 }
 
@@ -24,17 +22,23 @@ function fmtDatum(ymd: string): string {
   return `${d}.${m}.${y}`;
 }
 
-const HOEHE = 200;
+const HOEHE = 220;
 const ACHSE_BREITE = 54;
 
 /**
- * Kalorienbilanz je Tag: Verbrauch nach unten, Gegessen nach oben.
+ * Kalorienbilanz der letzten Tage als ein Balken je Tag.
  *
- * Vorher zeigte das Diagramm nur die Differenz (Budget − Gegessen). Tage ohne
- * Essen waren dadurch nur ein 4-px-Stummel und die Grafik war fast leer, obwohl
- * der Verbrauch der Uhr für jeden Tag vorlag. Jetzt stehen beide Größen einzeln
- * im Diagramm: unten der Verbrauch, oben das Gegessene. So ist jeder Tag sichtbar
- * und man sieht sofort, ob gegessen oder verbraucht überwiegt.
+ * Der Balken zeigt die Bilanz (Gegessen − Verbrauch):
+ *
+ *  - Er hängt an der Nulllinie und wächst nach unten, solange das Defizit offen
+ *    ist. Je mehr die Uhr im Lauf des Tages verbraucht, desto länger wird er —
+ *    heute also dynamisch.
+ *  - Mit jedem erfassten Essen wird er kürzer: Gegessenes gleicht das Defizit aus.
+ *  - Isst man mehr als man verbraucht, rutscht er über die Nulllinie nach oben ins
+ *    Positive — Kalorienüberschuss.
+ *
+ * Langer Balken nach unten = großes Defizit, kurzer Balken = knapp am Budget,
+ * Balken oben = Überschuss.
  */
 export default function BilanzChart({
   bilanz,
@@ -48,11 +52,12 @@ export default function BilanzChart({
   const tage = useMemo(() => bilanz.slice(-hoechstens), [bilanz, hoechstens]);
 
   /*
-   * Maßstab: der größte Einzelwert eines Tages, nicht die Summe.
-   * Sonst müsste die Achse 6.000 kcal zeigen und die Balken würden flach.
+   * Maßstab: die größte Bilanz eines Tages, nach oben wie nach unten.
+   * Ein Tag ohne Erfassung hat die volle Bilanz (= Verbrauch) — der Balken darf
+   * nicht abgeschnitten werden, sonst sieht er aus wie ein erfasster Tag.
    */
   const maxWert = useMemo(() => {
-    const werte = tage.flatMap((t) => [t.verbrannt, t.kcal]);
+    const werte = tage.map((t) => Math.abs(t.bilanz));
     return rundeGrenze(Math.max(500, ...werte));
   }, [tage]);
 
@@ -70,7 +75,7 @@ export default function BilanzChart({
   return (
     <div>
       <div className="flex">
-        {/* Y-Achse: oben positiv (gegessen), unten negativ (verbraucht) */}
+        {/* Y-Achse: oben Überschuss, unten Defizit */}
         <div className="relative shrink-0" style={{ width: ACHSE_BREITE, height: HOEHE }}>
           {ticksY.map((tick) => (
             <div
@@ -106,12 +111,15 @@ export default function BilanzChart({
             />
           ))}
 
-          {/* Ein Tag = zwei Balken: oben gegessen, unten verbraucht */}
+          {/* Ein Balken je Tag, an der Nulllinie */}
           <div className="absolute inset-0 flex items-stretch gap-1.5">
             {tage.map((tag) => {
               const istHeute = tag.ymd === heute;
-              const hoeheVerbrauch = Math.min(mitte, tag.verbrannt * skala);
-              const hoeheGegessen = Math.min(mitte, tag.kcal * skala);
+              const wert = Math.round(tag.bilanz);
+              const ueberschuss = wert > 0;
+              const hoehe = Math.min(mitte, Math.abs(wert) * skala);
+              /* Nur zeichnen, wenn es einen Wert gibt — kein Strich bei 0. */
+              const sichtbar = hoehe >= 1;
 
               return (
                 <div
@@ -121,41 +129,25 @@ export default function BilanzChart({
                     fmtDatum(tag.ymd),
                     `gegessen ${fmtZahl(tag.kcal)} kcal`,
                     `verbraucht ${fmtZahl(tag.verbrannt)} kcal`,
-                    `Bilanz ${tag.bilanz > 0 ? '+' : ''}${fmtZahl(tag.bilanz)} kcal`,
-                    tag.vollstaendig ? '' : '(unvollständig erfasst)',
+                    `${ueberschuss ? 'Überschuss' : 'Defizit'} ${fmtZahl(Math.abs(wert))} kcal`,
+                    tag.kcal === 0 ? 'nichts erfasst' : tag.vollstaendig ? '' : 'unvollständig erfasst',
                   ]
                     .filter(Boolean)
                     .join(' · ')}
                 >
-                  {/*
-                   * Beide Balken hängen an der Nulllinie: gegessen nach oben,
-                   * verbraucht nach unten. Nebeneinander, nicht übereinander —
-                   * so bleibt jeder Wert ablesbar, auch wenn einer viel größer ist.
-                   */}
-                  {hoeheGegessen > 0 && (
+                  {sichtbar && (
                     <div
-                      className="absolute left-0 right-1/2 mr-[1px] transition-all duration-500 group-hover:brightness-110"
+                      className="absolute inset-x-0 transition-all duration-500 group-hover:brightness-110"
                       style={{
-                        height: hoeheGegessen,
-                        bottom: '50%',
-                        background: GEGESSEN,
-                        borderRadius: '2px 2px 0 0',
-                      }}
-                    />
-                  )}
-                  {hoeheVerbrauch > 0 && (
-                    <div
-                      className="absolute left-1/2 right-0 ml-[1px] transition-all duration-500 group-hover:brightness-110"
-                      style={{
-                        height: hoeheVerbrauch,
-                        top: '50%',
-                        background: VERBRAUCH,
-                        borderRadius: '0 0 2px 2px',
+                        height: hoehe,
+                        top: ueberschuss ? mitte - hoehe : mitte,
+                        background: ueberschuss ? UEBERSCHUSS : DEFIZIT,
+                        borderRadius: ueberschuss ? '3px 3px 0 0' : '0 0 3px 3px',
                       }}
                     />
                   )}
 
-                  {/* Heute-Markierung: feiner Rahmen um die Tagesspalte */}
+                  {/* Heute: feiner Rahmen um die Tagesspalte */}
                   {istHeute && (
                     <div
                       className="pointer-events-none absolute inset-0 rounded-sm"
@@ -232,9 +224,9 @@ export default function BilanzChart({
                   <td className="py-1 text-right tabular-nums">{t.verbrannt > 0 ? fmtZahl(t.verbrannt) : '—'}</td>
                   <td
                     className="py-1 text-right font-semibold tabular-nums"
-                    style={{ color: t.hatDaten ? (t.bilanz < 0 ? GRUEN : ROT) : 'var(--text-muted)' }}
+                    style={{ color: t.bilanz > 0 ? UEBERSCHUSS : DEFIZIT }}
                   >
-                    {t.hatDaten ? `${t.bilanz > 0 ? '+' : ''}${fmtZahl(t.bilanz)}` : '—'}
+                    {`${t.bilanz > 0 ? '+' : ''}${fmtZahl(t.bilanz)}`}
                   </td>
                 </tr>
               ))}
@@ -246,14 +238,14 @@ export default function BilanzChart({
       {/* Legende */}
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-[var(--border-muted)] pt-2.5 text-[10.5px] text-[var(--text-muted)]">
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-[2px]" style={{ background: GEGESSEN }} />
-          gegessen
+          <span className="h-2.5 w-2.5 rounded-[2px]" style={{ background: DEFIZIT }} />
+          Defizit
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-[2px]" style={{ background: VERBRAUCH }} />
-          verbraucht
+          <span className="h-2.5 w-2.5 rounded-[2px]" style={{ background: UEBERSCHUSS }} />
+          Überschuss
         </span>
-        <span className="ml-auto text-[10px]">oben gegessen · unten verbraucht</span>
+        <span className="ml-auto text-[10px]">Balken kürzer, sobald du isst</span>
       </div>
     </div>
   );

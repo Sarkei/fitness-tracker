@@ -593,11 +593,10 @@ export default function TodayPage() {
           </div>
         )}
         <p className="mt-1.5 text-[10.5px] leading-relaxed text-[var(--text-muted)]">
-          Bilanz = Gegessen − Tagesbudget. Als Budget dient der Verbrauch deiner Uhr (Grundumsatz +
-          Aktivität); ohne Uhr das Tagesziel plus Trainingsschätzung (7 kcal/min bei 80 kg). Balken unter
-          der Nulllinie sind Defizit, darüber Überschuss. Graue Stummel sind Tage, an denen nichts erfasst
-          wurde — dort gibt es keine Bilanz. Der Durchschnitt zählt nur Tage, an denen mindestens die
-          Hälfte des Ziels erfasst wurde.
+          Ein Balken je Tag: dein Verbrauch als offenes Defizit nach unten. Mit jedem erfassten Essen wird
+          der Balken kürzer — ist mehr gegessen als verbraucht, wächst er über die Nulllinie nach oben ins
+          Positive (Überschuss). Der heutige Balken wächst mit, sobald die Uhr neue Werte liefert. Der
+          Durchschnitt zählt nur Tage, an denen mindestens die Hälfte des Ziels erfasst wurde.
         </p>
       </Card>
 
