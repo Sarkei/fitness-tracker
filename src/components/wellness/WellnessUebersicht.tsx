@@ -11,7 +11,7 @@ import { useWellness, WellnessAktualisieren } from './WellnessProvider';
 import { KennzahlSheet, KlickKachel, type KennzahlDef, type KennzahlPunkt } from './KennzahlSheet';
 import { Tagesdetail } from './Tagesdetail';
 import EinheitDetailModal, { type EinheitDaten } from './EinheitDetailModal';
-import { alsHHMM, formLabel, heuteWert, juengsterTag, schlafBewertung, schlafStunden } from '@/src/lib/wellness';
+import { alsHHMM, formLabel, heuteWert, juengsterTag, letzterWert, schlafBewertung, schlafStunden } from '@/src/lib/wellness';
 
 type Kennzahl = { def: KennzahlDef; punkte: KennzahlPunkt[] };
 
@@ -70,10 +70,48 @@ export default function WellnessUebersicht() {
   const bodyBattery = heuteWert(tage, 'bodyBatteryMax');
   const spo2 = heuteWert(tage, 'spo2');
   const atem = heuteWert(tage, 'respiration');
-  const vo2 = heuteWert(tage, 'vo2max');
-  const fitnessAlter = heuteWert(tage, 'fitnessAge');
+  /*
+   * VO2max und Fitnessalter sind traege Werte: Garmin berechnet sie nur bei
+   * Einheiten und schreibt sie fort. `heuteWert` gaebe an trainingsfreien Tagen
+   * null — die Kachel bliebe leer, obwohl ein gueltiger Wert vorliegt. Deshalb
+   * der letzte gemessene Wert samt Datum.
+   */
+  const vo2Letzte = letzterWert(tage, 'vo2max');
+  const vo2 = vo2Letzte?.wert ?? null;
+  const fitnessAlterLetzte = letzterWert(tage, 'fitnessAge');
+  const fitnessAlter = fitnessAlterLetzte?.wert ?? null;
+
+  /*
+   * Trainingsform: Garmins Trainingsstatus ist die bessere Aussage als der
+   * TSB-Wert von Intervals — TSB setzt eine lueckenlose Trainingshistorie
+   * voraus, die hier fehlt. Der Status kommt von der Uhr und ist immer da.
+   */
+  const trainingsStatus =
+    [...tage].reverse().find((t) => typeof t.trainingStatus === 'string' && t.trainingStatus)?.trainingStatus ?? null;
   const gewicht = heuteWert(tage, 'weight');
   const etagen = heuteWert(tage, 'floors');
+
+  /*
+   * Garmins Statuswerte auf Deutsch. Garmin liefert sie englisch und in
+   * Grossbuchstaben ("STRAINED") — in der Kachel soll das lesbar stehen.
+   * Unbekannte Werte werden lesbar gemacht statt verworfen.
+   */
+  const STATUS_TEXT: Record<string, { text: string; farbe: string }> = {
+    PRODUCTIVE: { text: 'Produktiv', farbe: 'var(--simple-accent)' },
+    MAINTAINING: { text: 'Konstant', farbe: 'var(--simple-accent)' },
+    RECOVERY: { text: 'Erholung', farbe: '#4a9eda' },
+    STRAINED: { text: 'Belastet', farbe: '#dc5a4a' },
+    UNPRODUCTIVE: { text: 'Unproduktiv', farbe: '#d98a2b' },
+    OVERREACHING: { text: 'Überlastet', farbe: '#dc5a4a' },
+    DETRAINING: { text: 'Abbau', farbe: '#d98a2b' },
+    NO_STATUS: { text: 'Kein Status', farbe: 'var(--text-muted)' },
+  };
+  const statusAnzeige = trainingsStatus
+    ? (STATUS_TEXT[trainingsStatus] ?? {
+        text: trainingsStatus.charAt(0) + trainingsStatus.slice(1).toLowerCase(),
+        farbe: 'var(--text-muted)',
+      })
+    : null;
 
   const formFarbe =
     form.tone === 'gut'
@@ -257,11 +295,14 @@ export default function WellnessUebersicht() {
           <p className="text-[9.5px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
             Trainingsform
           </p>
-          <p className="mt-1 text-[18px] font-semibold capitalize leading-none" style={{ color: formFarbe }}>
-            {form.text}
+          <p
+            className="mt-1 text-[18px] font-semibold leading-none"
+            style={{ color: statusAnzeige?.farbe ?? formFarbe }}
+          >
+            {statusAnzeige?.text ?? form.text}
           </p>
           <p className="mt-1 text-[10.5px] text-[var(--text-muted)]">
-            {tsb != null ? `TSB ${Math.round(tsb)}` : 'keine Daten'}
+            {statusAnzeige ? 'von der Uhr' : tsb != null ? `TSB ${Math.round(tsb)}` : 'keine Daten'}
           </p>
         </button>
         <Link

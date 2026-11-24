@@ -7,7 +7,7 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 import { api } from '@/src/lib/api';
 import { Card } from '@/src/simple/ui';
 import type { WellnessAktivitaet, WellnessTag } from '@/src/lib/wellness';
@@ -70,21 +70,46 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
   const laden = useCallback(async () => {
     setLaedt(true);
     setFehler(null);
-    try {
-      // Die API liefert mindestens 7 Tage — bei "Heute" hier auf den letzten
-      // Tag begrenzen, damit alle Unterseiten reelle Tageswerte zeigen.
-      const tageApi = Math.max(7, zeitraum);
-      const res = await api<WellnessDaten>(`/api/integrations/intervals/wellness?days=${tageApi}`);
-      setDaten(
-        zeitraum === 1
-          ? { ...res, tage: res.tage.slice(-1) }
-          : res,
-      );
-    } catch (e) {
-      setFehler(e instanceof Error ? e.message : 'Wellness-Daten konnten nicht geladen werden.');
-    } finally {
-      setLaedt(false);
+
+    /*
+     * Bis zu drei Versuche mit kurzer Pause.
+     *
+     * Der Endpunkt holt bei veraltetem Stand einmal live bei Garmin nach — das
+     * dauert manchmal ein paar Sekunden. Ein einzelner Timeout (oder ein
+     * Neustart des Containers im Hintergrund) reichte bisher, um die ganze
+     * Seite in eine rote Fehlerwand zu verwandeln. Erst danach kam man durch
+     * einen Wechsel in einen anderen Bereich wieder hinein — der Remount lud
+     * neu. Ein zweiter Versuch loest das ohne Zutun.
+     */
+    const tageApi = Math.max(7, zeitraum);
+    let letzterFehler: unknown = null;
+
+    for (let versuch = 1; versuch <= 3; versuch++) {
+      try {
+        const res = await api<WellnessDaten>(`/api/integrations/intervals/wellness?days=${tageApi}`);
+        setDaten(zeitraum === 1 ? { ...res, tage: res.tage.slice(-1) } : res);
+        setFehler(null);
+        setLaedt(false);
+        return;
+      } catch (e) {
+        letzterFehler = e;
+        if (versuch < 3) {
+          await new Promise((r) => setTimeout(r, versuch * 1200));
+        }
+      }
     }
+
+    /*
+     * Alle Versuche gescheitert: liegen bereits Daten vor, bleiben sie stehen.
+     * Eine kurze Notiz sagt, dass der letzte Abruf nicht durchkam — besser als
+     * eine leere Seite, die den Anschein erweckt, es gaebe keine Werte.
+     */
+    setFehler(
+      letzterFehler instanceof Error
+        ? letzterFehler.message
+        : 'Wellness-Daten konnten nicht geladen werden.',
+    );
+    setLaedt(false);
   }, [zeitraum]);
 
   useEffect(() => {
@@ -139,27 +164,66 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     [daten, zeitraum, laden, laedt, syncJetzt, synct, fortschritt],
   );
 
-  if (fehler || (!laedt && !daten)) {
+  /*
+   * Nur wenn wirklich NICHTS vorliegt, gibt es die ganze Seite als Hinweis.
+   * Kommt ein Fehler, obwohl schon Daten geladen waren, bleibt die Ansicht
+   * stehen und traegt nur oben eine schmale Notiz — frueher verschwand die
+   * gesamte Seite hinter einer roten Wand, bis man den Bereich wechselte.
+   */
+  if (!daten) {
+    if (laedt) {
+      return (
+        <div className="flex items-center justify-center gap-2 py-12 text-sm text-[var(--text-muted)]">
+          <Loader2 className="h-4 w-4 animate-spin" /> Wellness-Daten werden geladen …
+        </div>
+      );
+    }
     return (
       <Card className="space-y-2 p-5">
         <p className="text-sm font-semibold text-[var(--foreground)]">Keine Wellness-Daten</p>
         <p className="text-[12.5px] leading-relaxed text-[var(--text-muted)]">
-          {fehler ?? 'Intervals.icu ist noch nicht verbunden.'} Verbinde unter „Daten &amp; Sync“
-          dein Intervals.icu-Konto — dort laufen Garmin, Polar, Suunto, Whoop und Co. als Quellen mit.
+          {fehler ?? 'Noch keine Werte vorhanden.'} Verbinde unter „Daten & Sync“ eine Quelle —
+          Garmin per Login ist der vollständigste Weg.
         </p>
       </Card>
     );
   }
 
-  if (laedt && !daten) {
-    return (
-      <div className="flex items-center justify-center gap-2 py-12 text-sm text-[var(--text-muted)]">
-        <Loader2 className="h-4 w-4 animate-spin" /> Wellness-Daten werden geladen …
-      </div>
-    );
-  }
+  /*
+   * Daten sind da, aber der letzte Abruf kam nicht durch: schmale Notiz ueber
+   * der Ansicht statt einer Fehlerseite. Die Werte sind ja vorhanden — nur
+   * eben nicht frisch.
+   */
+  const hinweis = fehler;
 
-  return <WellnessKontext.Provider value={wert}>{children}</WellnessKontext.Provider>;
+  return (
+    <WellnessKontext.Provider value={wert}>
+      {hinweis && (
+        <div
+          className="mb-3 flex items-start gap-2 rounded-xl px-3 py-2 text-[11px]"
+          style={{
+            background: 'color-mix(in srgb, #dc5a4a 12%, transparent)',
+            color: 'var(--foreground)',
+          }}
+          role="status"
+        >
+          <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" style={{ color: '#dc5a4a' }} />
+          <span>
+            Die Werte sind vom letzten erfolgreichen Abruf — gerade kam keine Verbindung durch.
+            <button
+              type="button"
+              onClick={() => void laden()}
+              className="ml-1 font-semibold underline"
+              style={{ color: 'var(--simple-accent)' }}
+            >
+              Nochmal versuchen
+            </button>
+          </span>
+        </div>
+      )}
+      {children}
+    </WellnessKontext.Provider>
+  );
 }
 
 export function useWellness(): Kontext {

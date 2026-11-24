@@ -235,8 +235,10 @@ export type LoginTag = {
   /** Garmin "Training Readiness" (0-100) und Einordnung. */
   readiness?: number;
   readinessLevel?: string;
-  /** Trainingsstatus, z. B. PRODUCTIVE, MAINTAINING. */
+  /** Trainingsstatus, z. B. PRODUCTIVE, MAINTAINING, STRAINED. */
   trainingStatus?: string;
+  /** Fitnesstrend: 1 = steigend, 0 = gleichbleibend, -1 = sinkend. */
+  fitnessTrend?: number;
 };
 
 /**
@@ -418,28 +420,71 @@ export async function tagVoll(
     if (hoch != null) tag.floors = Math.round(hoch);
   }
 
-  /* Leichter Lauf endet hier. */
-  if (opts.leicht) return tag;
-
-  /* 3 - Training Readiness */
-  const ready = (await garmin.getTrainingReadiness(datum).catch(() => null)) as
-    | Array<Record<string, unknown>>
-    | null;
-  if (Array.isArray(ready) && ready.length) {
-    const letzte = ready[ready.length - 1];
-    const score = zahl(letzte.score);
-    if (score != null) tag.readiness = Math.round(score);
-    if (typeof letzte.level === 'string') tag.readinessLevel = letzte.level;
+  /*
+   * 3 - Training Readiness
+   *
+   * Der leichte Lauf ueberspringt nur diesen Punkt: Readiness wird einmal pro
+   * Tag berechnet und aendert sich nicht stuendlich. Trainingsstatus und
+   * VO2max dagegen kommen gleich mit — sie standen frueher hinter einem
+   * fruehen `return` und fehlten deshalb im 10-Minuten-Lauf komplett.
+   */
+  if (!opts.leicht) {
+    const ready = (await garmin.getTrainingReadiness(datum).catch(() => null)) as
+      | Array<Record<string, unknown>>
+      | null;
+    if (Array.isArray(ready) && ready.length) {
+      const letzte = ready[ready.length - 1];
+      const score = zahl(letzte.score);
+      if (score != null) tag.readiness = Math.round(score);
+      if (typeof letzte.level === 'string') tag.readinessLevel = letzte.level;
+    }
   }
 
-  /* 4 - Trainingsstatus */
+  /*
+   * 4 - Trainingsstatus und VO2max
+   *
+   * Beide stecken in derselben Antwort. Der Trainingsstatus liegt NICHT als
+   * `trainingStatus.trainingStatusKey` vor, sondern als Zahl plus Klartext:
+   * `trainingStatus: 8` und `trainingStatusFeedbackPhrase: "STRAINED_4"`.
+   * Der frueher gelesene Pfad existiert nicht — deshalb blieb die Kachel leer.
+   */
   const status = (await client
     .connectapi(`/metrics-service/metrics/trainingstatus/aggregated/${datum}`)
     .catch(() => null)) as Record<string, unknown> | null;
-  if (status && typeof status.mostRecentTrainingStatus === 'object') {
-    const block = status.mostRecentTrainingStatus as Record<string, unknown>;
-    const wert = block.trainingStatus as { trainingStatusKey?: string } | undefined;
-    if (wert?.trainingStatusKey) tag.trainingStatus = wert.trainingStatusKey;
+
+  if (status) {
+    /* --- Trainingsstatus --- */
+    const kopf = status.mostRecentTrainingStatus as Record<string, unknown> | undefined;
+    const jeGeraet = kopf?.latestTrainingStatusData as Record<string, Record<string, unknown>> | undefined;
+    if (jeGeraet) {
+      /* Neuester Eintrag ueber alle Geraete — meist gibt es nur einen. */
+      const eintraege = Object.values(jeGeraet).filter((e) => e && typeof e === 'object');
+      eintraege.sort((a, b) => Number(b.timestamp ?? 0) - Number(a.timestamp ?? 0));
+      const neuester = eintraege[0];
+      if (neuester) {
+        const phrase = neuester.trainingStatusFeedbackPhrase;
+        if (typeof phrase === 'string' && phrase) {
+          /* "STRAINED_4" -> "STRAINED": die Ziffer ist nur die Stufe. */
+          tag.trainingStatus = phrase.replace(/_\d+$/, '');
+        }
+        const trend = neuester.fitnessTrend;
+        if (typeof trend === 'number') tag.fitnessTrend = trend;
+      }
+    }
+
+    /*
+     * --- VO2max ---
+     * Garmin berechnet VO2max nur bei Laeufen und schreibt den Wert dann fort.
+     * `mostRecentVO2Max.generic` ist der letzte gueltige Wert — auch wenn er
+     * von einem Tag vor dem gefragten stammt. Das ist genau richtig fuer die
+     * Anzeige: der Wert gilt bis zur naechsten Messung.
+     */
+    const vo2Block = status.mostRecentVO2Max as Record<string, unknown> | undefined;
+    const generisch = vo2Block?.generic as Record<string, unknown> | undefined;
+    const vo2 = zahl(generisch?.vo2MaxPreciseValue) ?? zahl(generisch?.vo2MaxValue);
+    if (vo2 != null) tag.vo2max = vo2;
+    const alter = zahl(generisch?.fitnessAge);
+    if (alter != null) tag.fitnessAge = Math.round(alter);
   }
 
   return tag;

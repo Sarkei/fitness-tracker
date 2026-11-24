@@ -48,6 +48,11 @@ export type GarminTag = {
   floorsClimbed?: number;
   /** Login-Weg nennt das Feld `floors` — beide zulassen. */
   floors?: number;
+  /** Garmin Readiness (0-100) und Einordnung — nur ueber den Login-Weg. */
+  readiness?: number;
+  readinessLevel?: string;
+  /** Garmin-Trainingsstatus, z. B. PRODUCTIVE, STRAINED. */
+  trainingStatus?: string;
   distanceMeters?: number;
   activeCalories?: number;
   totalCalories?: number;

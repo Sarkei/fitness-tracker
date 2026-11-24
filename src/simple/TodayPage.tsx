@@ -35,6 +35,7 @@ import {
 } from './simpleApi';
 import { toYmd } from './analytics';
 import BilanzChart from './BilanzChart';
+import AktualisierenKnopf from './AktualisierenKnopf';
 import {
   bilanzDurchschnitt,
   fastenSerie,
@@ -91,39 +92,43 @@ export default function TodayPage() {
    * Verbrauch der Uhr holen und alle 15 Minuten auffrischen, damit das Budget
    * ueber den Tag mitwaechst - ohne dass die Seite neu geladen werden muss.
    */
-  useEffect(() => {
-    let abgebrochen = false;
-    const holen = () => {
-      api<{
+  /**
+   * Garmin-Tageswerte holen.
+   *
+   * Als eigene Funktion, weil sie an zwei Stellen gebraucht wird: im Takt unten
+   * und nach einem manuellen Abgleich (Aktualisieren-Knopf).
+   */
+  const holeGarmin = useCallback(async () => {
+    try {
+      const r = await api<{
         verbunden?: boolean;
         gesamt?: number | null;
         aktiv?: number | null;
         passiv?: number | null;
         schnitt?: { gesamt?: number | null };
         verlauf?: Array<{ date: string; total: number }>;
-      }>('/api/integrations/garmin/heute')
-        .then((r) => {
-          if (abgebrochen || !r.verbunden) return;
-          if (Array.isArray(r.verlauf)) {
-            setGarminTage(r.verlauf.map((v) => ({ date: String(v.date), total: Number(v.total) || 0 })));
-          }
-          setGarminHeute({
-            gesamt: r.gesamt ?? null,
-            aktiv: r.aktiv ?? null,
-            passiv: r.passiv ?? null,
-            schnitt: r.schnitt?.gesamt ?? null,
-          });
-        })
-        .catch(() => {});
-    };
-    holen();
-    // Alle 5 Minuten nachziehen — im Takt des Hintergrund-Abgleichs.
-    const timer = window.setInterval(holen, 5 * 60_000);
-    return () => {
-      abgebrochen = true;
-      window.clearInterval(timer);
-    };
+      }>('/api/integrations/garmin/heute');
+      if (!r.verbunden) return;
+      if (Array.isArray(r.verlauf)) {
+        setGarminTage(r.verlauf.map((v) => ({ date: String(v.date), total: Number(v.total) || 0 })));
+      }
+      setGarminHeute({
+        gesamt: r.gesamt ?? null,
+        aktiv: r.aktiv ?? null,
+        passiv: r.passiv ?? null,
+        schnitt: r.schnitt?.gesamt ?? null,
+      });
+    } catch {
+      /* Aussetzer: die Seite behaelt den letzten Stand. */
+    }
   }, []);
+
+  useEffect(() => {
+    void holeGarmin();
+    /* Alle 5 Minuten nachziehen — im Takt des Hintergrund-Abgleichs. */
+    const timer = window.setInterval(() => void holeGarmin(), 5 * 60_000);
+    return () => window.clearInterval(timer);
+  }, [holeGarmin]);
 
   const { profile } = useAuth();
   const navigate = useNavigate();
@@ -156,6 +161,14 @@ export default function TodayPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /**
+   * Nach einem manuellen Abgleich: alles neu holen, was auf der Seite steht.
+   * Der Knopf im Kopf ruft das auf, sobald der Server fertig ist.
+   */
+  const refetch = useCallback(async () => {
+    await Promise.all([holeGarmin(), load()]);
+  }, [holeGarmin, load]);
 
   const sum = totals(entries);
   const goals = (profile?.goals ?? {}) as {
@@ -268,6 +281,8 @@ export default function TodayPage() {
         }
         action={
           <div className="flex gap-2">
+            {/* Links neben Training, wie gewuenscht: holt neue Daten mit Fortschritt. */}
+            <AktualisierenKnopf onFertig={() => void refetch()} />
             <GhostButton onClick={() => setShowSession(true)}>
               <Dumbbell className="h-3.5 w-3.5" /> Training
             </GhostButton>

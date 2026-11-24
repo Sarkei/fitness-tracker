@@ -7396,7 +7396,65 @@ ${JSON.stringify(userCtx, null, 2)}
 
     try {
       const g = await readGarminSettings(req.userId!);
-      if (g.apiKey) {
+
+      /* ---------- Weg 1: Login (bevorzugt, alle Felder) ---------- */
+      if (g.login?.tokens) {
+        garminSyncLaufend.set(req.userId!, { schritt: 0, gesamt: tage, seit: Date.now() });
+        try {
+          const tokens = entschluesseln(g.login.tokens);
+          const heuteYmd = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' });
+          const sammlung: LoginTag[] = [];
+
+          /*
+           * Voller Lauf: jeder Tag einzeln mit allen Feldern. Bewusst nicht
+           * `historieVoll`, weil der Refresh nur die letzten `tage` anfassen
+           * soll — die Historie hat ihren eigenen Endpunkt.
+           */
+          let fertig = 0;
+          for (let i = 0; i < tage; i++) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            const ymd = d.toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' });
+            try {
+              /* Heute braucht alle Felder, aeltere Tage nur die Tageswerte. */
+              sammlung.push(await tagVoll(tokens, ymd, { leicht: ymd !== heuteYmd }));
+            } catch (e) {
+              console.warn('[garmin-refresh] Tag', ymd, e);
+            }
+            fertig++;
+            garminSyncLaufend.set(req.userId!, { schritt: fertig, gesamt: tage, seit: Date.now() });
+          }
+
+          await speichereLoginTage(req.userId!, sammlung);
+
+          const anzahlAktivitaeten = await (async () => {
+            try {
+              const ak = await garminAktivitaetenLogin(tokens, 40);
+              await speichereGarminAktivitaeten(req.userId!, ak as never).catch(() => {});
+              return ak.length;
+            } catch {
+              return 0;
+            }
+          })();
+
+          await writeGarminSettings(req.userId!, {
+            ...g,
+            lastAutoSyncAt: new Date().toISOString(),
+            lastVollSyncAt: new Date().toISOString(),
+            lastError: undefined,
+          });
+
+          bericht.garmin = {
+            tage: sammlung.length,
+            aktivitaeten: anzahlAktivitaeten,
+            quelle: 'login',
+          };
+        } catch (e) {
+          bericht.garmin = { fehler: e instanceof Error ? e.message : 'Garmin-Abgleich fehlgeschlagen.' };
+        } finally {
+          garminSyncLaufend.delete(req.userId!);
+        }
+      } else if (g.apiKey) {
         // Startwert 0/0 — syncGarmin meldet gleich danach die echte Gesamtzahl.
         garminSyncLaufend.set(req.userId!, { schritt: 0, gesamt: 0, seit: Date.now() });
         try {
@@ -7684,6 +7742,10 @@ ${JSON.stringify(userCtx, null, 2)}
         if (t.bodyBatteryMax != null) e.bodyBatteryMax = t.bodyBatteryMax;
         if (t.spo2Avg != null) e.spo2 = t.spo2Avg;
         if (t.respiration != null) e.respiration = t.respiration;
+        /* Readiness und Trainingsstatus fehlten hier — deshalb kamen sie nie an. */
+        if (t.readiness != null) e.readiness = t.readiness;
+        if (t.readinessLevel != null) e.readinessLevel = t.readinessLevel;
+        if (t.trainingStatus != null) e.trainingStatus = t.trainingStatus;
       }
 
       const alle = [...proTag.values()]

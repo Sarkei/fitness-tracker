@@ -41,6 +41,10 @@ export type WellnessTag = {
   respiration?: number | null;
   vo2max?: number | null;
   fitnessAge?: number | null;
+  /** Garmin-Trainingsstatus, z. B. PRODUCTIVE, MAINTAINING, STRAINED. */
+  trainingStatus?: string | null;
+  /** Garmin Readiness (0-100). */
+  readiness?: number | null;
   weight?: number | null;
   bodyFat?: number | null;
 };
@@ -175,6 +179,25 @@ export function heuteWert<T extends keyof WellnessTag>(tage: WellnessTag[], feld
   const heute = tage[tage.length - 1];
   const v = heute[feld];
   return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
+/**
+ * Letzter gueltiger Wert, rueckwaerts gesucht — fuer traege Werte.
+ *
+ * VO2max und Fitnessalter berechnet Garmin nur bei Einheiten und schreibt sie
+ * dann fort. Sie stehen deshalb an vielen Tagen nicht in der Tabelle. Fuer die
+ * Anzeige ist der letzte gemessene Wert der richtige: er gilt bis zur naechsten
+ * Messung. Anders als `heuteWert` (bewusst null) sucht diese Funktion rueckwaerts.
+ */
+export function letzterWert<T extends keyof WellnessTag>(
+  tage: WellnessTag[],
+  feld: T,
+): { wert: number; datum: string } | null {
+  for (let i = tage.length - 1; i >= 0; i--) {
+    const v = tage[i][feld];
+    if (typeof v === 'number' && Number.isFinite(v)) return { wert: v, datum: tage[i].date };
+  }
+  return null;
 }
 
 /** Datum des jüngsten Tages im Bestand (YYYY-MM-DD). */
