@@ -87,6 +87,33 @@ function dateOfDayKey(key: string, weekMonday: string = ymdOf(mondayOfYmd(todayY
   return ymdOf(date);
 }
 
+/** Ein Eintrag aus dem Wochenplan (`/plan`) — Workout an einem Datum. */
+type WochenPlanZeile = {
+  id: string;
+  datum: string;
+  trainings_id: string;
+  name: string;
+  art: string;
+  dauer_min: number | null;
+  inhalt?: { uebungen?: Array<{ name: string; saetze: Array<{ wiederholungen: number | null; gewicht: number | null }> }> };
+};
+
+/** Wochenplan-Eintrag in die Form bringen, die der Trainingsbildschirm erwartet. */
+function planDayAusTraining(z: WochenPlanZeile): PlanDay {
+  const uebungen = z.inhalt?.uebungen ?? [];
+  return {
+    day: '',
+    title: z.name,
+    estimatedDuration: z.dauer_min ?? undefined,
+    exercises: uebungen.map((u) => ({
+      name: u.name,
+      sets: u.saetze.length,
+      reps: u.saetze[0]?.wiederholungen ?? undefined,
+      weight: u.saetze[0]?.gewicht != null ? String(u.saetze[0].gewicht) : undefined,
+    })),
+  };
+}
+
 export default function TrainingPage() {
   const navigate = useNavigate();
   const ort = useLocation();
@@ -107,6 +134,10 @@ export default function TrainingPage() {
   const [weekOffset, setWeekOffset] = useState(0);
   const [wischStart, setWischStart] = useState<{ x: number; y: number } | null>(null);
   const [running, setRunning] = useState(false);
+  /** Einträge aus dem Wochenplan für die angezeigte Woche. */
+  const [wochenPlan, setWochenPlan] = useState<WochenPlanZeile[]>([]);
+  /** Manuell gestartetes Workout aus dem Wochenplan (statt Coach-Plan). */
+  const [manuell, setManuell] = useState<WochenPlanZeile | null>(null);
   const [tagOffen, setTagOffen] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [laedt, setLaedt] = useState(true);
@@ -191,9 +222,25 @@ export default function TrainingPage() {
     return WEEK_ORDER.map((key) => schedule.find((d) => d.day === key) ?? { day: key, isRest: true, title: 'Ruhetag' });
   }, [angezeigtePlanWoche]);
 
+  /*
+   * Der Wochenplan (Seite /plan) war bisher nur dort sichtbar. Jetzt lädt die
+   * Trainingsseite ihn mit — sonst plant man und sieht am Trainingstag nichts.
+   */
+  useEffect(() => {
+    let ab = false;
+    api<{ eintraege?: WochenPlanZeile[] }>(
+      `/api/trainings/plan?von=${shownMondayYmd}&bis=${shiftYmdLocal(shownMondayYmd, 6)}`,
+    )
+      .then((r) => { if (!ab) setWochenPlan(Array.isArray(r.eintraege) ? r.eintraege : []); })
+      .catch(() => { if (!ab) setWochenPlan([]); });
+    return () => { ab = true; };
+  }, [shownMondayYmd]);
+
   const planDay = days.find((d) => d.day === selected) ?? null;
   const selectedYmd = dateOfDayKey(selected, shownMondayYmd);
   const trainingAmTag = workouts.find((w) => toYmd(w.date) === selectedYmd) ?? null;
+  /** Wochenplan-Einträge des gewählten Tages. */
+  const planHeute = wochenPlan.filter((z) => z.datum === selectedYmd);
 
   // Auswertungen
   const streak = workoutStreak(workouts);
@@ -423,21 +470,23 @@ export default function TrainingPage() {
         <Card className="flex flex-col p-5 lg:col-span-2">
           <div className="flex items-start gap-3">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--simple-accent-soft)] text-[var(--simple-accent)]">
-              {planDay?.isRest ? <Moon className="h-5 w-5" /> : <Dumbbell className="h-5 w-5" />}
+              {planDay?.isRest && planHeute.length === 0 ? <Moon className="h-5 w-5" /> : <Dumbbell className="h-5 w-5" />}
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
                 {DAY_LABELS[selected]} · {Number(selectedYmd.slice(8, 10))}. {Number(selectedYmd.slice(5, 7))}.
               </p>
               <p className="text-lg font-semibold leading-tight">
-                {trainingAmTag?.name || planDay?.title || (planDay?.isRest ? 'Ruhetag' : 'Training')}
+                {trainingAmTag?.name || (planHeute.length > 0 && planHeute[0].name) || planDay?.title || (planDay?.isRest ? 'Ruhetag' : 'Training')}
               </p>
               <p className="mt-0.5 text-xs text-[var(--text-muted)]">
                 {trainingAmTag
                   ? `erledigt · ${trainingAmTag.duration} min`
-                  : planDay?.isRest
-                    ? 'Erholung — kein Training geplant.'
-                    : `${(planDay?.exercises ?? []).length} Übungen${planDay?.estimatedDuration ? ` · ca. ${planDay.estimatedDuration} min` : ''}`}
+                  : planHeute.length > 0
+                    ? `aus deinem Wochenplan · ${planHeute.reduce((a, z) => a + (z.inhalt?.uebungen?.length ?? 0), 0)} Übungen`
+                    : planDay?.isRest
+                      ? 'Erholung — kein Training geplant.'
+                      : `${(planDay?.exercises ?? []).length} Übungen${planDay?.estimatedDuration ? ` · ca. ${planDay.estimatedDuration} min` : ''}`}
               </p>
             </div>
             <button
@@ -500,7 +549,36 @@ export default function TrainingPage() {
             </div>
           )}
 
-          {planDay?.isRest && (
+          {/* Was im Wochenplan für diesen Tag steht — mit Startknopf */}
+          {planHeute.length > 0 && (
+            <div className="mt-4 rounded-xl border border-[var(--simple-accent)]/40 bg-[var(--simple-accent-soft)] p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--simple-accent)]">
+                Aus deinem Wochenplan
+              </p>
+              <ul className="mt-1 divide-y divide-[var(--border-muted)]">
+                {planHeute.map((z) => (
+                  <li key={z.id} className="flex items-center justify-between gap-3 py-2">
+                    <span className="min-w-0">
+                      <span className="block truncate text-[12.5px] font-semibold">{z.name}</span>
+                      <span className="block text-[10px] text-[var(--text-muted)]">
+                        {z.inhalt?.uebungen?.length ?? 0} Übungen{z.dauer_min ? ` · ${z.dauer_min} min` : ''}
+                      </span>
+                    </span>
+                    <GhostButton
+                      onClick={() => {
+                        setManuell(z);
+                        setRunning(true);
+                      }}
+                    >
+                      Starten
+                    </GhostButton>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {planDay?.isRest && planHeute.length === 0 && (
             <EmptyState
               icon={<Moon className="h-6 w-6" />}
               title="Ruhetag"
@@ -548,7 +626,8 @@ export default function TrainingPage() {
             </div>
             {!week && (
               <p className="mt-2 rounded-lg bg-[#fbbf24]/10 px-2.5 py-2 text-[11px] leading-relaxed text-[#a16207]">
-                Noch kein aktiver Plan — unter <b>Mehr → Coach &amp; Pläne</b> erzeugen lassen.
+                Noch kein aktiver Plan — oben <b>„Neuer Plan"</b> für den Wochenplan oder <b>„Von Coach
+                erstellen lassen"</b> für einen KI-Plan.
               </p>
             )}
             {week && !angezeigtePlanWoche && (
@@ -753,10 +832,13 @@ export default function TrainingPage() {
 
       {running && (
         <WorkoutSheet
-          day={planDay}
-          name={trainingAmTag?.name || planDay?.title || `Training ${formatDay(today)}`}
+          day={manuell ? planDayAusTraining(manuell) : planDay}
+          name={manuell?.name || trainingAmTag?.name || planDay?.title || `Training ${formatDay(today)}`}
           date={today}
-          onClose={() => setRunning(false)}
+          onClose={() => {
+            setRunning(false);
+            setManuell(null);
+          }}
           onSaved={() => void load()}
         />
       )}

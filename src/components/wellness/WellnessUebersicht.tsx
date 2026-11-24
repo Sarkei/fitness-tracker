@@ -192,24 +192,24 @@ export default function WellnessUebersicht() {
           label="Schlaf"
           value={schlafLetzteHHMM ?? '—'}
           unit="h"
-          onClick={() => navigate('/wellness/schlaf')}
+          onClick={() => navigate('/health/schlaf')}
         />
         <KlickKachel
           label="Schlafscore"
           value={schlafScore != null ? Math.round(schlafScore) : '—'}
-          onClick={() => navigate('/wellness/schlaf')}
+          onClick={() => navigate('/health/schlaf')}
         />
         <KlickKachel
           label="HRV"
           value={hrv != null ? Math.round(hrv) : '—'}
           unit="ms"
-          onClick={() => navigate('/wellness/koerper')}
+          onClick={() => navigate('/health/koerper')}
         />
         <KlickKachel
           label="Ruhepuls"
           value={puls != null ? Math.round(puls) : '—'}
           unit="bpm"
-          onClick={() => navigate('/wellness/koerper')}
+          onClick={() => navigate('/health/koerper')}
         />
       </Gruppe>
 
@@ -217,12 +217,12 @@ export default function WellnessUebersicht() {
         <KlickKachel
           label="Schritte"
           value={schritte != null ? Math.round(schritte).toLocaleString('de-DE') : '—'}
-          onClick={() => navigate('/wellness/bewegung')}
+          onClick={() => navigate('/health/bewegung')}
         />
         <KlickKachel
           label="Etagen"
           value={etagen != null ? Math.round(etagen) : '—'}
-          onClick={() => navigate('/wellness/bewegung')}
+          onClick={() => navigate('/health/bewegung')}
         />
         <KlickKachel
           label="Verbrauch"
@@ -240,12 +240,12 @@ export default function WellnessUebersicht() {
               return aktiv != null ? `${aktiv} aktiv` : undefined;
             })()
           }
-          onClick={() => navigate('/wellness/kalorien')}
+          onClick={() => navigate('/health/kalorien')}
         />
         <KlickKachel
           label="Body Battery"
           value={bodyBattery != null ? Math.round(bodyBattery) : '—'}
-          onClick={() => navigate('/wellness/koerper')}
+          onClick={() => navigate('/health/koerper')}
         />
       </Gruppe>
 
@@ -253,19 +253,19 @@ export default function WellnessUebersicht() {
         <KlickKachel
           label="Stress"
           value={stress != null ? Math.round(stress) : '—'}
-          onClick={() => navigate('/wellness/koerper')}
+          onClick={() => navigate('/health/koerper')}
         />
         <KlickKachel
           label="Sauerstoff"
           value={spo2 != null ? Math.round(spo2) : '—'}
           unit="%"
-          onClick={() => navigate('/wellness/koerper')}
+          onClick={() => navigate('/health/koerper')}
         />
         <KlickKachel
           label="Atemfrequenz"
           value={atem != null ? Math.round(atem) : '—'}
           unit="/min"
-          onClick={() => navigate('/wellness/koerper')}
+          onClick={() => navigate('/health/koerper')}
         />
       </Gruppe>
 
@@ -273,23 +273,23 @@ export default function WellnessUebersicht() {
         <KlickKachel
           label="VO₂max"
           value={vo2 != null ? Math.round(vo2) : '—'}
-          onClick={() => navigate('/wellness/form')}
+          onClick={() => navigate('/health/form')}
         />
         <KlickKachel
           label="Fitnessalter"
           value={fitnessAlter != null ? Math.round(fitnessAlter) : '—'}
           unit="Jahre"
-          onClick={() => navigate('/wellness/form')}
+          onClick={() => navigate('/health/form')}
         />
         {gewicht != null && (
-          <KlickKachel label="Gewicht" value={gewicht} unit="kg" onClick={() => navigate('/wellness/koerper')} />
+          <KlickKachel label="Gewicht" value={gewicht} unit="kg" onClick={() => navigate('/health/koerper')} />
         )}
       </Gruppe>
 
       <div className="grid grid-cols-2 gap-3">
         <button
           type="button"
-          onClick={() => navigate('/wellness/form')}
+          onClick={() => navigate('/health/form')}
           className="rounded-2xl border border-[var(--border-muted)] bg-[var(--card-bg)] px-4 py-3 text-left transition hover:border-[var(--simple-accent)]"
         >
           <p className="text-[9.5px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
@@ -306,7 +306,7 @@ export default function WellnessUebersicht() {
           </p>
         </button>
         <Link
-          to="/wellness/form"
+          to="/health/form"
           className="flex items-center gap-2 rounded-2xl border border-[var(--border-muted)] bg-[var(--card-bg)] px-4 py-3 text-[12.5px] font-semibold text-[var(--foreground)] transition hover:border-[var(--simple-accent)]"
         >
           Belastung
@@ -340,7 +340,7 @@ export default function WellnessUebersicht() {
             </p>
           </div>
           <Link
-            to="/wellness/aktivitaeten"
+            to="/health/aktivitaeten"
             className="inline-flex shrink-0 items-center gap-1 text-[12px] font-semibold text-[var(--simple-accent)]"
           >
             Alle <ChevronRight className="h-3.5 w-3.5" />
@@ -350,10 +350,10 @@ export default function WellnessUebersicht() {
 
       <div className="grid grid-cols-2 gap-3">
         {[
-          { to: '/wellness/schlaf', label: 'Schlaf', icon: Moon },
-          { to: '/wellness/aktivitaeten', label: 'Aktivitäten', icon: Activity },
-          { to: '/wellness/koerper', label: 'Herz & Körper', icon: Heart },
-          { to: '/wellness/bewegung', label: 'Bewegung', icon: Footprints },
+          { to: '/health/schlaf', label: 'Schlaf', icon: Moon },
+          { to: '/health/aktivitaeten', label: 'Aktivitäten', icon: Activity },
+          { to: '/health/koerper', label: 'Herz & Körper', icon: Heart },
+          { to: '/health/bewegung', label: 'Bewegung', icon: Footprints },
         ].map(({ to, label, icon: Icon }) => (
           <Link
             key={to}

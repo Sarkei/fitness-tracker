@@ -232,6 +232,69 @@ export default function TodayPage() {
   }, [heutePlanWoche, date]);
 
   const trainingToday = workouts.find((w) => toYmd(w.date) === date) ?? null;
+
+  /*
+   * Der Wochenplan (Seite /plan) gehört auf die Startseite: Man plant am
+   * Sonntag und will morgens sehen, was ansteht. Vorher zeigte die Karte nur
+   * den Coach-Plan — selbst gebaute Pläne blieben unsichtbar.
+   */
+  /** Garmin-Tageswerte für die „Tagesform"-Karte. */
+  const [tagesform, setTagesform] = useState<null | {
+    schlafStunden: number | null;
+    schlafScore: number | null;
+    hrv: number | null;
+    ruhepuls: number | null;
+    bodyBattery: number | null;
+    hrvSchnitt: number | null;
+  }>(null);
+
+  useEffect(() => {
+    let ab = false;
+    api<{
+      reihe?: Array<{
+        date: string;
+        schlafStunden?: number | null;
+        schlafScore?: number | null;
+        hrv?: number | null;
+        ruhepuls?: number | null;
+        bodyBatteryMax?: number | null;
+      }>;
+    }>('/api/integrations/garmin/stats')
+      .then((r) => {
+        if (ab) return;
+        const reihe = (r.reihe ?? []).filter((x) => x.date && x.date.slice(0, 10) <= date);
+        const heute = reihe[reihe.length - 1];
+        if (!heute) return;
+        const hrvWerte = reihe
+          .slice(-8, -1)
+          .map((x) => x.hrv)
+          .filter((x): x is number => typeof x === 'number' && x > 0);
+        setTagesform({
+          schlafStunden: heute.schlafStunden ?? null,
+          schlafScore: heute.schlafScore ?? null,
+          hrv: heute.hrv ?? null,
+          ruhepuls: heute.ruhepuls ?? null,
+          bodyBattery: heute.bodyBatteryMax ?? null,
+          hrvSchnitt: hrvWerte.length ? Math.round(hrvWerte.reduce((a, b) => a + b, 0) / hrvWerte.length) : null,
+        });
+      })
+      .catch(() => { if (!ab) setTagesform(null); });
+    return () => { ab = true; };
+  }, [date]);
+
+  const [planWocheHeute, setPlanWocheHeute] = useState<
+    Array<{ id: string; name: string; dauer_min: number | null; inhalt?: { uebungen?: unknown[] } }>
+  >([]);
+
+  useEffect(() => {
+    let ab = false;
+    api<{ eintraege?: Array<{ id: string; name: string; dauer_min: number | null; inhalt?: { uebungen?: unknown[] } }> }>(
+      `/api/trainings/plan?von=${date}&bis=${date}`,
+    )
+      .then((r) => { if (!ab) setPlanWocheHeute(Array.isArray(r.eintraege) ? r.eintraege : []); })
+      .catch(() => { if (!ab) setPlanWocheHeute([]); });
+    return () => { ab = true; };
+  }, [date]);
   // Offenes Budget: Tagesziel plus Aktivkalorien minus Gegessenes.
   const offen = Math.round(budgetHeute - sum.kcal);
   const ueber = offen < 0;
@@ -261,6 +324,50 @@ export default function TodayPage() {
 
       {/* Fasten läuft dauerhaft mit */}
       <FastingCard />
+
+      {/*
+       * Tagesform: Schlaf, HRV, Ruhepuls und Body Battery von der Uhr, in einem
+       * Satz bewertet. Das verbindet Health mit Training — ohne die Zahlen
+       * irgendwo nachzuschlagen.
+       */}
+      {tagesform && (() => {
+        const schlafText =
+          tagesform.schlafStunden != null
+            ? `${Math.floor(tagesform.schlafStunden)}:${String(Math.round((tagesform.schlafStunden % 1) * 60)).padStart(2, '0')} h`
+            : '—';
+        const hrvHoch = tagesform.hrv != null && tagesform.hrvSchnitt != null && tagesform.hrv >= tagesform.hrvSchnitt;
+        const schlecht =
+          (tagesform.schlafScore != null && tagesform.schlafScore < 60) ||
+          (tagesform.hrv != null && tagesform.hrvSchnitt != null && tagesform.hrv < tagesform.hrvSchnitt * 0.85);
+        const urteil = schlecht
+          ? 'Heute lieber locker — der Körper braucht Erholung.'
+          : hrvHoch && (tagesform.schlafScore ?? 0) >= 70
+            ? 'Gute Basis für eine harte Einheit.'
+            : 'Normale Belastung passt heute.';
+        const farbe = schlecht ? 'var(--warn, #e8b25f)' : hrvHoch ? 'var(--simple-accent)' : 'var(--text-muted)';
+        return (
+          <Card className="p-4">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">Tagesform</p>
+              <span className="text-[10px] font-semibold" style={{ color: farbe }}>von der Uhr</span>
+            </div>
+            <div className="mt-2 grid grid-cols-4 gap-2">
+              {[
+                { label: 'Schlaf', wert: schlafText },
+                { label: 'Score', wert: tagesform.schlafScore != null ? String(tagesform.schlafScore) : '—' },
+                { label: 'HRV', wert: tagesform.hrv != null ? String(tagesform.hrv) : '—' },
+                { label: 'Puls', wert: tagesform.ruhepuls != null ? String(tagesform.ruhepuls) : '—' },
+              ].map((k) => (
+                <div key={k.label}>
+                  <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--text-muted)]">{k.label}</p>
+                  <p className="text-[15px] font-bold leading-none tabular-nums">{k.wert}</p>
+                </div>
+              ))}
+            </div>
+            <p className="mt-2 text-[11px] leading-snug" style={{ color: farbe }}>{urteil}</p>
+          </Card>
+        );
+      })()}
 
       {/* Einheiten von der Uhr — auch ohne geplantes Training */}
       {einheiten.length > 0 && (
@@ -453,6 +560,34 @@ export default function TodayPage() {
                         </li>
                       ))}
                     </ul>
+                  )}
+                </div>
+                <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+              </div>
+            </button>
+          ) : planWocheHeute.length > 0 ? (
+            <button
+              type="button"
+              className="flex-1 w-full rounded-xl border border-[var(--border-muted)] bg-[var(--card-bg)] p-4 text-left transition hover:border-[var(--simple-accent)]/50"
+              onClick={() => navigate('/training')}
+            >
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--simple-accent-soft)] text-[var(--simple-accent)]">
+                  <Dumbbell className="h-5 w-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold">{planWocheHeute[0].name}</p>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    aus deinem Wochenplan
+                    {planWocheHeute[0].inhalt?.uebungen?.length
+                      ? ` · ${planWocheHeute[0].inhalt.uebungen.length} Übungen`
+                      : ''}
+                    {planWocheHeute[0].dauer_min ? ` · ${planWocheHeute[0].dauer_min} min` : ''}
+                  </p>
+                  {planWocheHeute.length > 1 && (
+                    <p className="mt-1 text-[10.5px] text-[var(--text-muted)]">
+                      + {planWocheHeute.length - 1} weitere Einheit{planWocheHeute.length > 2 ? 'en' : ''}
+                    </p>
                   )}
                 </div>
                 <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[var(--text-muted)]" />

@@ -852,11 +852,11 @@ export default function ProfilePage() {
           </Gruppe>
 
           <Link
-            to="/wellness"
+            to="/health"
             className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-[12px] font-semibold text-[var(--foreground)] transition hover:border-[var(--simple-accent)]"
           >
             <Activity className="h-4 w-4 text-[var(--simple-accent)]" />
-            Wellness-Daten ansehen
+            Health-Daten ansehen
             <span className="ml-auto text-[11px] font-normal text-[var(--text-muted)]">Schlaf, Bewegung, Form</span>
           </Link>
         </div>

@@ -21,7 +21,7 @@ const ICONS: Record<string, typeof Home> = {
   '/nutrition': Utensils,
   '/coach': Brain,
   '/stats': BarChart2,
-  '/wellness': Watch,
+  '/health': Watch,
   '/social': Users,
   '/profile': User,
 };
@@ -32,7 +32,7 @@ const SHORT_LABEL_KEYS: Record<string, string> = {
   '/nutrition': 'nav.nutrition.short',
   '/coach': 'nav.coach.short',
   '/stats': 'nav.stats.short',
-  '/wellness': 'nav.wellness.short',
+  '/health': 'nav.wellness.short',
   '/social': 'nav.social.short',
   '/profile': 'nav.profile.short',
 };

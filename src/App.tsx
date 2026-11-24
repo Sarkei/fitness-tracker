@@ -145,13 +145,15 @@ const AppContent = () => {
           }
         />
         <Route
-          path="/wellness/*"
+          path="/health/*"
           element={
-            <RouteErrorBoundary title="Garmin-Daten konnten nicht geladen werden">
+            <RouteErrorBoundary title="Health-Daten konnten nicht geladen werden">
               <WellnessPage />
             </RouteErrorBoundary>
           }
         />
+        {/* Alter Pfad: bleibt als Umleitung, damit gespeicherte Links weiter funktionieren. */}
+        <Route path="/wellness/*" element={<Navigate to="/health" replace />} />
         <Route
           path="/profile"
           element={

@@ -518,7 +518,7 @@ export async function syncGarmin(
     { pfad: `/usersummary-service/stats/steps/daily/${kurzVon}/${bis}` },
     { pfad: `/usersummary-service/stats/stress/daily/${kurzVon}/${bis}` },
     { pfad: `/wellness-service/wellness/daily/spo2acclimation/${heute}` },
-    { pfad: '/wellness-service/wellness/dailyHeartRate' },
+    { pfad: '/health-service/wellness/dailyHeartRate' },
     { pfad: `/usersummary-service/v2/dailysummaries?startDate=${von}&endDate=${bis}` },
     { pfad: `/weight-service/weight/range/${von}/${bis}` },
   ];

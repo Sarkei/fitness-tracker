@@ -1,5 +1,5 @@
 /**
- * Wellness-Bereich (`/wellness`) mit eigenen Unterseiten.
+ * Health-Bereich (`/health`) mit eigenen Unterseiten.
  *
  * Bewusst getrennt statt einer überladenen Seite:
  *   /wellness               Übersicht (Tageslage)
@@ -27,44 +27,44 @@ import WellnessKalorien from './WellnessKalorien';
  * anschaut — vorher stand ueberall "Wellness", auch auf Schlaf oder Kalorien.
  */
 const BEREICHE: Record<string, { titel: string; text: string }> = {
-  '/wellness': {
-    titel: 'Wellness',
+  '/health': {
+    titel: 'Health',
     text: 'Schlaf, Bewegung, Herz und Garmin-Werte — automatisch von deiner Uhr.',
   },
-  '/wellness/schlaf': {
+  '/health/schlaf': {
     titel: 'Schlaf',
     text: 'Dauer, Phasen und Score je Nacht. Bei „Heute“ nur die reellen Werte der letzten Nacht.',
   },
-  '/wellness/bewegung': {
+  '/health/bewegung': {
     titel: 'Bewegung',
     text: 'Schritte, Etagen und Strecke aus dem Alltag.',
   },
-  '/wellness/koerper': {
+  '/health/koerper': {
     titel: 'Herz & Körper',
     text: 'Ruhepuls, HRV, Blutsauerstoff, Atmung und Körperzusammensetzung.',
   },
-  '/wellness/form': {
+  '/health/form': {
     titel: 'Form',
     text: 'Trainingsbelastung: Fitness (CTL), Ermüdung (ATL) und Form (TSB).',
   },
-  '/wellness/aktivitaeten': {
+  '/health/aktivitaeten': {
     titel: 'Aktivitäten',
     text: 'Aufgezeichnete Einheiten von der Uhr, mit Puls, Tempo und Höhenprofil.',
   },
-  '/wellness/kalorien': {
+  '/health/kalorien': {
     titel: 'Kalorien',
     text: 'Verbrauch von Garmin und Gegessenes aus deinen Mahlzeiten — Tag für Tag.',
   },
 };
 
 const UNTERSEITEN = [
-  { pfad: '/wellness', label: 'Übersicht', icon: LayoutGrid },
-  { pfad: '/wellness/schlaf', label: 'Schlaf', icon: Moon },
-  { pfad: '/wellness/bewegung', label: 'Bewegung', icon: Footprints },
-  { pfad: '/wellness/koerper', label: 'Herz & Körper', icon: Heart },
-  { pfad: '/wellness/form', label: 'Form', icon: BarChart3 },
-  { pfad: '/wellness/aktivitaeten', label: 'Aktivitäten', icon: Activity },
-  { pfad: '/wellness/kalorien', label: 'Kalorien', icon: Flame },
+  { pfad: '/health', label: 'Übersicht', icon: LayoutGrid },
+  { pfad: '/health/schlaf', label: 'Schlaf', icon: Moon },
+  { pfad: '/health/bewegung', label: 'Bewegung', icon: Footprints },
+  { pfad: '/health/koerper', label: 'Herz & Körper', icon: Heart },
+  { pfad: '/health/form', label: 'Form', icon: BarChart3 },
+  { pfad: '/health/aktivitaeten', label: 'Aktivitäten', icon: Activity },
+  { pfad: '/health/kalorien', label: 'Kalorien', icon: Flame },
 ];
 
 export default function WellnessPage() {
@@ -74,9 +74,9 @@ export default function WellnessPage() {
   return (
     <div className="flex flex-col gap-5 pb-10">
       <PageHeader
-        eyebrow="Wellness"
-        title={(BEREICHE[location.pathname] ?? BEREICHE['/wellness']).titel}
-        hint={(BEREICHE[location.pathname] ?? BEREICHE['/wellness']).text}
+        eyebrow="Health"
+        title={(BEREICHE[location.pathname] ?? BEREICHE['/health']).titel}
+        hint={(BEREICHE[location.pathname] ?? BEREICHE['/health']).text}
       />
 
       {/*
@@ -117,7 +117,7 @@ export default function WellnessPage() {
           <Route path="form" element={<WellnessForm />} />
           <Route path="aktivitaeten" element={<WellnessAktivitaeten />} />
           <Route path="kalorien" element={<WellnessKalorien />} />
-          <Route path="*" element={<Navigate to="/wellness" replace />} />
+          <Route path="*" element={<Navigate to="/health" replace />} />
         </Routes>
       </WellnessProvider>
     </div>
