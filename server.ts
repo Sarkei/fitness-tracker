@@ -7125,14 +7125,38 @@ ${JSON.stringify(userCtx, null, 2)}
    * Der Hinweis kommt nur, wenn heute laut Plan überhaupt etwas vorgesehen ist
    * und weder eine eigene Einheit noch eine Garmin-Aktivität vorliegt.
    */
+
+/*
+ * Stunde und Uhrzeit in Europe/Berlin.
+ *
+ * `Intl.DateTimeFormat("de-DE", { hour: "numeric" })` liefert "09 Uhr" — nicht
+ * "9". `Number("09 Uhr")` ist NaN, damit war jede Stundenpruefung falsch und
+ * der Morgenbericht konnte nie ausloesen. Diese Helfer lesen die Teile direkt
+ * aus den formatToParts() und liefern echte Zahlen.
+ */
+function berlinTeile(d: Date = new Date()): { stunde: number; minute: number; hhmm: string } {
+  const teile = new Intl.DateTimeFormat("de-DE", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Europe/Berlin",
+  }).formatToParts(d);
+  const wert = (typ: string) => Number(teile.find((t) => t.type === typ)?.value ?? "0");
+  const stunde = wert("hour");
+  const minute = wert("minute");
+  return {
+    stunde,
+    minute,
+    hhmm: `${String(stunde).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
+  };
+}
+
   let erinnerungLaeuft = false;
   const erinnerungTick = async () => {
     if (erinnerungLaeuft) return;
     const jetzt = new Date();
-    // Nur zwischen 18 und 19 Uhr (deutsche Zeit)
-    const stunde = Number(
-      new Intl.DateTimeFormat("de-DE", { hour: "numeric", hour12: false, timeZone: "Europe/Berlin" }).format(jetzt),
-    );
+    // Nur in der 18-Uhr-Stunde (deutsche Zeit)
+    const { stunde } = berlinTeile(jetzt);
     if (stunde !== 18) return;
 
     erinnerungLaeuft = true;
@@ -7173,12 +7197,21 @@ ${JSON.stringify(userCtx, null, 2)}
           if (eigene.rowCount || garmin.rowCount) continue;
 
           // Ist heute etwas geplant?
-          const woche = await pool.query<{ schedule: unknown }>(
-            `SELECT schedule FROM coach_plan_weeks
-              WHERE plan_id = $1 AND start_date <= $2 AND start_date + INTERVAL '6 days' >= $2
-              LIMIT 1`,
-            [k.plan_id, heute],
-          );
+          /* Tabelle heisst coach_weekly_schedules (siehe Morgenbericht). */
+          let woche: { rowCount: number | null; rows: Array<{ schedule: unknown }> };
+          try {
+            woche = await pool.query<{ schedule: unknown }>(
+              `SELECT schedule FROM coach_weekly_schedules
+                WHERE plan_id = $1 AND start_date <= $2::date
+                  AND start_date + INTERVAL '6 days' >= $2::date
+                ORDER BY start_date DESC
+                LIMIT 1`,
+              [k.plan_id, heute],
+            );
+          } catch (e) {
+            console.error("[push] Trainingserinnerung: Abfrage fehlgeschlagen:", (e as Error).message);
+            continue;
+          }
           if (!woche.rowCount) continue;
           const schedule = (woche.rows[0].schedule as { schedule?: Array<{ day: string; isRest?: boolean }> })?.schedule ?? [];
           const tagPlan = schedule.find((d) => d.day === wochentag);
@@ -7202,8 +7235,10 @@ ${JSON.stringify(userCtx, null, 2)}
             "INSERT INTO push_erinnert (user_id, tag, art) VALUES ($1,$2,'training') ON CONFLICT DO NOTHING",
             [k.user_id, heute],
           );
-        } catch {
-          /* ein Nutzer darf den Lauf nicht abbrechen */
+        } catch (e) {
+          // Bisher still verschluckt — dadurch war nicht zu sehen, warum eine
+          // Meldung ausblieb.
+          console.error("[push] Erinnerung fehlgeschlagen:", (e as Error).message);
         }
       }
     } catch {
@@ -7225,12 +7260,9 @@ ${JSON.stringify(userCtx, null, 2)}
     beobachtungLaeuft = true;
     try {
       const jet = new Date();
-      const stunde = Number(
-        new Intl.DateTimeFormat("de-DE", { hour: "numeric", hour12: false, timeZone: "Europe/Berlin" }).format(jet),
-      );
+      const { stunde, hhmm: uhr } = berlinTeile(jet);
       const heute = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" });
       const wochentag = new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "Europe/Berlin" }).format(jet);
-      const uhr = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" }).format(jet);
 
       const nutzer = await pool.query<{ id: number; goals: unknown }>(
         "SELECT id, goals FROM users WHERE is_active IS NOT FALSE",
@@ -7260,14 +7292,28 @@ ${JSON.stringify(userCtx, null, 2)}
 
               if (std != null) {
                 // Was steht heute an?
-                const woche = await pool.query<{ schedule: unknown }>(
-                  `SELECT w.schedule FROM coach_plan_weeks w
-                     JOIN coach_plans p ON p.id = w.plan_id
-                    WHERE p.user_id = $1 AND p.status = 'active'
-                      AND w.start_date <= $2 AND w.start_date + INTERVAL '6 days' >= $2
-                    LIMIT 1`,
-                  [u.id, heute],
-                );
+                /*
+                 * Die Tabelle heisst coach_weekly_schedules, nicht coach_plan_weeks.
+                 * Die alte Abfrage warf einen Fehler, der die ganze Meldung
+                 * verschluckte - der Morgenbericht kam deshalb nie an.
+                 */
+                let woche: { rowCount: number | null; rows: Array<{ schedule: unknown }> };
+                try {
+                  woche = await pool.query<{ schedule: unknown }>(
+                    `SELECT w.schedule FROM coach_weekly_schedules w
+                       JOIN coach_plans p ON p.id = w.plan_id
+                      WHERE p.user_id = $1 AND p.status = 'active'
+                        AND w.start_date <= $2::date
+                        AND w.start_date + INTERVAL '6 days' >= $2::date
+                      ORDER BY w.start_date DESC
+                      LIMIT 1`,
+                    [u.id, heute],
+                  );
+                } catch (e) {
+                  // Fehlt der Plan, darf der Schlafbericht trotzdem rausgehen.
+                  console.error("[push] Plan-Abfrage fehlgeschlagen:", (e as Error).message);
+                  woche = { rowCount: 0, rows: [] };
+                }
                 let planText = "";
                 if (woche.rowCount) {
                   const plan = (woche.rows[0].schedule as { schedule?: Array<{ day: string; isRest?: boolean; label?: string; title?: string }> })?.schedule ?? [];
@@ -7344,14 +7390,22 @@ ${JSON.stringify(userCtx, null, 2)}
 
           /* ---- 3. Training heute: Vorschau am Morgen ---- */
           if (stunde >= 6 && stunde <= 9) {
-            const woche = await pool.query<{ schedule: unknown }>(
-              `SELECT w.schedule FROM coach_plan_weeks w
-                 JOIN coach_plans p ON p.id = w.plan_id
-                WHERE p.user_id = $1 AND p.status = 'active'
-                  AND w.start_date <= $2 AND w.start_date + INTERVAL '6 days' >= $2
-                LIMIT 1`,
-              [u.id, heute],
-            );
+            let woche: { rowCount: number | null; rows: Array<{ schedule: unknown }> };
+            try {
+              woche = await pool.query<{ schedule: unknown }>(
+                `SELECT w.schedule FROM coach_weekly_schedules w
+                   JOIN coach_plans p ON p.id = w.plan_id
+                  WHERE p.user_id = $1 AND p.status = 'active'
+                    AND w.start_date <= $2::date
+                    AND w.start_date + INTERVAL '6 days' >= $2::date
+                  ORDER BY w.start_date DESC
+                  LIMIT 1`,
+                [u.id, heute],
+              );
+            } catch (e) {
+              console.error("[push] Trainingsvorschau: Plan-Abfrage fehlgeschlagen:", (e as Error).message);
+              woche = { rowCount: 0, rows: [] };
+            }
             if (woche.rowCount) {
               const plan = (woche.rows[0].schedule as { schedule?: Array<{ day: string; isRest?: boolean; title?: string; label?: string; exercises?: unknown[] }> })?.schedule ?? [];
               const tag = plan.find((d) => d.day === wochentag);
@@ -7366,8 +7420,10 @@ ${JSON.stringify(userCtx, null, 2)}
               }
             }
           }
-        } catch {
-          /* ein Nutzer darf den Lauf nicht abbrechen */
+        } catch (e) {
+          // Bisher still verschluckt — dadurch war nicht zu sehen, warum eine
+          // Meldung ausblieb.
+          console.error("[push] Erinnerung fehlgeschlagen:", (e as Error).message);
         }
       }
     } catch {
