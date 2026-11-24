@@ -339,7 +339,17 @@ export default function TodayPage() {
           label="Trainings-Serie"
           value={serie.aktuell}
           unit={serie.aktuell === 1 ? 'Einheit' : 'Einheiten'}
-          hint={serie.geplant > 0 ? `ohne Auslassen · ${serie.absolviert}/${serie.geplant} in 30 Tagen` : 'kein Plan hinterlegt'}
+          hint={
+            /*
+             * Ohne hinterlegten Plan gibt es kein "Geplantes" — dann ist nur die
+             * Zahl der Trainingstage aussagekraeftig, nicht ein Verhaeltnis.
+             */
+            planWochen.length === 0
+              ? `${serie.absolviert} ${serie.absolviert === 1 ? 'Trainingstag' : 'Trainingstage'} in 30 Tagen`
+              : serie.geplant > 0
+                ? `ohne Auslassen · ${serie.absolviert}/${serie.geplant} in 30 Tagen`
+                : 'kein Plan hinterlegt'
+          }
           tone={serie.aktuell > 0 ? 'accent' : 'muted'}
           icon={<Dumbbell className="h-3.5 w-3.5" />}
         />
@@ -347,7 +357,7 @@ export default function TodayPage() {
           label="Beste Serie"
           value={serie.laengste}
           unit="am Stück"
-          hint="längste Kette ohne Auslassen"
+          hint={planWochen.length === 0 ? "längste Kette aufeinanderfolgender Tage" : "längste Kette ohne Auslassen"}
           tone="default"
           icon={<Target className="h-3.5 w-3.5" />}
         />

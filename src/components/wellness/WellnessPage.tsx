@@ -11,7 +11,7 @@
  */
 
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import { Activity, BarChart3, ChevronLeft, Footprints, Heart, LayoutGrid, Moon } from 'lucide-react';
+import { Activity, BarChart3, ChevronLeft, Flame, Footprints, Heart, LayoutGrid, Moon } from 'lucide-react';
 import { PageHeader } from '@/src/simple/ui';
 import { WellnessProvider } from './WellnessProvider';
 import WellnessUebersicht from './WellnessUebersicht';
@@ -20,6 +20,42 @@ import WellnessBewegung from './WellnessBewegung';
 import WellnessKoerper from './WellnessKoerper';
 import WellnessForm from './WellnessForm';
 import WellnessAktivitaeten from './WellnessAktivitaeten';
+import WellnessKalorien from './WellnessKalorien';
+
+/**
+ * Titel und Beschreibung je Bereich. Die Kopfzeile zeigt, was man gerade
+ * anschaut — vorher stand ueberall "Wellness", auch auf Schlaf oder Kalorien.
+ */
+const BEREICHE: Record<string, { titel: string; text: string }> = {
+  '/wellness': {
+    titel: 'Wellness',
+    text: 'Schlaf, Bewegung, Herz und Garmin-Werte — automatisch von deiner Uhr.',
+  },
+  '/wellness/schlaf': {
+    titel: 'Schlaf',
+    text: 'Dauer, Phasen und Score je Nacht. Bei „Heute“ nur die reellen Werte der letzten Nacht.',
+  },
+  '/wellness/bewegung': {
+    titel: 'Bewegung',
+    text: 'Schritte, Etagen und Strecke aus dem Alltag.',
+  },
+  '/wellness/koerper': {
+    titel: 'Herz & Körper',
+    text: 'Ruhepuls, HRV, Blutsauerstoff, Atmung und Körperzusammensetzung.',
+  },
+  '/wellness/form': {
+    titel: 'Form',
+    text: 'Trainingsbelastung: Fitness (CTL), Ermüdung (ATL) und Form (TSB).',
+  },
+  '/wellness/aktivitaeten': {
+    titel: 'Aktivitäten',
+    text: 'Aufgezeichnete Einheiten von der Uhr, mit Puls, Tempo und Höhenprofil.',
+  },
+  '/wellness/kalorien': {
+    titel: 'Kalorien',
+    text: 'Verbrauch von Garmin und Gegessenes aus deinen Mahlzeiten — Tag für Tag.',
+  },
+};
 
 const UNTERSEITEN = [
   { pfad: '/wellness', label: 'Übersicht', icon: LayoutGrid },
@@ -28,6 +64,7 @@ const UNTERSEITEN = [
   { pfad: '/wellness/koerper', label: 'Herz & Körper', icon: Heart },
   { pfad: '/wellness/form', label: 'Form', icon: BarChart3 },
   { pfad: '/wellness/aktivitaeten', label: 'Aktivitäten', icon: Activity },
+  { pfad: '/wellness/kalorien', label: 'Kalorien', icon: Flame },
 ];
 
 export default function WellnessPage() {
@@ -38,8 +75,8 @@ export default function WellnessPage() {
     <div className="flex flex-col gap-5 pb-10">
       <PageHeader
         eyebrow="Wellness"
-        title="Wellness"
-        hint="Schlaf, Bewegung, Herz und Garmin-Werte — automatisch von deiner Uhr."
+        title={(BEREICHE[location.pathname] ?? BEREICHE['/wellness']).titel}
+        hint={(BEREICHE[location.pathname] ?? BEREICHE['/wellness']).text}
       />
 
       {/* Zurück-Leiste: nur auf Unterseiten, damit man aus einem Bereich herauskommt.
@@ -62,6 +99,7 @@ export default function WellnessPage() {
           <Route path="koerper" element={<WellnessKoerper />} />
           <Route path="form" element={<WellnessForm />} />
           <Route path="aktivitaeten" element={<WellnessAktivitaeten />} />
+          <Route path="kalorien" element={<WellnessKalorien />} />
           <Route path="*" element={<Navigate to="/wellness" replace />} />
         </Routes>
       </WellnessProvider>

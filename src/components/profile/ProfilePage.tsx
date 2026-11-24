@@ -19,7 +19,7 @@ import ReportHistoryView from './ReportHistoryView';
 import IntervalsConnect from './IntervalsConnect';
 import MealplannerConnect from './MealplannerConnect';
 import GarminConnect from './GarminConnect';
-import { PageHeader } from '@/src/simple/ui';
+import { Card, PageHeader } from '@/src/simple/ui';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
 import { de as dfDe, enUS as dfEnUS } from 'date-fns/locale';
@@ -438,98 +438,71 @@ export default function ProfilePage() {
       </div>
 
       {tab === 'uebersicht' && (
-        <div className="space-y-6">
-      {/* ── Avatar ── */}
-      <div className="flex flex-col items-center gap-6 w-full">
-        <label className="cursor-pointer group relative">
-          <div className="w-40 h-40 bg-[var(--card-bg)] rounded-[3rem] overflow-hidden border-4 border-white shadow-2xl relative">
-            {profile?.photoURL ? (
-              <img src={profile.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-[var(--text-muted)]">
-                <User size={64} />
+        <div className="space-y-4">
+          {/*
+            Kopf des Profils: Avatar, Name, Plan — ruhig und ohne Social-Zaehler.
+            Vorher standen hier 40px-Ueberschrift, Follower-Zahlen und drei grosse
+            Archivknoepfe; das wirkte ueberladen.
+          */}
+          <Card className="flex items-center gap-4 p-4">
+            <label className="group relative shrink-0 cursor-pointer">
+              <div className="h-16 w-16 overflow-hidden rounded-full border border-[var(--line)] bg-[var(--surface)]">
+                {profile?.photoURL ? (
+                  <img src={profile.photoURL} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-[var(--muted)]">
+                    <User size={26} />
+                  </div>
+                )}
               </div>
-            )}
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
-              <Plus size={32} />
-            </div>
-          </div>
-          <input type="file" className="hidden" accept="image/*" onChange={onPhotoChange} />
-        </label>
-        <div className="text-center w-full">
-          <h2 className="text-4xl font-black italic uppercase tracking-tighter">
-            {profile?.displayName ||
-              [profile?.firstName, profile?.lastName].filter(Boolean).join(' ') ||
-              t('profile.elite')}
-          </h2>
-          <div className="flex items-center justify-center gap-3 mt-2">
-            <span className={cn("text-[10px] font-black uppercase tracking-widest", PROTOCOL_COLORS[protocol])}>
-              {t(`profile.protocol.${protocol}`)}
-            </span>
-          </div>
-          <div className="flex items-center justify-center gap-8 mt-4">
-            {socialMeta && (
-              <>
-                <div className="text-center">
-                  <p className="text-xl font-black italic text-[var(--text-primary)]">{socialMeta.followers}</p>
-                  <p className="text-[9px] font-black uppercase text-[var(--text-muted)] tracking-widest">{t('profile.followers')}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xl font-black italic text-[var(--text-primary)]">{socialMeta.following}</p>
-                  <p className="text-[9px] font-black uppercase text-[var(--text-muted)] tracking-widest">{t('profile.following')}</p>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+              <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 text-white opacity-0 transition group-hover:opacity-100">
+                <Plus size={16} />
+              </span>
+              <input type="file" className="hidden" accept="image/*" onChange={onPhotoChange} />
+            </label>
 
-        <motion.div className="grid grid-cols-2 gap-2 w-full">
+            <div className="min-w-0 flex-1">
+              <h2 className="truncate text-[15px] font-semibold leading-tight">
+                {profile?.displayName ||
+                  [profile?.firstName, profile?.lastName].filter(Boolean).join(' ') ||
+                  t('profile.elite')}
+              </h2>
+              <p className={cn('mt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]', PROTOCOL_COLORS[protocol])}>
+                {t(`profile.protocol.${protocol}`)}
+              </p>
+            </div>
+
             <button
               type="button"
               onClick={() => setShowCheckIn(true)}
-              className="col-span-2 min-h-[48px] px-5 rounded-2xl ui-btn-brand text-[10px] font-black uppercase tracking-widest shadow-lg shadow-brand/20 touch-manipulation"
+              className="min-h-[40px] shrink-0 rounded-lg bg-[var(--simple-accent)] px-3 py-2 text-[11px] font-semibold text-white"
             >
               {t('profile.checkin')}
             </button>
-            <button
-              type="button"
-              onClick={() =>
-                archive === 'transformation' ? setArchive(null) : void openArchive('transformation')
-              }
-              className={cn(
-                'min-h-[48px] px-4 rounded-2xl border text-[10px] font-black uppercase transition-colors',
-                archive === 'transformation'
-                  ? 'border-brand bg-brand/10 text-brand'
-                  : 'border-[var(--border-muted)] text-[var(--text-muted)]',
-              )}
-            >
-              {t('profile.transformation')}
-            </button>
-            <button
-              type="button"
-              onClick={() => (archive === 'posts' ? setArchive(null) : void openArchive('posts'))}
-              className={cn(
-                'min-h-[48px] px-4 rounded-2xl border text-[10px] font-black uppercase transition-colors',
-                archive === 'posts'
-                  ? 'border-brand bg-brand/10 text-brand'
-                  : 'border-[var(--border-muted)] text-[var(--text-muted)]',
-              )}
-            >
-              {t('profile.myPosts')}
-            </button>
-            <button
-              type="button"
-              onClick={() => (archive === 'liked' ? setArchive(null) : void openArchive('liked'))}
-              className={cn(
-                'col-span-2 min-h-[48px] px-3 rounded-2xl border text-[10px] font-black uppercase transition-colors touch-manipulation',
-                archive === 'liked'
-                  ? 'border-brand bg-brand/10 text-brand'
-                  : 'border-[var(--border-muted)] text-[var(--text-muted)]',
-              )}
-            >
-              {t('profile.liked')}
-            </button>
-        </motion.div>
+          </Card>
+
+          {/* Archiv: eine Zeile, drei gleiche Knoepfe */}
+          <div className="grid grid-cols-3 gap-2">
+            {([
+              ['transformation', t('profile.transformation')],
+              ['posts', t('profile.myPosts')],
+              ['liked', t('profile.liked')],
+            ] as const).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => (archive === id ? setArchive(null) : void openArchive(id))}
+                className={cn(
+                  'min-h-[40px] rounded-lg border px-2 text-[11px] font-semibold transition',
+                  archive === id
+                    ? 'border-[var(--simple-accent)] bg-[var(--simple-accent-soft)] text-[var(--simple-accent)]'
+                    : 'border-[var(--border-muted)] text-[var(--text-muted)]',
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
 
         <div className="w-full rounded-[2rem] border border-[var(--border-muted)] bg-[var(--card-bg)] p-6 text-left space-y-4">
             <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">
@@ -765,8 +738,6 @@ export default function ProfilePage() {
               </div>
             </motion.section>
         )}
-      </div>
-
         </div>
       )}
       {tab === 'koerper' && (

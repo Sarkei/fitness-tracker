@@ -71,10 +71,21 @@ export function trainingsSerie(
 ): { aktuell: number; laengste: number; geplant: number; absolviert: number } {
   const hatTraining = new Set(workouts.map((w) => toYmd(w.date)).filter(Boolean));
 
-  // Ohne Plan: keine "geplanten" Tage — dann zählt jeder Trainingstag.
+  /*
+   * Ohne Plan gibt es keine "geplanten" Tage. Dann zaehlen nur die Trainingstage
+   * im Anzeigezeitraum — vorher wurden ALLE Trainingstage aller Zeiten gezaehlt,
+   * was zu "38/38 in 30 Tagen" fuehrte, obwohl 30 Tage hoechstens 30 Tage hat.
+   */
   if (!planWochen.length) {
     const s = workoutStreak(workouts);
-    return { aktuell: s.aktuell, laengste: s.laengste, geplant: hatTraining.size, absolviert: hatTraining.size };
+    const zeitraumStart = shiftYmdLocal(heute, -(zeitraumTage - 1));
+    const imZeitraum = [...hatTraining].filter((tag) => tag >= zeitraumStart && tag <= heute).length;
+    return {
+      aktuell: s.aktuell,
+      laengste: s.laengste,
+      geplant: imZeitraum,
+      absolviert: imZeitraum,
+    };
   }
 
   const fruehesteWoche = [...planWochen]
@@ -141,6 +152,15 @@ export function fastenSerie(
   heute: Ymd = new Date().toISOString().slice(0, 10),
 ): { tage: number; seit: Ymd | null } {
   const seit = String(fastingSince ?? '').slice(0, 10);
+  /*
+   * Fehlt das Startdatum, ist die Serie unbekannt — nicht null.
+   *
+   * Tims Fall: Das Fasten war im Profil aktiviert (label 20:4, startTime 20:00),
+   * aber `fastingSince` wurde nie geschrieben, weil die Karte zum Aktivieren
+   * einen anderen Weg nimmt. Die Serie stand deshalb dauerhaft auf 0 Tagen.
+   * Ohne Datum wird jetzt ab dem Beginn der Fastenzeit gerechnet (siehe Aufrufer)
+   * — hier bleibt es bei 0, damit die Funktion ehrlich bleibt.
+   */
   if (!/^\d{4}-\d{2}-\d{2}$/.test(seit)) return { tage: 0, seit: null };
   const diff = daysBetween(seit, heute);
   if (diff < 0) return { tage: 0, seit };

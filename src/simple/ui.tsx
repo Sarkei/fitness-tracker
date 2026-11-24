@@ -406,7 +406,14 @@ export function Sparkline({
   // wirkt die Kurve flach. Etwas Luft nach oben und unten lassen.
   const spanne = datenMax - datenMin;
   const polster = spanne > 0 ? spanne * 0.15 : Math.max(1, datenMax * 0.1);
-  const min = minY ?? Math.max(0, datenMin - polster);
+  /*
+   * Untergrenze: Werte duerfen negativ sein (TSB geht unter null).
+   *
+   * Vorher stand hier `Math.max(0, datenMin - polster)` - damit wurde jeder
+   * negative Wert auf 0 geklemmt und die Kurve schnitt ab. Jetzt gilt die echte
+   * Datengrenze; `minY` kann sie weiterhin erzwingen (z. B. 0 bei Schritten).
+   */
+  const min = minY ?? datenMin - polster;
   const max = maxY ?? Math.max(datenMax + polster, goal ?? 0, min + 1);
 
   const w = 100;
@@ -454,6 +461,19 @@ export function Sparkline({
         className="w-full"
         style={{ height: h + 2 * PAD }}
       >
+        {/* Nulllinie, wenn Werte ins Negative gehen (TSB) */}
+        {datenMin < 0 && datenMax > 0 && (
+          <line
+            x1={0}
+            x2={w}
+            y1={y(0)}
+            y2={y(0)}
+            stroke="var(--text-muted)"
+            strokeWidth={1}
+            opacity={0.45}
+            vectorEffect="non-scaling-stroke"
+          />
+        )}
         {linien.map((wert, i) => (
           <line
             key={`g${i}`}
