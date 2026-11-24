@@ -119,13 +119,34 @@ export default function BilanzChart({
               const offen = budget - tag.kcal;
               const ueberzogen = tag.hatDaten && offen < 0;
               const imZiel = bilanzImZiel(tag.bilanz, zielTyp);
-              // Jeder Balken ist grün oder rot — nie grau.
-              const farbe = imZiel ? GRUEN : ROT;
               const istHeute = tag.ymd === heute;
-              // Heute immer zeichnen (am Tagesanfang volles Budget),
-              // vergangene Tage nur, wenn etwas erfasst wurde.
-              const sichtbar = tag.hatDaten || istHeute;
-              const hoehe = Math.min(mitte, Math.max(3, Math.abs(offen) * skala));
+
+              /*
+               * Drei Arten von Tagen, drei Arten von Balken:
+               *
+               *  - erfasst:       gruen (im Ziel) oder rot (daneben), volle Farbe
+               *  - nichts erfasst, aber Verbrauch bekannt:
+               *                   blasser grauer Balken. Vorher blieb der Tag
+               *                   komplett leer und die Grafik sah kaputt aus —
+               *                   dabei liegt der Verbrauch der Uhr vor, nur das
+               *                   Essen wurde nicht eingetragen.
+               *  - gar nichts:    nichts zeichnen
+               *
+               * Der graue Balken zeigt bewusst NICHT die Bilanz (die waere
+               * fiktiv), sondern markiert nur: hier fehlt die Erfassung.
+               */
+              const ohneEssen = !tag.hatDaten && tag.verbrannt > 0;
+              const sichtbar = tag.hatDaten || istHeute || ohneEssen;
+              const farbe = ohneEssen ? 'var(--border-muted)' : imZiel ? GRUEN : ROT;
+
+              /*
+               * Ohne Erfassung ist die Hoehe fest und klein: ein Stummel an der
+               * Nulllinie, damit man den Tag sieht, ohne einen Watt aussagende
+               * Bilanz zu behaupten.
+               */
+              const hoehe = ohneEssen
+                ? 4
+                : Math.min(mitte, Math.max(3, Math.abs(offen) * skala));
 
               return (
                 <div
@@ -248,6 +269,10 @@ export default function BilanzChart({
         <span className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-[2px]" style={{ background: ROT }} />
           daneben
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-[2px]" style={{ background: 'var(--border-muted)' }} />
+          nichts erfasst
         </span>
         <span className="ml-auto text-[10px]">unter 0 = noch offen · über 0 = über dem Budget</span>
       </div>
