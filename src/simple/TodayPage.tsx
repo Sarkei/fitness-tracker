@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, ChevronRight, Dumbbell, Moon } from 'lucide-react';
+import { ChevronRight, Dumbbell, Moon } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { FastingCard } from '../components/dashboard/FastingCard';
 import EinheitDetailModal, { type EinheitDaten } from '../components/wellness/EinheitDetailModal';
@@ -11,7 +11,6 @@ import {
   MacroBar,
   MAKRO_FARBEN,
   PageHeader,
-  PrimaryButton,
   Ring,
   SectionTitle,
   StatTile,
@@ -35,7 +34,6 @@ import {
 } from './simpleApi';
 import { toYmd } from './analytics';
 import BilanzChart from './BilanzChart';
-import AktualisierenKnopf from './AktualisierenKnopf';
 import {
   fastenSerie,
   kcalBilanz,
@@ -160,14 +158,6 @@ export default function TodayPage() {
     void load();
   }, [load]);
 
-  /**
-   * Nach einem manuellen Abgleich: alles neu holen, was auf der Seite steht.
-   * Der Knopf im Kopf ruft das auf, sobald der Server fertig ist.
-   */
-  const refetch = useCallback(async () => {
-    await Promise.all([holeGarmin(), load()]);
-  }, [holeGarmin, load]);
-
   const sum = totals(entries);
   const goals = (profile?.goals ?? {}) as {
     dailyCalories?: number;
@@ -267,27 +257,6 @@ export default function TodayPage() {
           month: 'long',
         })}
         title="Heute"
-        hint={
-          entries.length
-            ? `${entries.length} Mahlzeiten · ${
-                ueber
-                  ? `${Math.abs(offen).toLocaleString('de-DE')} kcal über dem Budget`
-                  : `${offen.toLocaleString('de-DE')} kcal übrig`
-              }`
-            : 'Noch nichts erfasst'
-        }
-        action={
-          <div className="flex gap-2">
-            {/* Links neben Training, wie gewuenscht: holt neue Daten mit Fortschritt. */}
-            <AktualisierenKnopf onFertig={() => void refetch()} />
-            <GhostButton onClick={() => setShowSession(true)}>
-              <Dumbbell className="h-3.5 w-3.5" /> Training
-            </GhostButton>
-            <PrimaryButton onClick={() => setShowPhoto(true)}>
-              <Camera className="h-4 w-4" /> Erfassen
-            </PrimaryButton>
-          </div>
-        }
       />
 
       {/* Fasten läuft dauerhaft mit */}

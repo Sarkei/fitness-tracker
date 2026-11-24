@@ -37,6 +37,7 @@ import {
 } from '@/src/lib/mobileViewport';
 import PushoverKarte from './PushoverKarte';
 import PushKarte from './PushKarte';
+import FastingSettings from './FastingSettings';
 
 // ─── TDEE Calculator (Mifflin-St-Jeor) ───────────────────────────────────────
 
@@ -784,6 +785,9 @@ export default function ProfilePage() {
       {saveError && !isEditingGoals && (
         <ErrorBanner message={saveError} onRetry={() => setSaveError('')} retryLabel={t('common.dismiss')} />
       )}
+
+      {/* Intervallfasten: Schalter und Plan-Auswahl (frueher auf der Startseite) */}
+      <FastingSettings />
 
       <div className="bg-[var(--surface)] p-4 rounded-xl border border-[var(--line)] space-y-4">
         <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">{t('profile.changePassword.title')}</h3>
