@@ -6758,10 +6758,18 @@ ${JSON.stringify(userCtx, null, 2)}
       const stand = felderStand(tage);
       const laufend = garminSyncLaufend.get(req.userId!);
       res.json({
-        connected: Boolean(g.apiKey),
+        /*
+         * Verbunden ist, wer ENTWEDER einen Login-Zugang ODER einen
+         * Personal-API-Key hat. Der Login ist der Hauptweg, deshalb darf
+         * er hier nicht fehlen — sonst meldet die Oberflaeche "nicht
+         * verbunden", obwohl der Login laeuft.
+         */
+        connected: Boolean(g.login?.tokens || g.apiKey),
+        loginAktiv: Boolean(g.login?.tokens),
         connectedAt: g.connectedAt ?? null,
         displayName: g.displayName ?? null,
-        lastSync: g.cache?.fetchedAt ?? null,
+        lastSync: g.lastAutoSyncAt ?? g.cache?.fetchedAt ?? null,
+        lastVollSync: g.lastVollSyncAt ?? null,
         lastError: g.lastError ?? null,
         nichtVerfuegbar: g.cache?.nichtVerfuegbar ?? [],
         /** Wie viele der gewuenschten Felder beim juengsten Tag gefuellt sind. */
