@@ -153,6 +153,33 @@ export async function garminToken(apiKey: string): Promise<GarminToken> {
   };
 }
 
+
+/*
+ * Token zwischenspeichern.
+ *
+ * Der Access-Token gilt 24 Stunden. Ohne Cache kostet jeder Abgleich zwei
+ * Anfragen (Token + Daten) — bei kurzem Takt frisst der Token-Tausch die
+ * Haelfte des Tagesbudgets von 100 Anfragen auf.
+ */
+const tokenCache = new Map<string, { token: string; expiresAt: number }>();
+
+function tokenSchluessel(apiKey: string): string {
+  // Kein Klartext-Key als Map-Schluessel halten.
+  return apiKey.slice(0, 8) + ':' + apiKey.slice(-8) + ':' + apiKey.length;
+}
+
+/** Token holen — aus dem Cache, wenn er noch mindestens 30 Minuten gilt. */
+export async function garminTokenGecacht(apiKey: string): Promise<GarminToken> {
+  const k = tokenSchluessel(apiKey);
+  const treffer = tokenCache.get(k);
+  if (treffer && treffer.expiresAt - Date.now() > 30 * 60_000) {
+    return { token: treffer.token, expiresAt: treffer.expiresAt };
+  }
+  const frisch = await garminToken(apiKey);
+  tokenCache.set(k, { token: frisch.token, expiresAt: frisch.expiresAt });
+  return frisch;
+}
+
 function ymd(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
@@ -443,7 +470,12 @@ export async function syncGarmin(
   // „laeuft gerade" statt faelschlich „abgeschlossen".
   let erledigt = 0;
   const anzahlEinzel = Math.min(tage, 14);
-  const anzahlKoerper = Math.min(tage, 30);
+  /*
+   * Nur 7 Tage Koerperwerte statt 30: VO2max und Fitnessalter aendern sich nicht
+   * taeglich, und der Tageswert kommt ueber den leichten Lauf. 30 Tage kosteten
+   * 60 Anfragen pro Lauf - mit 7 sind es 14, das haelt das Tagesbudget ein.
+   */
+  const anzahlKoerper = Math.min(tage, 7);
   // 9 Sammelabrufe + Tagesdetails + Koerperwerte (2 je Tag). Die Aktivitaeten
   // werden ausserhalb geholt und nicht mitgezaehlt — sonst endet die Anzeige bei 83/84.
   const gesamtSchritte = 9 + anzahlEinzel + anzahlKoerper * 2;
@@ -811,3 +843,88 @@ export async function syncGarmin(
     nichtVerfuegbar,
   };
 }
+
+/**
+ * Leichter Abgleich: nur der heutige Tag.
+ *
+ * Tims Vorgabe war ein schneller Refresh, aber unter 100 Anfragen pro Tag.
+ * Ein voller Abgleich kostet rund 85 Anfragen (9 Sammel + 14 Tagesdetails +
+ * 30 x 2 Koerperwerte) — damit waere nur ein Lauf pro Tag moeglich gewesen.
+ *
+ * Dieser Weg holt ausschliesslich den heutigen Tagesabruf (Schritte, Kalorien,
+ * Puls, Stress, Body Battery, SpO2 in einem Objekt) und braucht dafuer drei
+ * Anfragen: Token, Tag, Aktivitaeten. Damit ist ein Takt von 20 Minuten
+ * (72 Anfragen/Tag) unkritisch.
+ *
+ * Der volle Abgleich laeuft weiter seltener und zieht die Historie nach.
+ */
+export async function syncGarminHeute(apiKey: string): Promise<GarminTag | null> {
+  const { token } = await garminTokenGecacht(apiKey);
+  const heute = ymd(new Date());
+
+  const daten = await hole<Record<string, unknown>>(
+    token,
+    `/usersummary-service/usersummary/daily?calendarDate=${heute}`,
+  );
+  if (!daten) return null;
+
+  // Dieselbe Auswertung wie im vollen Abgleich — nur fuer einen Tag.
+  const tag: GarminTag = { date: heute };
+  const s = daten;
+
+  const zahl = (v: unknown): number | undefined =>
+    typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+
+  const schrittBlock = s.steps as Record<string, unknown> | undefined;
+  const schritte = zahl(schrittBlock?.value) ?? zahl(s.totalSteps) ?? zahl(s.steps);
+  if (schritte) tag.steps = schritte;
+
+  const distRaw = zahl(schrittBlock?.distanceInMeters) ?? zahl(s.totalDistanceMeters) ?? zahl(s.distance);
+  if (distRaw) tag.distanceMeters = Math.round(distRaw);
+
+  const etagen = zahl(schrittBlock?.floorsClimbed) ?? zahl(s.floorsClimbed) ?? zahl(s.floors);
+  if (etagen) tag.floorsClimbed = etagen;
+
+  const kcal = s.calories as Record<string, unknown> | undefined;
+  if (kcal) {
+    const aktiv = zahl(kcal.burnedActive) ?? zahl(kcal.activeKilocalories);
+    const gesamt = zahl(kcal.burnedTotal);
+    const ruhe = zahl(kcal.burnedResting);
+    if (aktiv) tag.activeCalories = Math.round(aktiv);
+    if (gesamt) tag.totalCalories = Math.round(gesamt);
+    else if (aktiv && ruhe) tag.totalCalories = Math.round(aktiv + ruhe);
+  }
+
+  const hf = s.heartRate as Record<string, unknown> | undefined;
+  if (hf) {
+    const rest = zahl(hf.restingValue) ?? zahl(hf.restingHeartRate);
+    const min = zahl(hf.minValue);
+    const max = zahl(hf.maxValue);
+    if (rest) tag.restingHr = rest;
+    if (min) tag.minHr = min;
+    if (max) tag.maxHr = max;
+  }
+
+  const stressBlock = s.stress as Record<string, unknown> | undefined;
+  if (stressBlock) {
+    const avg = zahl(stressBlock.avgStressLevel) ?? zahl(stressBlock.averageStressLevel);
+    if (avg) tag.stressAvg = avg;
+  }
+
+  const bb = s.bodyBattery as Record<string, unknown> | undefined;
+  if (bb) {
+    const min = zahl(bb.lowestValue);
+    const max = zahl(bb.highestValue);
+    if (min != null) tag.bodyBatteryMin = Math.round(min);
+    if (max != null) tag.bodyBatteryMax = Math.round(max);
+  }
+
+  const spo2 = s.spo2 as Record<string, unknown> | undefined;
+  if (spo2) {
+    const wert = zahl(spo2.averageValue);
+    if (wert) tag.spo2Avg = Math.round(wert * 10) / 10;
+  }
+
+  return tag;
+}
+

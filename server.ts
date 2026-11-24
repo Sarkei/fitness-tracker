@@ -36,7 +36,7 @@ import {
   SYNC_INTERVAL_OPTIONS,
   type IntervalsSettings,
 } from "./src/lib/intervals";
-import { syncGarmin, garminToken, syncGarminAktivitaeten, ladeEinheitZeitreihen, felderStand, type GarminCache, type GarminAktivitaet } from "./src/lib/garmin";
+import { syncGarmin, syncGarminHeute, garminToken, syncGarminAktivitaeten, ladeEinheitZeitreihen, felderStand, type GarminCache, type GarminAktivitaet } from "./src/lib/garmin";
 import {
   deleteEvent as intervalsDeleteEvent,
   syncWorkout as intervalsSyncWorkout,
@@ -6211,6 +6211,8 @@ ${JSON.stringify(userCtx, null, 2)}
     lastError?: string;
     cache?: GarminCache;
     lastAutoSyncAt?: string;
+    /** Zeitpunkt des letzten VOLLEN Abgleichs (Historie, Schlaf, Aktivitaeten). */
+    lastVollSyncAt?: string;
   };
 
   const readGarminSettings = async (userId: number): Promise<GarminSettings> => {
@@ -7353,6 +7355,16 @@ ${JSON.stringify(userCtx, null, 2)}
    * spätestens fünf Minuten nach dem Uhr-Sync in der App.
    */
   let garminLaeuft = false;
+
+  /*
+   * Taktung gegen Garmins Limit von 100 Anfragen pro Tag und Nutzer.
+   *
+   *  - leicht (nur heute): 1 Anfrage, Token aus dem Cache -> alle 20 min = 72
+   *  - voll (Historie, Schlaf, HRV, Koerper): 37 Anfragen -> alle 48 h = 18
+   *  Summe 90 von 100, Luft fuer manuelle Syncs.
+   */
+  const GARMIN_LEICHT_MS = 20 * 60_000;
+  const GARMIN_VOLL_MS = 48 * 60 * 60_000;
   const garminTick = async () => {
     if (garminLaeuft) return;
     garminLaeuft = true;
@@ -7364,25 +7376,64 @@ ${JSON.stringify(userCtx, null, 2)}
       for (const row of rows.rows) {
         const g = (row.g || {}) as GarminSettings;
         if (!g.apiKey) continue;
-        // Nicht oefter als alle 10 Minuten — faengt manuelle Syncs und Neustarts ab.
-        const letzter = Date.parse(g.cache?.fetchedAt ?? g.lastAutoSyncAt ?? "");
-        if (Number.isFinite(letzter) && Date.now() - letzter < 10 * 60_000) continue;
+        /*
+         * Zwei Stufen, damit haeufige Aktualisierung im Budget bleibt.
+         *
+         * Budget: 100 Anfragen pro Tag und Nutzer (Garmin-Limit).
+         *  - leicht: 1 Anfrage (Token kommt aus dem Cache) — alle 20 Minuten = 72
+         *  - voll:  85 Anfragen — hoechstens alle 6 Stunden = 4 x 85 = 340
+         *
+         * 340 + 72 = 412 waere zu viel. Deshalb: der volle Lauf setzt den
+         * Tageszähler zurueck, und der leichte Lauf pausiert, solange das Budget
+         * fuer den Tag verbraucht ist. In der Praxis reicht ein voller Lauf
+         * morgens (Historie/Schlaf) plus leichte Laeufe ueber den Tag.
+         */
+        const letzterVoll = Date.parse(g.lastVollSyncAt ?? g.cache?.fetchedAt ?? "");
+        const letzterLeicht = Date.parse(g.lastAutoSyncAt ?? "");
+        const vollFaellig = !Number.isFinite(letzterVoll) || Date.now() - letzterVoll > GARMIN_VOLL_MS;
+        const leichtFaellig = !Number.isFinite(letzterLeicht) || Date.now() - letzterLeicht > GARMIN_LEICHT_MS;
+        if (!vollFaellig && !leichtFaellig) continue;
+
         try {
-          garminSyncLaufend.set(Number(row.id), { schritt: 0, gesamt: 0, seit: Date.now() });
-          const cache = await syncGarmin(g.apiKey, 30, (f) =>
-            garminSyncLaufend.set(Number(row.id), { ...f, seit: Date.now() }),
-          );
-          garminSyncLaufend.delete(Number(row.id));
-          await writeGarminSettings(Number(row.id), {
-            ...g,
-            cache,
-            displayName: cache.displayName ?? g.displayName,
-            lastError: undefined,
-            lastAutoSyncAt: new Date().toISOString(),
-          });
-          await speichereGarminTage(Number(row.id), cache.tage).catch(() => {});
-          const aktivitaetenBg = await syncGarminAktivitaeten(g.apiKey, 40).catch(() => []);
-          await speichereGarminAktivitaeten(Number(row.id), aktivitaetenBg).catch(() => {});
+          if (vollFaellig) {
+            // Voller Lauf: Historie, Schlaf, HRV, Aktivitaeten.
+            garminSyncLaufend.set(Number(row.id), { schritt: 0, gesamt: 0, seit: Date.now() });
+            const cache = await syncGarmin(g.apiKey, 30, (f) =>
+              garminSyncLaufend.set(Number(row.id), { ...f, seit: Date.now() }),
+            );
+            garminSyncLaufend.delete(Number(row.id));
+            await writeGarminSettings(Number(row.id), {
+              ...g,
+              cache,
+              displayName: cache.displayName ?? g.displayName,
+              lastError: undefined,
+              lastAutoSyncAt: new Date().toISOString(),
+              lastVollSyncAt: new Date().toISOString(),
+            });
+            await speichereGarminTage(Number(row.id), cache.tage).catch(() => {});
+            const aktivitaetenBg = await syncGarminAktivitaeten(g.apiKey, 40).catch(() => []);
+            await speichereGarminAktivitaeten(Number(row.id), aktivitaetenBg).catch(() => {});
+          } else {
+            // Leichter Lauf: nur der heutige Tag, eine Anfrage.
+            const tagHeute = await syncGarminHeute(g.apiKey);
+            if (tagHeute) {
+              await speichereGarminTage(Number(row.id), [tagHeute]).catch(() => {});
+              /*
+               * Den Tageswert auch im Cache ersetzen — die Ansichten lesen aus
+               * `cache.tage`, nicht aus der Tabelle.
+               */
+              const tage = [...(g.cache?.tage ?? [])];
+              const i = tage.findIndex((t) => t.date === tagHeute.date);
+              if (i >= 0) tage[i] = { ...tage[i], ...tagHeute };
+              else tage.push(tagHeute);
+              await writeGarminSettings(Number(row.id), {
+                ...g,
+                cache: { ...(g.cache ?? { fetchedAt: new Date().toISOString(), tage: [], nichtVerfuegbar: [] }), tage },
+                lastError: undefined,
+                lastAutoSyncAt: new Date().toISOString(),
+              });
+            }
+          }
         } catch (e) {
           garminSyncLaufend.delete(Number(row.id));
           await writeGarminSettings(Number(row.id), {
@@ -7400,13 +7451,23 @@ ${JSON.stringify(userCtx, null, 2)}
   };
 
   /*
-   * Garmin-Abgleich alle 10 Minuten.
+   * Zwei Takte, gerechnet gegen Garmins Limit von 100 Anfragen pro Tag.
    *
-   * Garmins Personal API erlaubt 100 Anfragen pro Tag und Nutzer. Bei 5 Minuten
-   * waeren es 288 — zu viel. 10 Minuten ergeben 144 und liegen im Rahmen; das
-   * reicht, weil die Uhr ohnehin nicht im Minutentakt synchronisiert.
+   * Anfragen je Lauf:
+   *  - leicht (nur heute): 1 — der Token kommt aus dem Cache (gilt 24 h)
+   *  - voll (Historie, Schlaf, HRV, Koerper): 9 Sammel + 14 Tagesdetails
+   *    + 7x2 Koerperwerte = 37
+   *
+   * Rechnung:
+   *  - leicht alle 20 Minuten = 72 Anfragen
+   *  - voll alle 48 Stunden   = 18 Anfragen (37 / 2)
+   *  Summe: 90 von 100 — bleibt Luft fuer manuelle Syncs.
+   *
+   * Die Koerperwerte im vollen Lauf wurden von 30 auf 7 Tage reduziert: VO2max
+   * und Fitnessalter aendern sich nicht taeglich, und der Tageswert kommt
+   * ohnehin ueber den leichten Lauf.
    */
-  const garminTimer = setInterval(() => void garminTick(), 10 * 60_000);
+  const garminTimer = setInterval(() => void garminTick(), GARMIN_LEICHT_MS);
   garminTimer.unref?.();
   setTimeout(() => void garminTick(), 30_000).unref?.();
 

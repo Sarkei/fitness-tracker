@@ -3,10 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback , type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/src/lib/AuthContext';
-import { User, LogOut, Loader2, Plus, Target, Moon, Sun, X, FileText, Camera, Image, ArrowUpRight, ArrowDownRight, Trash2, Download, Ruler, Shield, Activity } from 'lucide-react';
+import { User, LogOut, Loader2, Plus, Target, Moon, Sun, X, FileText, Camera, Image, ArrowUpRight, ArrowDownRight, Trash2, Download, Ruler, Shield, Activity, Plug } from 'lucide-react';
 import { useWorkouts } from '@/src/lib/useWorkouts';
 import { useNutrition } from '@/src/lib/useNutrition';
 import { generatePeriodFitnessReport, allowedReportRangeKeys, type ReportRangeKey } from '@/src/lib/periodReport';
@@ -81,6 +81,35 @@ const PROTOCOL_COLORS = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+
+/**
+ * Abschnitt im Integrations-Tab: Trennlinie, kurze Ueberschrift, erklaerender
+ * Satz, dann die Karten. So sieht man auf einen Blick, wofuer die Verbindungen
+ * in diesem Block da sind.
+ */
+function Gruppe({
+  titel,
+  hinweis,
+  children,
+}: {
+  titel: string;
+  hinweis: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="space-y-2.5">
+      <div className="flex items-baseline gap-2">
+        <h3 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--foreground)]">
+          {titel}
+        </h3>
+        <span className="h-px flex-1 bg-[var(--line)]" />
+      </div>
+      <p className="text-[10.5px] leading-relaxed text-[var(--muted)]">{hinweis}</p>
+      <div className="space-y-2.5">{children}</div>
+    </section>
+  );
+}
+
 export default function ProfilePage() {
   const location = useLocation();
   const { profile, logout, deleteAccount, updateProfile } = useAuth();
@@ -95,7 +124,7 @@ export default function ProfilePage() {
   const dfLocale = locale === 'de' ? dfDe : dfEnUS;
   const { workouts } = useWorkouts();
   const { nutritionEntries } = useNutrition();
-  const [tab, setTab] = useState<'uebersicht' | 'koerper' | 'ziele' | 'daten' | 'account'>('uebersicht');
+  const [tab, setTab] = useState<'uebersicht' | 'koerper' | 'ziele' | 'daten' | 'berichte' | 'account'>('uebersicht');
   const [isEditingGoals, setIsEditingGoals] = useState(false);
   const [isAddingWeight, setIsAddingWeight] = useState(false);
   const [newWeight, setNewWeight] = useState('');
@@ -405,7 +434,8 @@ export default function ProfilePage() {
     { id: 'uebersicht', label: t('profile.tab.overview'), icon: User },
     { id: 'koerper', label: t('profile.tab.body'), icon: Ruler },
     { id: 'ziele', label: t('profile.tab.goals'), icon: Target },
-    { id: 'daten', label: t('profile.tab.data'), icon: Download },
+    { id: 'daten', label: t('profile.tab.data'), icon: Plug },   // Integrationen
+    { id: 'berichte', label: 'Berichte', icon: FileText },
     { id: 'account', label: t('profile.tab.account'), icon: Shield },
   ] as const;
 
@@ -789,30 +819,44 @@ export default function ProfilePage() {
       )}
 
       {tab === 'daten' && (
-        <div className="space-y-6">
-      {/* ── Verbindungen ── */}
-      <div className="space-y-3">
-        <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)] px-4">Verbindungen</h3>
-        <GarminConnect />
-        {/* Pushover: Benachrichtigungen aufs Handy */}
-        <PushKarte beschreibung="Nachrichten aufs Handy, auch wenn die App geschlossen ist." />
-        
-        <PushoverKarte beschreibung="Pushover schickt dir Erinnerungen und Hinweise aufs Handy. Beide Werte stehen in deinem Pushover-Konto." />
-        <IntervalsConnect />
-        <MealplannerConnect />
-        <Link
-          to="/wellness"
-          className="flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-[12.5px] font-semibold text-[var(--foreground)] transition hover:border-[var(--simple-accent)]"
-        >
-          <Activity className="h-4 w-4 text-[var(--simple-accent)]" />
-          Wellness-Daten ansehen
-          <span className="ml-auto text-[11px] font-normal text-[var(--text-muted)]">Schlaf, Bewegung, Form</span>
-        </Link>
-      </div>
+        <div className="space-y-5">
+          {/*
+            Drei Gruppen statt einer langen Liste. Jede Gruppe bekommt eine
+            Trennlinie mit kurzer Ueberschrift, damit auf einen Blick klar ist,
+            wofuer die Verbindung da ist.
+          */}
 
+          <Gruppe titel="Datenquellen" hinweis="Woher deine Werte kommen">
+            <GarminConnect />
+            <IntervalsConnect />
+          </Gruppe>
+
+          <Gruppe titel="Benachrichtigungen" hinweis="Wie du erinnert wirst">
+            <PushKarte beschreibung="Nachrichten aufs Handy, auch wenn die App geschlossen ist." />
+            <PushoverKarte beschreibung="Pushover schickt dir Erinnerungen und Hinweise aufs Handy. Beide Werte stehen in deinem Pushover-Konto." />
+          </Gruppe>
+
+          <Gruppe titel="Mahlzeiten" hinweis="Verbindung zum Mealplanner">
+            <MealplannerConnect />
+          </Gruppe>
+
+          <Link
+            to="/wellness"
+            className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-[12px] font-semibold text-[var(--foreground)] transition hover:border-[var(--simple-accent)]"
+          >
+            <Activity className="h-4 w-4 text-[var(--simple-accent)]" />
+            Wellness-Daten ansehen
+            <span className="ml-auto text-[11px] font-normal text-[var(--text-muted)]">Schlaf, Bewegung, Form</span>
+          </Link>
+        </div>
+      )}
+
+
+      {/* ── Berichte: eigener Tab, ganz rechts vor Konto ── */}
+      {tab === 'berichte' && (
+        <div className="space-y-5">
       {/* ── Bericht ── */}
       <div className="space-y-6">
-        <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)] px-4">{t('profile.reportSection')}</h3>
 
         <div className="bg-[var(--surface)] p-6 sm:p-8 rounded-xl border border-[var(--line)] space-y-4">
           <div className="flex items-center gap-2">
@@ -882,39 +926,6 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* ── Datenexport ── */}
-      {profile && (
-        <div className="space-y-6">
-          <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)] px-4">{t('profile.export.title')}</h3>
-          <div className="bg-[var(--surface)] p-6 sm:p-8 rounded-xl border border-[var(--line)] space-y-4">
-            <p className="text-[10px] text-[var(--text-muted)] font-medium leading-relaxed">{t('profile.export.sub')}</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => downloadJsonExport(buildExportBundle(profile, workouts, nutritionEntries))}
-                className="min-h-[44px] flex items-center justify-center gap-2 rounded-2xl border border-[var(--line)] bg-[var(--background)] text-[10px] font-semibold uppercase tracking-[0.12em] hover:border-brand transition-all"
-              >
-                <Download size={16} className="text-brand" />
-                {t('profile.export.json')}
-              </button>
-              <button
-                type="button"
-                onClick={() => downloadCsvExport(buildExportBundle(profile, workouts, nutritionEntries))}
-                className="min-h-[44px] flex items-center justify-center gap-2 rounded-2xl border border-[var(--line)] bg-[var(--background)] text-[10px] font-semibold uppercase tracking-[0.12em] hover:border-brand transition-all"
-              >
-                <Download size={16} className="text-brand" />
-                {t('profile.export.csv')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="bg-[var(--surface)] p-6 sm:p-8 rounded-xl border border-[var(--line)] space-y-3">
-        <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">{t('profile.privacy.title')}</h3>
-        <p className="text-sm text-[var(--text-muted)] font-medium leading-relaxed">{t('profile.privacy.body')}</p>
-        <p className="text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-widest">{t('profile.privacy.exportHint')}</p>
-      </div>
         </div>
       )}
 
@@ -948,6 +959,39 @@ export default function ProfilePage() {
             </button>
           </div>
         </div>
+      </div>
+      {/* ── Datenexport und Datenschutz (gehoeren zum Konto) ── */}
+      {profile && (
+        <div className="space-y-6">
+          <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)] px-4">{t('profile.export.title')}</h3>
+          <div className="bg-[var(--surface)] p-6 sm:p-8 rounded-xl border border-[var(--line)] space-y-4">
+            <p className="text-[10px] text-[var(--text-muted)] font-medium leading-relaxed">{t('profile.export.sub')}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => downloadJsonExport(buildExportBundle(profile, workouts, nutritionEntries))}
+                className="min-h-[44px] flex items-center justify-center gap-2 rounded-2xl border border-[var(--line)] bg-[var(--background)] text-[10px] font-semibold uppercase tracking-[0.12em] hover:border-brand transition-all"
+              >
+                <Download size={16} className="text-brand" />
+                {t('profile.export.json')}
+              </button>
+              <button
+                type="button"
+                onClick={() => downloadCsvExport(buildExportBundle(profile, workouts, nutritionEntries))}
+                className="min-h-[44px] flex items-center justify-center gap-2 rounded-2xl border border-[var(--line)] bg-[var(--background)] text-[10px] font-semibold uppercase tracking-[0.12em] hover:border-brand transition-all"
+              >
+                <Download size={16} className="text-brand" />
+                {t('profile.export.csv')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-[var(--surface)] p-6 sm:p-8 rounded-xl border border-[var(--line)] space-y-3">
+        <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">{t('profile.privacy.title')}</h3>
+        <p className="text-sm text-[var(--text-muted)] font-medium leading-relaxed">{t('profile.privacy.body')}</p>
+        <p className="text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-widest">{t('profile.privacy.exportHint')}</p>
       </div>
         </div>
       )}
