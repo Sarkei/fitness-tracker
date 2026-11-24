@@ -11,8 +11,10 @@ import { Tagesdetail, TagesZeile } from './Tagesdetail';
 import { mittel, schlafBewertung, schlafFarben, schlafStufe, schlafStunden } from '@/src/lib/wellness';
 
 export default function WellnessSchlaf() {
-  const { daten } = useWellness();
+  const { daten, zeitraum } = useWellness();
   const tage = daten.tage;
+  /** Bei "Heute" gibt es keine Serie — dann nur reelle Werte der letzten Nacht. */
+  const nurHeute = zeitraum === 1;
   const [detail, setDetail] = useState<'dauer' | 'score' | null>(null);
   const [tagOffen, setTagOffen] = useState<string | null>(null);
 
@@ -22,6 +24,7 @@ export default function WellnessSchlaf() {
   const letzteNacht = [...reihe].reverse().find((v) => v > 0) ?? null;
   const scores = tage.map((t) => t.sleepScore).filter((s): s is number => s != null);
   const scoreSchnitt = mittel(scores);
+  const scoreHeute = [...tage].reverse().find((t) => t.sleepScore != null)?.sleepScore ?? null;
 
   /*
    * Schlafphasen: Garmin teilt die Nacht in Tief-, REM-, Leichtschlaf und Wachzeit.
@@ -62,20 +65,38 @@ export default function WellnessSchlaf() {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KlickKachel label="Letzte Nacht" value={letzteNacht ?? '—'} unit="h" hint="geschlafen" onClick={() => setDetail('dauer')} />
+        {!nurHeute && (
+          <KlickKachel
+            label="Nächte im Schnitt"
+            value={schnitt != null ? schnitt.toFixed(1) : '—'}
+            unit="h"
+            hint={`${naechte.filter((s) => s).length} Nächte`}
+            onClick={() => setDetail('dauer')}
+          />
+        )}
         <KlickKachel
-          label="Nächte im Schnitt"
-          value={schnitt != null ? schnitt.toFixed(1) : '—'}
-          unit="h"
-          hint={`${naechte.filter((s) => s).length} Nächte`}
-          onClick={() => setDetail('dauer')}
-        />
-        <KlickKachel
-          label="Schlafscore"
-          value={scoreSchnitt != null ? Math.round(scoreSchnitt) : '—'}
-          hint={scoreSchnitt != null ? schlafBewertung(scoreSchnitt) : 'kein Score'}
+          label={nurHeute ? 'Schlafscore' : 'Score im Schnitt'}
+          value={
+            (nurHeute ? scoreHeute : scoreSchnitt) != null
+              ? Math.round((nurHeute ? scoreHeute : scoreSchnitt) as number)
+              : '—'
+          }
+          hint={
+            (nurHeute ? scoreHeute : scoreSchnitt) != null
+              ? schlafBewertung((nurHeute ? scoreHeute : scoreSchnitt) as number)
+              : 'kein Score'
+          }
           onClick={() => setDetail('score')}
         />
-        <KlickKachel label="Nächte ≥ 7 h" value={gut} unit={`von ${reihe.filter((v) => v > 0).length}`} hint="ausreichend" onClick={() => setDetail('dauer')} />
+        {!nurHeute && (
+          <KlickKachel
+            label={`Nächte ≥ 7 h`}
+            value={gut}
+            unit={`von ${reihe.filter((v) => v > 0).length}`}
+            hint="ausreichend"
+            onClick={() => setDetail('dauer')}
+          />
+        )}
       </div>
 
       {/* Schlafphasen der letzten Nacht — Kacheln oben, Balken darunter */}
@@ -158,7 +179,8 @@ export default function WellnessSchlaf() {
             })()}
           </Card>
 
-          {/* Verlauf je Phase über den gewählten Zeitraum */}
+          {/* Verlauf je Phase — nur bei Mehrtaegesansicht sinnvoll */}
+          {!nurHeute && (
           <Card className="space-y-3 p-5">
             <p className="text-[12.5px] font-semibold text-[var(--foreground)]">
               Phasen im Verlauf
@@ -191,17 +213,21 @@ export default function WellnessSchlaf() {
               Ø über die Nächte mit Messung. Leere Nächte zählen nicht mit.
             </p>
           </Card>
+          )}
         </>
       )}
 
+      {!nurHeute && (
       <Card className="space-y-2 p-5">
         <div className="flex items-center gap-2">
           <Moon className="h-3.5 w-3.5 text-[var(--simple-accent)]" />
-          <p className="text-[12.5px] font-semibold text-[var(--foreground)]">Schlafdauer</p>
+          <p className="text-[12.5px] font-semibold text-[var(--foreground)]">Schlafdauer im Verlauf</p>
         </div>
         <Sparkline values={reihe} height={90} einheit="h" />
       </Card>
+      )}
 
+      {!nurHeute && (
       <Card className="space-y-2 p-5">
         <p className="text-[12.5px] font-semibold text-[var(--foreground)]">Verteilung</p>
         <div className="space-y-1.5">
@@ -228,6 +254,7 @@ export default function WellnessSchlaf() {
           })}
         </div>
       </Card>
+      )}
 
       {tagOffen && (() => {
         const t = tage.find((x) => x.date === tagOffen);

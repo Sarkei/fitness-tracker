@@ -47,6 +47,12 @@ type Kontext = {
 const WellnessKontext = createContext<Kontext | null>(null);
 
 const ZEITRAEUME = [
+  /*
+   * "Heute" zeigt ausschliesslich die reellen Werte der letzten Nacht bzw. des
+   * aktuellen Tages — ohne Durchschnittswerte daneben. Tims Vorgabe: die
+   * gemischte Ansicht aus Tageswert und Mehrtages-Schnitt war verwirrend.
+   */
+  { tage: 1, label: 'Heute' },
   { tage: 7, label: '7 Tage' },
   { tage: 14, label: '14 Tage' },
   { tage: 30, label: '30 Tage' },
@@ -55,7 +61,7 @@ const ZEITRAEUME = [
 
 export function WellnessProvider({ children }: { children: ReactNode }) {
   const [daten, setDaten] = useState<WellnessDaten | null>(null);
-  const [zeitraum, setZeitraum] = useState(30);
+  const [zeitraum, setZeitraum] = useState(1);  // Standard: nur heute
   const [laedt, setLaedt] = useState(true);
   const [synct, setSynct] = useState(false);
   const [fortschritt, setFortschritt] = useState<{ schritt: number; gesamt: number } | null>(null);
@@ -65,8 +71,15 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     setLaedt(true);
     setFehler(null);
     try {
-      const res = await api<WellnessDaten>(`/api/integrations/intervals/wellness?days=${zeitraum}`);
-      setDaten(res);
+      // Die API liefert mindestens 7 Tage — bei "Heute" hier auf den letzten
+      // Tag begrenzen, damit alle Unterseiten reelle Tageswerte zeigen.
+      const tageApi = Math.max(7, zeitraum);
+      const res = await api<WellnessDaten>(`/api/integrations/intervals/wellness?days=${tageApi}`);
+      setDaten(
+        zeitraum === 1
+          ? { ...res, tage: res.tage.slice(-1) }
+          : res,
+      );
     } catch (e) {
       setFehler(e instanceof Error ? e.message : 'Wellness-Daten konnten nicht geladen werden.');
     } finally {
