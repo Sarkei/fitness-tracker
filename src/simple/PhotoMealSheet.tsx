@@ -1,8 +1,45 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Camera, Check, Loader2, ScanBarcode, X } from 'lucide-react';
 import { PrimaryButton } from './ui';
 import { analyzeFood, fileToDataUrl, saveAnalyzedMeal, type V3Result } from './simpleApi';
+
+/**
+ * Sichtbarer Bereich inklusive Tastatur.
+ *
+ * Warum nicht `--vv-height` aus `mobileViewport.ts`: dort wird in der
+ * installierten PWA bewusst `window.innerHeight` gesetzt (damit die Tab-Leiste
+ * unten klebt). Diese Höhe schrumpft bei offener Tastatur NICHT — ein Sheet mit
+ * `inset-0` sitzt dann komplett hinter der Tastatur. Deshalb misst das Sheet den
+ * visualViewport selbst.
+ */
+function useSichtbarerBereich(aktiv: boolean): { top: number; hoehe: number } {
+  const [mass, setMass] = useState(() => ({ top: 0, hoehe: 0 }));
+
+  useEffect(() => {
+    if (!aktiv) return;
+    const vv = window.visualViewport;
+
+    const messen = () => {
+      const top = Math.max(0, Math.round(vv?.offsetTop ?? 0));
+      const hoehe = Math.round(vv?.height ?? window.innerHeight);
+      setMass({ top, hoehe });
+    };
+
+    messen();
+    vv?.addEventListener('resize', messen);
+    vv?.addEventListener('scroll', messen);
+    window.addEventListener('resize', messen);
+    return () => {
+      vv?.removeEventListener('resize', messen);
+      vv?.removeEventListener('scroll', messen);
+      window.removeEventListener('resize', messen);
+    };
+  }, [aktiv]);
+
+  return mass;
+}
+
 
 /** Essen fotografieren → KI erkennt das Gericht → kurz prüfen → speichern. */
 export default function PhotoMealSheet({
@@ -73,12 +110,31 @@ export default function PhotoMealSheet({
     return sum + c.kcal * factor;
   }, 0);
 
+  const bereich = useSichtbarerBereich(true);
+
   const inhalt = (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-6" onClick={onClose}>
+    <div
+      /*
+       * Höhe = sichtbarer Bereich (visualViewport), NICHT inset-0.
+       *
+       * Mit `inset-0` hängt das Sheet am unteren Rand des LAYOUT-Viewports. Sobald
+       * die Tastatur aufgeht, liegt dieser Rand hinter der Tastatur — das Panel war
+       * zwar richtig hoch, saß aber komplett darunter und man sah nichts mehr von
+       * der Eingabe.
+       */
+      className="fixed inset-x-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-6"
+      style={
+        bereich.hoehe > 0
+          ? { top: bereich.top, height: bereich.hoehe }
+          : { top: 0, height: 'var(--vv-height, 100dvh)' }
+      }
+      onClick={onClose}
+    >
       <div
-        className="flex max-h-[var(--vv-height,92dvh)] w-full max-w-lg flex-col rounded-t-3xl border border-[var(--border-muted)] bg-[var(--card-bg)] sm:rounded-3xl"
+        className="flex max-h-full w-full max-w-lg flex-col rounded-t-3xl border border-[var(--border-muted)] bg-[var(--card-bg)] sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
+
         <div className="flex items-center justify-between border-b border-[var(--border-muted)] px-4 py-3">
           <p className="text-sm font-black uppercase tracking-tighter">Essen erfassen</p>
           <button className="rounded-full p-1.5 text-[var(--text-muted)]" onClick={onClose} aria-label="Schließen">

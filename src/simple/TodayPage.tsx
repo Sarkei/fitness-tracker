@@ -570,7 +570,7 @@ export default function TodayPage() {
           Kalorienbilanz
         </SectionTitle>
 
-        <BilanzChart bilanz={bilanz} zielTyp={zielTyp} heute={date} />
+        <BilanzChart bilanz={bilanz} heute={date} />
 
         {hatBilanz && (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-muted)] pt-2.5 text-[11px] text-[var(--text-muted)]">

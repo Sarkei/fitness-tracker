@@ -1,13 +1,17 @@
 import { useMemo } from 'react';
-import { bilanzImZiel, wochentagKurz, type BilanzTag, type ZielTyp } from './serien';
+import { wochentagKurz, type BilanzTag } from './serien';
 
+/** Verbrauch (Balken nach unten). */
+const VERBRAUCH = '#2f7d5a';
+/** Gegessen (Balken nach oben). */
+const GEGESSEN = '#c9741f';
 const GRUEN = '#22c55e';
 const ROT = '#ef4444';
 
 /** Runde Obergrenze für die Y-Achse, damit die Beschriftung glatte Zahlen zeigt. */
 function rundeGrenze(wert: number): number {
   if (wert <= 0) return 500;
-  const stufen = [250, 500, 750, 1000, 1250, 1500, 2000, 2500, 3000, 4000, 5000];
+  const stufen = [500, 750, 1000, 1250, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 6000];
   return stufen.find((s) => s >= wert) ?? Math.ceil(wert / 1000) * 1000;
 }
 
@@ -24,44 +28,34 @@ const HOEHE = 200;
 const ACHSE_BREITE = 54;
 
 /**
- * Kalorienbilanz der letzten Tage als Balken an der Nulllinie.
+ * Kalorienbilanz je Tag: Verbrauch nach unten, Gegessen nach oben.
  *
- * Jeder Balken hängt am Tagesanfang in voller Höhe unter der Linie (= offenes Budget)
- * und schrumpft mit jedem erfassten Essen. Ist das Budget überschritten, wächst er rot
- * über die Linie. Die Farbe folgt dem Profilziel: grün = im Ziel, rot = daneben.
- * Es gibt keine eingefärbten Hintergrundflächen, nur die Balken tragen Farbe.
+ * Vorher zeigte das Diagramm nur die Differenz (Budget − Gegessen). Tage ohne
+ * Essen waren dadurch nur ein 4-px-Stummel und die Grafik war fast leer, obwohl
+ * der Verbrauch der Uhr für jeden Tag vorlag. Jetzt stehen beide Größen einzeln
+ * im Diagramm: unten der Verbrauch, oben das Gegessene. So ist jeder Tag sichtbar
+ * und man sieht sofort, ob gegessen oder verbraucht überwiegt.
  */
 export default function BilanzChart({
   bilanz,
-  zielTyp,
   heute,
   hoechstens = 14,
 }: {
   bilanz: BilanzTag[];
-  zielTyp: ZielTyp;
   heute: string;
   hoechstens?: number;
 }) {
   const tage = useMemo(() => bilanz.slice(-hoechstens), [bilanz, hoechstens]);
 
+  /*
+   * Maßstab: der größte Einzelwert eines Tages, nicht die Summe.
+   * Sonst müsste die Achse 6.000 kcal zeigen und die Balken würden flach.
+   */
   const maxWert = useMemo(() => {
-    /*
-     * Maßstab ist das Tagesbudget.
-     *
-     * Achtung: Mit Garmin ist `verbrannt` bereits der GESAMTverbrauch
-     * (Grundumsatz + Aktivitaet) — das Ziel ist darin enthalten. Wer hier
-     * `ziel + verbrannt` rechnet, verdoppelt das Budget und die Achse lief
-     * bis ±7.000 kcal, obwohl der Tag bei ~1.900 liegt.
-     *
-     * Ohne Garmin ist `verbrannt` nur die Trainings-Schaetzung, dann gilt
-     * weiterhin Ziel + Training.
-     */
-    const budgets = tage.map((t) => t.budget);
-    const ueberzogen = tage.filter((t) => t.hatDaten).map((t) => Math.abs(t.bilanz));
-    return rundeGrenze(Math.max(500, ...budgets, ...ueberzogen));
+    const werte = tage.flatMap((t) => [t.verbrannt, t.kcal]);
+    return rundeGrenze(Math.max(500, ...werte));
   }, [tage]);
 
-  // Nulllinie in der Mitte: oben Platz für Überschuss, unten für offenes Budget.
   const mitte = HOEHE / 2;
   const skala = mitte / maxWert;
 
@@ -76,7 +70,7 @@ export default function BilanzChart({
   return (
     <div>
       <div className="flex">
-        {/* Y-Achse */}
+        {/* Y-Achse: oben positiv (gegessen), unten negativ (verbraucht) */}
         <div className="relative shrink-0" style={{ width: ACHSE_BREITE, height: HOEHE }}>
           {ticksY.map((tick) => (
             <div
@@ -112,64 +106,61 @@ export default function BilanzChart({
             />
           ))}
 
-          {/* Balken */}
+          {/* Ein Tag = zwei Balken: oben gegessen, unten verbraucht */}
           <div className="absolute inset-0 flex items-stretch gap-1.5">
             {tage.map((tag) => {
-              const budget = tag.budget;
-              const offen = budget - tag.kcal;
-              const ueberzogen = tag.hatDaten && offen < 0;
-              const imZiel = bilanzImZiel(tag.bilanz, zielTyp);
               const istHeute = tag.ymd === heute;
-
-              /*
-               * Drei Arten von Tagen, drei Arten von Balken:
-               *
-               *  - erfasst:       gruen (im Ziel) oder rot (daneben), volle Farbe
-               *  - nichts erfasst, aber Verbrauch bekannt:
-               *                   blasser grauer Balken. Vorher blieb der Tag
-               *                   komplett leer und die Grafik sah kaputt aus —
-               *                   dabei liegt der Verbrauch der Uhr vor, nur das
-               *                   Essen wurde nicht eingetragen.
-               *  - gar nichts:    nichts zeichnen
-               *
-               * Der graue Balken zeigt bewusst NICHT die Bilanz (die waere
-               * fiktiv), sondern markiert nur: hier fehlt die Erfassung.
-               */
-              const ohneEssen = !tag.hatDaten && tag.verbrannt > 0;
-              const sichtbar = tag.hatDaten || istHeute || ohneEssen;
-              const farbe = ohneEssen ? 'var(--border-muted)' : imZiel ? GRUEN : ROT;
-
-              /*
-               * Ohne Erfassung ist die Hoehe fest und klein: ein Stummel an der
-               * Nulllinie, damit man den Tag sieht, ohne einen Watt aussagende
-               * Bilanz zu behaupten.
-               */
-              const hoehe = ohneEssen
-                ? 4
-                : Math.min(mitte, Math.max(3, Math.abs(offen) * skala));
+              const hoeheVerbrauch = Math.min(mitte, tag.verbrannt * skala);
+              const hoeheGegessen = Math.min(mitte, tag.kcal * skala);
 
               return (
                 <div
                   key={tag.ymd}
                   className="group relative flex-1"
-                  title={
-                    tag.hatDaten
-                      ? `${fmtDatum(tag.ymd)}: ${fmtZahl(tag.kcal)} kcal gegessen · Budget ${fmtZahl(
-                          budget,
-                        )} kcal · ${offen >= 0 ? `${fmtZahl(offen)} kcal offen` : `${fmtZahl(-offen)} kcal über`}${
-                          tag.vollstaendig ? '' : ' (unvollständig erfasst)'
-                        }`
-                      : `${fmtDatum(tag.ymd)}: nichts erfasst`
-                  }
+                  title={[
+                    fmtDatum(tag.ymd),
+                    `gegessen ${fmtZahl(tag.kcal)} kcal`,
+                    `verbraucht ${fmtZahl(tag.verbrannt)} kcal`,
+                    `Bilanz ${tag.bilanz > 0 ? '+' : ''}${fmtZahl(tag.bilanz)} kcal`,
+                    tag.vollstaendig ? '' : '(unvollständig erfasst)',
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
                 >
-                  {sichtbar && (
+                  {/*
+                   * Beide Balken hängen an der Nulllinie: gegessen nach oben,
+                   * verbraucht nach unten. Nebeneinander, nicht übereinander —
+                   * so bleibt jeder Wert ablesbar, auch wenn einer viel größer ist.
+                   */}
+                  {hoeheGegessen > 0 && (
                     <div
-                      className="absolute inset-x-0 transition-all duration-500 group-hover:brightness-110"
+                      className="absolute left-0 right-1/2 mr-[1px] transition-all duration-500 group-hover:brightness-110"
                       style={{
-                        height: hoehe,
-                        top: ueberzogen ? mitte - hoehe : mitte,
-                        background: farbe,
-                        borderRadius: ueberzogen ? '3px 3px 0 0' : '0 0 3px 3px',
+                        height: hoeheGegessen,
+                        bottom: '50%',
+                        background: GEGESSEN,
+                        borderRadius: '2px 2px 0 0',
+                      }}
+                    />
+                  )}
+                  {hoeheVerbrauch > 0 && (
+                    <div
+                      className="absolute left-1/2 right-0 ml-[1px] transition-all duration-500 group-hover:brightness-110"
+                      style={{
+                        height: hoeheVerbrauch,
+                        top: '50%',
+                        background: VERBRAUCH,
+                        borderRadius: '0 0 2px 2px',
+                      }}
+                    />
+                  )}
+
+                  {/* Heute-Markierung: feiner Rahmen um die Tagesspalte */}
+                  {istHeute && (
+                    <div
+                      className="pointer-events-none absolute inset-0 rounded-sm"
+                      style={{
+                        border: '1px dashed color-mix(in srgb, var(--simple-accent) 55%, transparent)',
                       }}
                     />
                   )}
@@ -209,7 +200,7 @@ export default function BilanzChart({
         </div>
       </div>
 
-      {/* Achsen-Titel: links die Einheit, rechts die Achse */}
+      {/* Achsen-Titel */}
       <div
         className="mt-1 flex items-center justify-between text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--text-muted)]"
         style={{ paddingLeft: ACHSE_BREITE }}
@@ -218,10 +209,7 @@ export default function BilanzChart({
         <span>Tag</span>
       </div>
 
-      {/*
-        Zahlen zum Ablesen. Die Balken zeigen die Richtung, aber nicht den Wert —
-        Tim wollte die Kalorien auch als Zahl sehen, gerade fuer vergangene Tage.
-      */}
+      {/* Zahlen zum Ablesen */}
       <details className="mt-3 border-t border-[var(--border-muted)] pt-2.5">
         <summary className="cursor-pointer list-none text-[10.5px] font-semibold text-[var(--simple-accent)]">
           Zahlen je Tag anzeigen
@@ -237,24 +225,19 @@ export default function BilanzChart({
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border-muted)]">
-              {[...tage].reverse().map((t) => {
-                const verbraucht = Math.round(t.budget);
-                return (
-                  <tr key={`z-${t.ymd}`}>
-                    <td className="py-1 text-[var(--text-muted)]">{fmtDatum(t.ymd)}</td>
-                    <td className="py-1 text-right tabular-nums">
-                      {t.hatDaten ? fmtZahl(t.kcal) : '—'}
-                    </td>
-                    <td className="py-1 text-right tabular-nums">{fmtZahl(verbraucht)}</td>
-                    <td
-                      className="py-1 text-right font-semibold tabular-nums"
-                      style={{ color: t.hatDaten ? (t.bilanz < 0 ? GRUEN : ROT) : 'var(--text-muted)' }}
-                    >
-                      {t.hatDaten ? `${t.bilanz > 0 ? '+' : ''}${fmtZahl(t.bilanz)}` : '—'}
-                    </td>
-                  </tr>
-                );
-              })}
+              {[...tage].reverse().map((t) => (
+                <tr key={`z-${t.ymd}`}>
+                  <td className="py-1 text-[var(--text-muted)]">{fmtDatum(t.ymd)}</td>
+                  <td className="py-1 text-right tabular-nums">{t.kcal > 0 ? fmtZahl(t.kcal) : '—'}</td>
+                  <td className="py-1 text-right tabular-nums">{t.verbrannt > 0 ? fmtZahl(t.verbrannt) : '—'}</td>
+                  <td
+                    className="py-1 text-right font-semibold tabular-nums"
+                    style={{ color: t.hatDaten ? (t.bilanz < 0 ? GRUEN : ROT) : 'var(--text-muted)' }}
+                  >
+                    {t.hatDaten ? `${t.bilanz > 0 ? '+' : ''}${fmtZahl(t.bilanz)}` : '—'}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -263,18 +246,14 @@ export default function BilanzChart({
       {/* Legende */}
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-[var(--border-muted)] pt-2.5 text-[10.5px] text-[var(--text-muted)]">
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-[2px]" style={{ background: GRUEN }} />
-          im Ziel
+          <span className="h-2.5 w-2.5 rounded-[2px]" style={{ background: GEGESSEN }} />
+          gegessen
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-[2px]" style={{ background: ROT }} />
-          daneben
+          <span className="h-2.5 w-2.5 rounded-[2px]" style={{ background: VERBRAUCH }} />
+          verbraucht
         </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-[2px]" style={{ background: 'var(--border-muted)' }} />
-          nichts erfasst
-        </span>
-        <span className="ml-auto text-[10px]">unter 0 = noch offen · über 0 = über dem Budget</span>
+        <span className="ml-auto text-[10px]">oben gegessen · unten verbraucht</span>
       </div>
     </div>
   );
