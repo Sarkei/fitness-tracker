@@ -8377,8 +8377,36 @@ function berlinTeile(d: Date = new Date()): { stunde: number; minute: number; hh
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (_req, res) => res.sendFile(path.join(distPath, "index.html")));
+
+    /*
+     * Cache-Regeln.
+     *
+     * `express.static` schickte alle Dateien mit `max-age=14400` (4 Stunden) —
+     * damit kamen Aenderungen erst Stunden spaeter an, auch nach einem Deploy.
+     *
+     * Jetzt:
+     *  - `/assets/*` (gehashte Dateien): ein Jahr, sie aendern sich nie unter
+     *    demselben Namen.
+     *  - `index.html` und Service Worker: immer neu pruefen, damit ein Deploy
+     *    sofort greift.
+     */
+    app.use(
+      express.static(distPath, {
+        setHeaders: (res, dateiPfad) => {
+          const name = path.basename(dateiPfad);
+          if (name === "index.html" || name === "sw.js") {
+            res.setHeader("Cache-Control", "no-cache, must-revalidate");
+            return;
+          }
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        },
+      }),
+    );
+    app.get("*", (_req, res) => {
+      // HTML nie cachen - sonst zeigt der Browser nach einem Deploy alte Bundles.
+      res.setHeader("Cache-Control", "no-cache, must-revalidate");
+      res.sendFile(path.join(distPath, "index.html"));
+    });
   }
 
   const PORT = parseInt(process.env.PORT || "3000");

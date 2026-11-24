@@ -428,7 +428,7 @@ export default function ProfilePage() {
               'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-[12px] font-semibold transition',
               tab === id
                 ? 'border-[var(--simple-accent)] bg-[var(--simple-accent)] text-white'
-                : 'border-[var(--border-muted)] text-[var(--text-muted)] hover:border-[var(--simple-accent)] hover:text-[var(--simple-accent)]',
+                : 'border-[var(--line)] text-[var(--text-muted)] hover:border-[var(--simple-accent)] hover:text-[var(--simple-accent)]',
             )}
           >
             <Icon className="h-3.5 w-3.5" />
@@ -496,7 +496,7 @@ export default function ProfilePage() {
                   'min-h-[40px] rounded-lg border px-2 text-[11px] font-semibold transition',
                   archive === id
                     ? 'border-[var(--simple-accent)] bg-[var(--simple-accent-soft)] text-[var(--simple-accent)]'
-                    : 'border-[var(--border-muted)] text-[var(--text-muted)]',
+                    : 'border-[var(--line)] text-[var(--text-muted)]',
                 )}
               >
                 {label}
@@ -504,12 +504,12 @@ export default function ProfilePage() {
             ))}
           </div>
 
-        <div className="w-full rounded-[2rem] border border-[var(--border-muted)] bg-[var(--card-bg)] p-6 text-left space-y-4">
-            <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">
+        <div className="w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] p-6 text-left space-y-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
               {t('profile.settings.section')}
             </p>
             <div>
-              <p className="text-[9px] font-black uppercase text-[var(--text-muted)] mb-2">{t('profile.settings.name')}</p>
+              <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)] mb-2">{t('profile.settings.name')}</p>
               <div className="grid grid-cols-2 gap-2">
                 <input
                   type="text"
@@ -517,7 +517,7 @@ export default function ProfilePage() {
                   value={nameFirst}
                   onChange={e => setNameFirst(e.target.value)}
                   placeholder={t('auth.placeholderFirstName')}
-                  className="min-h-[44px] bg-[var(--background)] border border-[var(--border-muted)] rounded-xl px-3 text-xs font-bold text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)]"
+                  className="min-h-[44px] bg-[var(--background)] border border-[var(--line)] rounded-xl px-3 text-xs font-bold text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)]"
                   minLength={2}
                   required
                 />
@@ -527,7 +527,7 @@ export default function ProfilePage() {
                   value={nameLast}
                   onChange={e => setNameLast(e.target.value)}
                   placeholder={t('auth.placeholderLastName')}
-                  className="min-h-[44px] bg-[var(--background)] border border-[var(--border-muted)] rounded-xl px-3 text-xs font-bold text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)]"
+                  className="min-h-[44px] bg-[var(--background)] border border-[var(--line)] rounded-xl px-3 text-xs font-bold text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)]"
                   minLength={2}
                   required
                 />
@@ -539,22 +539,22 @@ export default function ProfilePage() {
                 type="button"
                 disabled={nameSaving}
                 onClick={() => void handleSaveName()}
-                className="mt-2 w-full min-h-[44px] rounded-xl ui-btn-brand text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
+                className="mt-2 w-full min-h-[44px] rounded-xl ui-btn-brand text-[10px] font-semibold uppercase tracking-[0.12em] disabled:opacity-50"
               >
                 {nameSaving ? <Loader2 size={16} className="animate-spin mx-auto" /> : t('profile.settings.nameSave')}
               </button>
             </div>
             <div>
-              <p className="text-[9px] font-black uppercase text-[var(--text-muted)] mb-2">{t('profile.settings.language')}</p>
+              <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)] mb-2">{t('profile.settings.language')}</p>
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => void setLocale('de')}
                   className={cn(
-                    'flex-1 min-h-[44px] rounded-xl text-[10px] font-black uppercase tracking-widest border transition-colors',
+                    'flex-1 min-h-[44px] rounded-xl text-[10px] font-semibold uppercase tracking-[0.12em] border transition-colors',
                     locale === 'de'
                       ? 'border-2 border-brand bg-brand/15 text-[var(--text-primary)]'
-                      : 'bg-[var(--background)] border-[var(--border-muted)] text-[var(--text-muted)] hover:border-brand'
+                      : 'bg-[var(--background)] border-[var(--line)] text-[var(--text-muted)] hover:border-brand'
                   )}
                 >
                   DE
@@ -563,10 +563,10 @@ export default function ProfilePage() {
                   type="button"
                   onClick={() => void setLocale('en')}
                   className={cn(
-                    'flex-1 min-h-[44px] rounded-xl text-[10px] font-black uppercase tracking-widest border transition-colors',
+                    'flex-1 min-h-[44px] rounded-xl text-[10px] font-semibold uppercase tracking-[0.12em] border transition-colors',
                     locale === 'en'
                       ? 'border-2 border-brand bg-brand/15 text-[var(--text-primary)]'
-                      : 'bg-[var(--background)] border-[var(--border-muted)] text-[var(--text-muted)] hover:border-brand'
+                      : 'bg-[var(--background)] border-[var(--line)] text-[var(--text-muted)] hover:border-brand'
                   )}
                 >
                   EN
@@ -574,16 +574,16 @@ export default function ProfilePage() {
               </div>
             </div>
             <div>
-              <p className="text-[9px] font-black uppercase text-[var(--text-muted)] mb-2">{t('profile.theme')}</p>
+              <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)] mb-2">{t('profile.theme')}</p>
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => void setThemeMode('light')}
                   className={cn(
-                    'flex-1 min-h-[44px] rounded-xl text-[10px] font-black uppercase tracking-widest border transition-colors flex items-center justify-center gap-2',
+                    'flex-1 min-h-[44px] rounded-xl text-[10px] font-semibold uppercase tracking-[0.12em] border transition-colors flex items-center justify-center gap-2',
                     (profile.themePreference ?? 'dark') === 'light'
                       ? 'border-2 border-brand bg-brand/15 text-[var(--text-primary)]'
-                      : 'bg-[var(--background)] border-[var(--border-muted)] text-[var(--text-muted)] hover:border-brand'
+                      : 'bg-[var(--background)] border-[var(--line)] text-[var(--text-muted)] hover:border-brand'
                   )}
                 >
                   <Sun size={16} />
@@ -593,10 +593,10 @@ export default function ProfilePage() {
                   type="button"
                   onClick={() => void setThemeMode('dark')}
                   className={cn(
-                    'flex-1 min-h-[44px] rounded-xl text-[10px] font-black uppercase tracking-widest border transition-colors flex items-center justify-center gap-2',
+                    'flex-1 min-h-[44px] rounded-xl text-[10px] font-semibold uppercase tracking-[0.12em] border transition-colors flex items-center justify-center gap-2',
                     (profile.themePreference !== 'light')
                       ? 'border-2 border-brand bg-brand/15 text-[var(--text-primary)]'
-                      : 'bg-[var(--background)] border-[var(--border-muted)] text-[var(--text-muted)] hover:border-brand'
+                      : 'bg-[var(--background)] border-[var(--line)] text-[var(--text-muted)] hover:border-brand'
                   )}
                 >
                   <Moon size={16} />
@@ -605,16 +605,16 @@ export default function ProfilePage() {
               </div>
             </div>
             <div>
-              <p className="text-[9px] font-black uppercase text-[var(--text-muted)] mb-2">{t('profile.fasting.section')}</p>
+              <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)] mb-2">{t('profile.fasting.section')}</p>
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => void setFastingEnabled(true)}
                   className={cn(
-                    'flex-1 min-h-[44px] rounded-xl text-[10px] font-black uppercase tracking-widest border transition-colors flex items-center justify-center gap-2',
+                    'flex-1 min-h-[44px] rounded-xl text-[10px] font-semibold uppercase tracking-[0.12em] border transition-colors flex items-center justify-center gap-2',
                     fastingEnabled
                       ? 'border-2 border-brand bg-brand/15 text-[var(--text-primary)]'
-                      : 'bg-[var(--background)] border-[var(--border-muted)] text-[var(--text-muted)] hover:border-brand'
+                      : 'bg-[var(--background)] border-[var(--line)] text-[var(--text-muted)] hover:border-brand'
                   )}
                 >
                   <Moon size={16} />
@@ -624,10 +624,10 @@ export default function ProfilePage() {
                   type="button"
                   onClick={() => void setFastingEnabled(false)}
                   className={cn(
-                    'flex-1 min-h-[44px] rounded-xl text-[10px] font-black uppercase tracking-widest border transition-colors flex items-center justify-center gap-2',
+                    'flex-1 min-h-[44px] rounded-xl text-[10px] font-semibold uppercase tracking-[0.12em] border transition-colors flex items-center justify-center gap-2',
                     !fastingEnabled
                       ? 'border-2 border-brand bg-brand/15 text-[var(--text-primary)]'
-                      : 'bg-[var(--background)] border-[var(--border-muted)] text-[var(--text-muted)] hover:border-brand'
+                      : 'bg-[var(--background)] border-[var(--line)] text-[var(--text-muted)] hover:border-brand'
                   )}
                 >
                   {t('profile.fasting.off')}
@@ -636,7 +636,7 @@ export default function ProfilePage() {
               <p className="mt-1.5 text-[10px] text-[var(--text-muted)]">{t('profile.fasting.hint')}</p>
             </div>
             <div>
-              <p className="text-[9px] font-black uppercase text-[var(--text-muted)] mb-2">{t('profile.settings.focus')}</p>
+              <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)] mb-2">{t('profile.settings.focus')}</p>
               <select
                 value={profile.navigationFocus ?? 'hybrid'}
                 onChange={e =>
@@ -644,7 +644,7 @@ export default function ProfilePage() {
                     navigationFocus: e.target.value as NavigationFocus,
                   } as Record<string, unknown>)
                 }
-                className="w-full min-h-[44px] bg-[var(--background)] border border-[var(--border-muted)] rounded-xl px-4 text-xs font-bold text-[var(--text-primary)]"
+                className="w-full min-h-[44px] bg-[var(--background)] border border-[var(--line)] rounded-xl px-4 text-xs font-bold text-[var(--text-primary)]"
               >
                 <option value="hybrid">{t('onb.focus.hybrid')}</option>
                 <option value="workout">{t('onb.focus.workout')}</option>
@@ -669,10 +669,10 @@ export default function ProfilePage() {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.25 }}
-              className="mt-6 w-full text-left rounded-[1.75rem] border-2 border-[var(--border-muted)] bg-[var(--card-bg)] shadow-lg overflow-hidden max-h-[min(72vh,720px)] flex flex-col"
+              className="mt-6 w-full text-left rounded-[1.75rem] border-2 border-[var(--line)] bg-[var(--surface)] shadow-lg overflow-hidden max-h-[min(72vh,720px)] flex flex-col"
             >
-              <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--border-muted)] bg-[var(--background)]">
-                <p className="text-xs font-black uppercase italic tracking-tight text-[var(--text-primary)] truncate">
+              <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--line)] bg-[var(--background)]">
+                <p className="text-xs text-[11px] font-semibold text-[var(--text-primary)] truncate">
                   {archive === 'transformation'
                     ? t('profile.transformation')
                     : archive === 'liked'
@@ -682,7 +682,7 @@ export default function ProfilePage() {
                 <button
                   type="button"
                   onClick={() => setArchive(null)}
-                  className="shrink-0 p-2 rounded-xl border border-[var(--border-muted)] bg-[var(--card-bg)] text-[var(--text-primary)] hover:opacity-90"
+                  className="shrink-0 p-2 rounded-xl border border-[var(--line)] bg-[var(--surface)] text-[var(--text-primary)] hover:opacity-90"
                   aria-label={t('profile.closePanel')}
                 >
                   <X size={18} strokeWidth={2.25} />
@@ -692,7 +692,7 @@ export default function ProfilePage() {
                 {archiveLoading && (
                   <div className="flex items-center justify-center gap-2 py-16 text-[var(--text-muted)]">
                     <Loader2 className="animate-spin" size={22} />
-                    <span className="text-[10px] font-black uppercase tracking-widest">{t('profile.loadingShort')}</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.12em]">{t('profile.loadingShort')}</span>
                   </div>
                 )}
                 {!archiveLoading && archive === 'transformation' && (
@@ -700,7 +700,7 @@ export default function ProfilePage() {
                     {[...(profile.checkIns || [])].reverse().map(c => (
                       <div
                         key={c.id}
-                        className="rounded-xl border border-[var(--border-muted)] overflow-hidden bg-[var(--background)] hover:border-brand/30 transition-colors"
+                        className="rounded-xl border border-[var(--line)] overflow-hidden bg-[var(--background)] hover:border-brand/30 transition-colors"
                       >
                         {c.photoURL ? (
                           <img src={c.photoURL} alt="" className="w-full aspect-[4/5] object-cover" />
@@ -708,7 +708,7 @@ export default function ProfilePage() {
                           <div className="aspect-[4/5] flex items-center justify-center text-[var(--text-muted)] text-[10px]">—</div>
                         )}
                         <div className="p-2">
-                          <p className="text-[9px] font-black uppercase text-[var(--text-primary)]">{c.date}</p>
+                          <p className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--text-primary)]">{c.date}</p>
                           {c.weight != null && <p className="text-xs font-bold mt-1">{c.weight} kg</p>}
                           {c.note && <p className="text-[10px] mt-1 text-[var(--text-muted)] line-clamp-3">{c.note}</p>}
                         </div>
@@ -724,7 +724,7 @@ export default function ProfilePage() {
                     {archivePosts.map(p => (
                       <article
                         key={p.id}
-                        className="rounded-xl border border-[var(--border-muted)] p-4 bg-[var(--background)] hover:border-brand/25 transition-colors"
+                        className="rounded-xl border border-[var(--line)] p-4 bg-[var(--background)] hover:border-brand/25 transition-colors"
                       >
                         <p className="text-[10px] text-[var(--text-muted)] mb-1">{p.userName}</p>
                         <p className="text-sm text-[var(--text-primary)] whitespace-pre-wrap leading-relaxed">{p.content}</p>
@@ -745,10 +745,10 @@ export default function ProfilePage() {
       {/* ── Biometrics Quick Stats ── */}
       <div className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="bg-[var(--card-bg)] p-6 rounded-[2rem] border border-[var(--border-muted)] flex flex-col justify-between text-center">
+          <div className="bg-[var(--surface)] p-4 rounded-xl border border-[var(--line)] flex flex-col justify-between text-center">
             <div>
               <div className="flex items-center justify-center gap-2 flex-wrap">
-                <p className="text-3xl font-black italic tracking-tighter uppercase">{profile?.measurements?.weight ?? '—'}</p>
+                <p className="text-3xl font-semibold uppercase">{profile?.measurements?.weight ?? '—'}</p>
                 {weightTrendVsLastLog === 'up' && (
                   <ArrowUpRight
                     size={28}
@@ -766,19 +766,19 @@ export default function ProfilePage() {
                   />
                 )}
               </div>
-              <p className="text-[10px] text-[var(--text-muted)] font-black uppercase tracking-widest mt-2">{t('profile.kgCurrent')}</p>
+              <p className="text-[10px] text-[var(--text-muted)] font-semibold tracking-widest mt-2">{t('profile.kgCurrent')}</p>
             </div>
             <button
               type="button"
               onClick={() => setIsAddingWeight(true)}
-              className="mt-5 w-full min-h-[48px] rounded-xl bg-[var(--background)] border border-[var(--border-muted)] text-[10px] font-black uppercase tracking-widest text-[var(--text-primary)] hover:border-brand transition-colors"
+              className="mt-5 w-full min-h-[48px] rounded-xl bg-[var(--background)] border border-[var(--line)] text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-primary)] hover:border-brand transition-colors"
             >
               {t('profile.updateWeight.open')}
             </button>
           </div>
-          <div className="bg-[var(--card-bg)] p-6 rounded-[2rem] border border-[var(--border-muted)] flex flex-col items-center justify-center text-center">
-            <p className="text-3xl font-black italic tracking-tighter uppercase">{profile?.measurements?.height ?? '—'}</p>
-            <p className="text-[10px] text-[var(--text-muted)] font-black uppercase tracking-widest mt-2">{t('profile.cmHeight')}</p>
+          <div className="bg-[var(--surface)] p-4 rounded-xl border border-[var(--line)] flex flex-col items-center justify-center text-center">
+            <p className="text-3xl font-semibold uppercase">{profile?.measurements?.height ?? '—'}</p>
+            <p className="text-[10px] text-[var(--text-muted)] font-semibold tracking-widest mt-2">{t('profile.cmHeight')}</p>
           </div>
         </div>
       </div>
@@ -790,7 +790,7 @@ export default function ProfilePage() {
       {/* ── Operational Goals ── */}
       <div className="space-y-6">
         <div className="flex justify-between items-end px-4">
-          <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--text-muted)]">{t('profile.operationalGoals')}</h3>
+          <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">{t('profile.operationalGoals')}</h3>
           <button
             onClick={() => {
               setGoalsForm({
@@ -801,17 +801,17 @@ export default function ProfilePage() {
               });
               setIsEditingGoals(!isEditingGoals);
             }}
-            className="text-[10px] font-black uppercase text-brand hover:underline"
+            className="text-[10px] font-semibold text-brand hover:underline"
           >
             {isEditingGoals ? t('profile.cancel') : t('profile.adjust')}
           </button>
         </div>
 
-        <div className="bg-[var(--card-bg)] p-8 rounded-[2.5rem] border border-[var(--border-muted)] shadow-sm space-y-6">
+        <div className="bg-[var(--surface)] p-8 rounded-xl border border-[var(--line)] shadow-sm space-y-6">
           {isEditingGoals ? (
             <div className="space-y-6">
               <div>
-                <label className="text-[8px] font-black uppercase text-[var(--text-muted)] tracking-widest mb-2 block">
+                <label className="text-[8px] font-semibold text-[var(--text-muted)] tracking-widest mb-2 block">
                   {t('profile.targetWeightLabel')}
                 </label>
                 <div className="flex gap-3">
@@ -821,12 +821,12 @@ export default function ProfilePage() {
                     value={goalsForm.weight ?? ''}
                     onChange={e => handleTargetWeightChange(e.target.value)}
                     placeholder={t('profile.targetWeightPlaceholder')}
-                    className="flex-1 bg-[var(--background)] border border-[var(--border-muted)] rounded-xl p-4 font-bold text-[var(--text-primary)]"
+                    className="flex-1 bg-[var(--background)] border border-[var(--line)] rounded-xl p-4 font-bold text-[var(--text-primary)]"
                   />
                   {goalsForm.weight !== null && (
                     <button
                       onClick={() => handleTargetWeightChange('')}
-                      className="p-4 bg-[var(--background)] border border-[var(--border-muted)] rounded-xl text-[var(--text-muted)] hover:text-red-500 transition-colors"
+                      className="p-4 bg-[var(--background)] border border-[var(--line)] rounded-xl text-[var(--text-muted)] hover:text-red-500 transition-colors"
                       title={t('profile.removeTargetTitle')}
                     >
                       <X size={16} />
@@ -834,13 +834,13 @@ export default function ProfilePage() {
                   )}
                 </div>
                 {goalsForm.weight !== null && currentWeight && (
-                  <p className={cn("text-[9px] font-black uppercase tracking-widest mt-2", PROTOCOL_COLORS[deriveProtocol(currentWeight, goalsForm.weight)])}>
+                  <p className={cn("text-[9px] font-semibold uppercase tracking-[0.1em] mt-2", PROTOCOL_COLORS[deriveProtocol(currentWeight, goalsForm.weight)])}>
                     → {t(`profile.protocol.${deriveProtocol(currentWeight, goalsForm.weight)}`)}
                   </p>
                 )}
               </div>
               <div>
-                <label className="text-[8px] font-black uppercase text-[var(--text-muted)] tracking-widest mb-2 block">
+                <label className="text-[8px] font-semibold text-[var(--text-muted)] tracking-widest mb-2 block">
                   {t('profile.dailyKcal')}
                   {tdee ? ` ${t('profile.dailyKcalTdee', { tdee })}` : ''}
                 </label>
@@ -848,7 +848,7 @@ export default function ProfilePage() {
                   type="number"
                   value={goalsForm.dailyCalories}
                   onChange={e => setGoalsForm({ ...goalsForm, dailyCalories: parseInt(e.target.value) })}
-                  className="w-full bg-[var(--background)] border border-[var(--border-muted)] rounded-xl p-4 font-bold text-[var(--text-primary)]"
+                  className="w-full bg-[var(--background)] border border-[var(--line)] rounded-xl p-4 font-bold text-[var(--text-primary)]"
                 />
                 {tdee && (
                   <div className="flex gap-2 mt-2">
@@ -857,10 +857,10 @@ export default function ProfilePage() {
                         key={p}
                         onClick={() => setGoalsForm({ ...goalsForm, dailyCalories: calcProtocolCalories(tdee, p) })}
                         className={cn(
-                          "flex-1 py-2 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all border",
+                          "flex-1 py-2 rounded-lg text-[8px] font-semibold tracking-widest transition-all border",
                           goalsForm.dailyCalories === calcProtocolCalories(tdee, p)
                             ? "border-2 border-brand bg-brand/15 text-[var(--text-primary)]"
-                            : "bg-[var(--background)] border-[var(--border-muted)] text-[var(--text-muted)] hover:border-brand"
+                            : "bg-[var(--background)] border-[var(--line)] text-[var(--text-muted)] hover:border-brand"
                         )}
                       >
                         {p === 'lose'
@@ -874,7 +874,7 @@ export default function ProfilePage() {
                 )}
               </div>
               <div>
-                <label className="text-[8px] font-black uppercase text-[var(--text-muted)] tracking-widest mb-2 block">
+                <label className="text-[8px] font-semibold text-[var(--text-muted)] tracking-widest mb-2 block">
                   {t('profile.dailySteps')}
                 </label>
                 <input
@@ -883,11 +883,11 @@ export default function ProfilePage() {
                   step={500}
                   value={goalsForm.dailySteps}
                   onChange={e => setGoalsForm({ ...goalsForm, dailySteps: parseInt(e.target.value, 10) || 10000 })}
-                  className="w-full bg-[var(--background)] border border-[var(--border-muted)] rounded-xl p-4 font-bold text-[var(--text-primary)]"
+                  className="w-full bg-[var(--background)] border border-[var(--line)] rounded-xl p-4 font-bold text-[var(--text-primary)]"
                 />
               </div>
               <div>
-                <label className="text-[8px] font-black uppercase text-[var(--text-muted)] tracking-widest mb-2 block">
+                <label className="text-[8px] font-semibold text-[var(--text-muted)] tracking-widest mb-2 block">
                   {t('profile.dailyWater')}
                 </label>
                 <input
@@ -896,14 +896,14 @@ export default function ProfilePage() {
                   step={250}
                   value={goalsForm.dailyWaterMl}
                   onChange={e => setGoalsForm({ ...goalsForm, dailyWaterMl: parseInt(e.target.value, 10) || 2500 })}
-                  className="w-full bg-[var(--background)] border border-[var(--border-muted)] rounded-xl p-4 font-bold text-[var(--text-primary)]"
+                  className="w-full bg-[var(--background)] border border-[var(--line)] rounded-xl p-4 font-bold text-[var(--text-primary)]"
                 />
               </div>
               {saveError && <p className="text-xs font-bold text-red-600">{saveError}</p>}
               <button
                 onClick={handleUpdateGoals}
                 disabled={saving}
-                className="w-full ui-btn-brand py-4 rounded-xl font-black uppercase text-xs shadow-lg shadow-brand/20 disabled:opacity-50"
+                className="w-full ui-btn-brand py-4 rounded-xl font-semibold text-xs shadow-lg shadow-brand/20 disabled:opacity-50"
               >
                 {saving ? t('profile.updating') : t('profile.saveGoals')}
               </button>
@@ -916,22 +916,22 @@ export default function ProfilePage() {
                   <Target size={20} />
                 </div>
                 <div>
-                  <p className="text-xl font-black italic uppercase tracking-tighter">{profile.goals?.dailyCalories} kcal</p>
-                  <p className="text-[10px] font-black uppercase text-[var(--text-muted)]">{t('profile.dailyCaloricLoad')}</p>
+                  <p className="text-[15px] font-semibold tabular-nums uppercase tracking-tighter">{profile.goals?.dailyCalories} kcal</p>
+                  <p className="text-[10px] font-semibold text-[var(--text-muted)]">{t('profile.dailyCaloricLoad')}</p>
                 </div>
               </div>
               <div className="flex flex-col items-end justify-center">
                 {profile.goals?.weight ? (
                   <>
-                    <p className="text-xl font-black italic uppercase text-brand tracking-tighter">{profile.goals.weight} kg</p>
-                    <p className="text-[10px] font-black uppercase text-[var(--text-muted)]">{t('profile.missionObjective')}</p>
+                    <p className="text-[15px] font-semibold tabular-nums uppercase text-brand tracking-tighter">{profile.goals.weight} kg</p>
+                    <p className="text-[10px] font-semibold text-[var(--text-muted)]">{t('profile.missionObjective')}</p>
                   </>
                 ) : (
                   <>
-                    <p className={cn("text-sm font-black italic uppercase tracking-tighter", PROTOCOL_COLORS[protocol])}>
+                    <p className={cn("text-[11px] font-semibold uppercase tracking-[0.12em]", PROTOCOL_COLORS[protocol])}>
                       {t(`profile.protocol.${protocol}`)}
                     </p>
-                    <p className="text-[10px] font-black uppercase text-[var(--text-muted)]">{t('profile.noWeightTarget')}</p>
+                    <p className="text-[10px] font-semibold text-[var(--text-muted)]">{t('profile.noWeightTarget')}</p>
                   </>
                 )}
               </div>
@@ -948,15 +948,15 @@ export default function ProfilePage() {
         <ErrorBanner message={saveError} onRetry={() => setSaveError('')} retryLabel={t('common.dismiss')} />
       )}
 
-      <div className="bg-[var(--card-bg)] p-6 rounded-[2rem] border border-[var(--border-muted)] space-y-4">
-        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--text-muted)]">{t('profile.changePassword.title')}</h3>
+      <div className="bg-[var(--surface)] p-4 rounded-xl border border-[var(--line)] space-y-4">
+        <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">{t('profile.changePassword.title')}</h3>
         <input
           type="password"
           autoComplete="current-password"
           value={pwdCurrent}
           onChange={e => setPwdCurrent(e.target.value)}
           placeholder={t('profile.changePassword.current')}
-          className="w-full bg-[var(--background)] border border-[var(--border-muted)] rounded-xl p-4 font-bold"
+          className="w-full bg-[var(--background)] border border-[var(--line)] rounded-xl p-4 font-bold"
         />
         <input
           type="password"
@@ -964,7 +964,7 @@ export default function ProfilePage() {
           value={pwdNew}
           onChange={e => setPwdNew(e.target.value)}
           placeholder={t('profile.changePassword.new')}
-          className="w-full bg-[var(--background)] border border-[var(--border-muted)] rounded-xl p-4 font-bold"
+          className="w-full bg-[var(--background)] border border-[var(--line)] rounded-xl p-4 font-bold"
         />
         {pwdMsg && (
           <p className={cn('text-xs font-bold', pwdMsg === t('profile.changePassword.ok') ? 'text-brand' : 'text-red-600')}>
@@ -975,7 +975,7 @@ export default function ProfilePage() {
           type="button"
           disabled={pwdBusy || !pwdCurrent || !pwdNew}
           onClick={() => void handleChangePassword()}
-          className="w-full min-h-[48px] rounded-xl bg-[var(--background)] border border-[var(--border-muted)] text-[10px] font-black uppercase tracking-widest hover:border-brand disabled:opacity-50 flex items-center justify-center"
+          className="w-full min-h-[48px] rounded-xl bg-[var(--background)] border border-[var(--line)] text-[10px] font-semibold uppercase tracking-[0.12em] hover:border-brand disabled:opacity-50 flex items-center justify-center"
         >
           {pwdBusy ? <Loader2 className="animate-spin" size={18} /> : t('profile.changePassword.submit')}
         </button>
@@ -987,7 +987,7 @@ export default function ProfilePage() {
         <div className="space-y-6">
       {/* ── Verbindungen ── */}
       <div className="space-y-3">
-        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--text-muted)] px-4">Verbindungen</h3>
+        <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)] px-4">Verbindungen</h3>
         <GarminConnect />
         {/* Pushover: Benachrichtigungen aufs Handy */}
         <PushKarte beschreibung="Nachrichten aufs Handy, auch wenn die App geschlossen ist." />
@@ -997,7 +997,7 @@ export default function ProfilePage() {
         <MealplannerConnect />
         <Link
           to="/wellness"
-          className="flex items-center gap-2 rounded-2xl border border-[var(--border-muted)] bg-[var(--card-bg)] px-4 py-3 text-[12.5px] font-semibold text-[var(--foreground)] transition hover:border-[var(--simple-accent)]"
+          className="flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-[12.5px] font-semibold text-[var(--foreground)] transition hover:border-[var(--simple-accent)]"
         >
           <Activity className="h-4 w-4 text-[var(--simple-accent)]" />
           Wellness-Daten ansehen
@@ -1007,20 +1007,20 @@ export default function ProfilePage() {
 
       {/* ── Bericht ── */}
       <div className="space-y-6">
-        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--text-muted)] px-4">{t('profile.reportSection')}</h3>
+        <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)] px-4">{t('profile.reportSection')}</h3>
 
-        <div className="bg-[var(--card-bg)] p-6 sm:p-8 rounded-[2.5rem] border border-[var(--border-muted)] space-y-4">
+        <div className="bg-[var(--surface)] p-6 sm:p-8 rounded-xl border border-[var(--line)] space-y-4">
           <div className="flex items-center gap-2">
             <FileText size={18} className="text-brand" />
-            <p className="text-sm font-black uppercase italic tracking-tighter">{t('profile.reportTitle')}</p>
+            <p className="text-sm text-[11px] font-semibolder">{t('profile.reportTitle')}</p>
           </div>
           <p className="text-[10px] text-[var(--text-muted)] font-medium leading-relaxed">{t('profile.reportHint')}</p>
           <div className="space-y-2">
-            <label className="text-[9px] font-black uppercase text-[var(--text-muted)] tracking-widest">{t('profile.reportRange')}</label>
+            <label className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)] tracking-widest">{t('profile.reportRange')}</label>
             <select
               value={reportRange}
               onChange={e => setReportRange(e.target.value as ReportRangeKey)}
-              className="w-full min-h-[48px] bg-[var(--background)] border border-[var(--border-muted)] rounded-xl px-4 font-bold text-[var(--text-primary)]"
+              className="w-full min-h-[48px] bg-[var(--background)] border border-[var(--line)] rounded-xl px-4 font-bold text-[var(--text-primary)]"
             >
               {allowedReportRangeKeys(profile.accountCreatedAt).map(k => (
                 <option key={k} value={k}>
@@ -1040,12 +1040,12 @@ export default function ProfilePage() {
             </select>
           </div>
           <div className="space-y-2">
-            <label className="text-[9px] font-black uppercase text-[var(--text-muted)]">{t('profile.reportCustomDate')}</label>
+            <label className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">{t('profile.reportCustomDate')}</label>
             <input
               type="date"
               value={reportCustomDate}
               onChange={e => setReportCustomDate(e.target.value)}
-              className="w-full min-h-[48px] bg-[var(--background)] border border-[var(--border-muted)] rounded-xl px-4 font-bold text-[var(--text-primary)]"
+              className="w-full min-h-[48px] bg-[var(--background)] border border-[var(--line)] rounded-xl px-4 font-bold text-[var(--text-primary)]"
             />
           </div>
           <button
@@ -1061,7 +1061,7 @@ export default function ProfilePage() {
               });
               if (!ok) setReportError(t('profile.report.popupBlocked'));
             }}
-            className="w-full min-h-[48px] bg-[var(--background)] border border-[var(--border-muted)] rounded-xl text-[10px] font-black uppercase tracking-widest hover:border-brand text-[var(--text-primary)]"
+            className="w-full min-h-[48px] bg-[var(--background)] border border-[var(--line)] rounded-xl text-[10px] font-semibold uppercase tracking-[0.12em] hover:border-brand text-[var(--text-primary)]"
           >
             {t('profile.reportGenerate')}
           </button>
@@ -1080,14 +1080,14 @@ export default function ProfilePage() {
       {/* ── Datenexport ── */}
       {profile && (
         <div className="space-y-6">
-          <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--text-muted)] px-4">{t('profile.export.title')}</h3>
-          <div className="bg-[var(--card-bg)] p-6 sm:p-8 rounded-[2.5rem] border border-[var(--border-muted)] space-y-4">
+          <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)] px-4">{t('profile.export.title')}</h3>
+          <div className="bg-[var(--surface)] p-6 sm:p-8 rounded-xl border border-[var(--line)] space-y-4">
             <p className="text-[10px] text-[var(--text-muted)] font-medium leading-relaxed">{t('profile.export.sub')}</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={() => downloadJsonExport(buildExportBundle(profile, workouts, nutritionEntries))}
-                className="min-h-[52px] flex items-center justify-center gap-2 rounded-2xl border border-[var(--border-muted)] bg-[var(--background)] text-[10px] font-black uppercase tracking-widest hover:border-brand transition-all"
+                className="min-h-[44px] flex items-center justify-center gap-2 rounded-2xl border border-[var(--line)] bg-[var(--background)] text-[10px] font-semibold uppercase tracking-[0.12em] hover:border-brand transition-all"
               >
                 <Download size={16} className="text-brand" />
                 {t('profile.export.json')}
@@ -1095,7 +1095,7 @@ export default function ProfilePage() {
               <button
                 type="button"
                 onClick={() => downloadCsvExport(buildExportBundle(profile, workouts, nutritionEntries))}
-                className="min-h-[52px] flex items-center justify-center gap-2 rounded-2xl border border-[var(--border-muted)] bg-[var(--background)] text-[10px] font-black uppercase tracking-widest hover:border-brand transition-all"
+                className="min-h-[44px] flex items-center justify-center gap-2 rounded-2xl border border-[var(--line)] bg-[var(--background)] text-[10px] font-semibold uppercase tracking-[0.12em] hover:border-brand transition-all"
               >
                 <Download size={16} className="text-brand" />
                 {t('profile.export.csv')}
@@ -1105,8 +1105,8 @@ export default function ProfilePage() {
         </div>
       )}
 
-      <div className="bg-[var(--card-bg)] p-6 sm:p-8 rounded-[2.5rem] border border-[var(--border-muted)] space-y-3">
-        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--text-muted)]">{t('profile.privacy.title')}</h3>
+      <div className="bg-[var(--surface)] p-6 sm:p-8 rounded-xl border border-[var(--line)] space-y-3">
+        <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">{t('profile.privacy.title')}</h3>
         <p className="text-sm text-[var(--text-muted)] font-medium leading-relaxed">{t('profile.privacy.body')}</p>
         <p className="text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-widest">{t('profile.privacy.exportHint')}</p>
       </div>
@@ -1117,16 +1117,16 @@ export default function ProfilePage() {
         <div className="space-y-6">
       {/* ── Konto ── */}
       <div className="space-y-6">
-        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--text-muted)] px-4">{t('profile.account')}</h3>
-        <div className="bg-[var(--card-bg)] rounded-[2.5rem] border border-[var(--border-muted)] overflow-hidden shadow-sm p-6 sm:p-8">
+        <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)] px-4">{t('profile.account')}</h3>
+        <div className="bg-[var(--surface)] rounded-xl border border-[var(--line)] overflow-hidden shadow-sm p-6 sm:p-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button
               type="button"
               onClick={handleLogout}
-              className="min-h-[52px] w-full flex items-center justify-center gap-3 rounded-2xl border border-[var(--border-muted)] bg-[var(--background)] px-4 py-3 text-red-500 hover:bg-red-500/5 transition-colors"
+              className="min-h-[44px] w-full flex items-center justify-center gap-3 rounded-2xl border border-[var(--line)] bg-[var(--background)] px-4 py-3 text-red-500 hover:bg-red-500/5 transition-colors"
             >
               <LogOut size={18} />
-              <span className="font-black uppercase italic tracking-tight text-sm">{t('profile.logout')}</span>
+              <span className="text-[11px] font-semibold text-sm">{t('profile.logout')}</span>
             </button>
             <button
               type="button"
@@ -1136,10 +1136,10 @@ export default function ProfilePage() {
                 setDeleteAccountStep('confirm');
                 setDeleteAccountOpen(true);
               }}
-              className="min-h-[52px] w-full flex items-center justify-center gap-3 rounded-2xl border border-red-500/40 bg-[var(--background)] px-4 py-3 text-red-500 hover:bg-red-500/10 transition-colors"
+              className="min-h-[44px] w-full flex items-center justify-center gap-3 rounded-2xl border border-red-500/40 bg-[var(--background)] px-4 py-3 text-red-500 hover:bg-red-500/10 transition-colors"
             >
               <Trash2 size={18} />
-              <span className="font-black uppercase italic tracking-tight text-sm">{t('profile.deleteAccount')}</span>
+              <span className="text-[11px] font-semibold text-sm">{t('profile.deleteAccount')}</span>
             </button>
           </div>
         </div>
@@ -1161,19 +1161,19 @@ export default function ProfilePage() {
               initial={{ scale: 0.96, opacity: 0, y: 24 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.96, opacity: 0, y: 24 }}
-              className="bg-[var(--card-bg)] w-full max-w-sm relative z-10 shadow-2xl border border-[var(--border-muted)] rounded-t-[2.5rem] lg:rounded-[2.5rem] max-h-[min(92dvh,calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)))] flex flex-col overflow-hidden"
+              className="bg-[var(--surface)] w-full max-w-sm relative z-10 shadow-2xl border border-[var(--line)] rounded-t-[2.5rem] lg:rounded-xl max-h-[min(92dvh,calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)))] flex flex-col overflow-hidden"
               onClick={e => e.stopPropagation()}
             >
               <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch] p-6 sm:p-10 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-                <h3 className="text-2xl font-black italic uppercase tracking-tighter mb-2 text-center text-[var(--text-primary)]">{t('profile.biometricScan')}</h3>
+                <h3 className="text-[15px] font-semibold mb-2 text-center text-[var(--text-primary)]">{t('profile.biometricScan')}</h3>
                 {tdee && (
-                  <p className="text-[10px] font-black uppercase text-[var(--text-muted)] tracking-widest text-center mb-8">
+                  <p className="text-[10px] font-semibold text-[var(--text-muted)] tracking-widest text-center mb-8">
                     {t('profile.caloriesRecalc')}
                   </p>
                 )}
                 <div className="space-y-6">
                   <div>
-                    <label className="text-[10px] font-black uppercase text-[var(--text-muted)] tracking-widest mb-2 block">
+                    <label className="text-[10px] font-semibold text-[var(--text-muted)] tracking-widest mb-2 block">
                       {t('profile.newMassEntry')}
                     </label>
                     <input
@@ -1182,11 +1182,11 @@ export default function ProfilePage() {
                       inputMode="decimal"
                       value={newWeight}
                       onChange={e => setNewWeight(e.target.value)}
-                      className="w-full min-h-[52px] bg-[var(--background)] border border-[var(--border-muted)] rounded-xl px-4 py-4 text-xl font-black text-center text-[var(--text-primary)] text-base sm:text-xl"
+                      className="w-full min-h-[44px] bg-[var(--background)] border border-[var(--line)] rounded-xl px-4 py-4 text-base font-semibold text-center text-[var(--text-primary)] text-base sm:text-xl"
                       placeholder="85.5"
                     />
                   {newWeight && tdee && (
-                    <div className="mt-3 p-3 bg-[var(--background)] rounded-xl border border-[var(--border-muted)]">
+                    <div className="mt-3 p-3 bg-[var(--background)] rounded-xl border border-[var(--line)]">
                       {(() => {
                         const m = profile.measurements;
                         if (!m?.height || !m?.age) return null;
@@ -1195,7 +1195,7 @@ export default function ProfilePage() {
                         const p = deriveProtocol(newW, targetWeight);
                         const cal = calcProtocolCalories(newTDEE, p);
                         return (
-                          <div className="flex justify-between text-[9px] font-black uppercase tracking-widest">
+                          <div className="flex justify-between text-[9px] font-semibold uppercase tracking-[0.1em]">
                             <span className="text-[var(--text-muted)]">{t(`profile.protocol.${p}`)}</span>
                             <span className={PROTOCOL_COLORS[p]}>{t('profile.kcalPerDay', { n: cal })}</span>
                           </div>
@@ -1208,7 +1208,7 @@ export default function ProfilePage() {
                   type="button"
                   onClick={handleAddWeight}
                   disabled={saving || !newWeight}
-                  className="w-full min-h-[52px] bg-accent text-[var(--on-accent)] py-5 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-black/20 disabled:opacity-50 touch-manipulation"
+                  className="w-full min-h-[44px] bg-accent text-[var(--on-accent)] py-5 rounded-2xl font-semibold tracking-widest text-xs shadow-xl shadow-black/20 disabled:opacity-50 touch-manipulation"
                 >
                   {saving ? t('profile.updatingScan') : t('profile.confirmEntry')}
                 </button>
@@ -1231,13 +1231,13 @@ export default function ProfilePage() {
               initial={{ scale: 0.96, opacity: 0, y: 24 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.96, opacity: 0, y: 24 }}
-              className="bg-[var(--card-bg)] w-full max-w-sm rounded-t-[2.5rem] lg:rounded-[2.5rem] relative z-10 shadow-2xl border border-[var(--border-muted)] max-h-[min(92dvh,calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)))] flex flex-col overflow-hidden"
+              className="bg-[var(--surface)] w-full max-w-sm rounded-t-[2.5rem] lg:rounded-xl relative z-10 shadow-2xl border border-[var(--line)] max-h-[min(92dvh,calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)))] flex flex-col overflow-hidden"
               onClick={e => e.stopPropagation()}
             >
               <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch] p-6 sm:p-10 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))]">
               {deleteAccountStep === 'confirm' ? (
                 <>
-                  <h3 className="text-xl font-black italic uppercase tracking-tighter mb-3 text-center">
+                  <h3 className="text-[15px] font-semibold tabular-nums uppercase tracking-tighter mb-3 text-center">
                     {t('profile.deleteAccount.title')}
                   </h3>
                   <p className="text-[11px] text-[var(--text-muted)] font-medium leading-relaxed text-center mb-8">
@@ -1251,7 +1251,7 @@ export default function ProfilePage() {
                         setDeleteError(null);
                         setDeleteAccountStep('password');
                       }}
-                      className="w-full min-h-[52px] rounded-xl bg-red-600 text-white text-[10px] font-black uppercase tracking-widest touch-manipulation"
+                      className="w-full min-h-[44px] rounded-xl bg-red-600 text-white text-[10px] font-semibold uppercase tracking-[0.12em] touch-manipulation"
                     >
                     {t('profile.deleteAccount.continue')}
                   </button>
@@ -1259,7 +1259,7 @@ export default function ProfilePage() {
                     type="button"
                     disabled={deleteBusy}
                     onClick={() => setDeleteAccountOpen(false)}
-                    className="w-full min-h-[52px] rounded-xl border border-[var(--border-muted)] text-[10px] font-black uppercase text-[var(--text-muted)] touch-manipulation"
+                    className="w-full min-h-[44px] rounded-xl border border-[var(--line)] text-[10px] font-semibold text-[var(--text-muted)] touch-manipulation"
                   >
                       {t('profile.cancel')}
                     </button>
@@ -1267,7 +1267,7 @@ export default function ProfilePage() {
                 </>
               ) : (
                 <>
-                  <h3 className="text-xl font-black italic uppercase tracking-tighter mb-2 text-center">
+                  <h3 className="text-[15px] font-semibold tabular-nums uppercase tracking-tighter mb-2 text-center">
                     {t('profile.deleteAccount.passwordTitle')}
                   </h3>
                   <p className="text-[11px] text-[var(--text-muted)] font-medium leading-relaxed text-center mb-4">
@@ -1282,7 +1282,7 @@ export default function ProfilePage() {
                       setDeleteError(null);
                     }}
                     placeholder={t('profile.deleteAccount.passwordPh')}
-                    className="w-full min-h-[52px] bg-[var(--background)] border border-[var(--border-muted)] rounded-xl px-4 py-3 text-base font-bold text-[var(--text-primary)] mb-3"
+                    className="w-full min-h-[44px] bg-[var(--background)] border border-[var(--line)] rounded-xl px-4 py-3 text-base font-bold text-[var(--text-primary)] mb-3"
                   />
                   {deleteError && (
                     <p className="text-[10px] font-bold text-red-500 text-center mb-3">{deleteError}</p>
@@ -1310,7 +1310,7 @@ export default function ProfilePage() {
                           setDeleteBusy(false);
                         }
                       }}
-                      className="w-full min-h-[52px] rounded-xl bg-red-600 text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-50 touch-manipulation"
+                      className="w-full min-h-[44px] rounded-xl bg-red-600 text-white text-[10px] font-semibold uppercase tracking-[0.12em] disabled:opacity-50 touch-manipulation"
                     >
                     {deleteBusy ? t('profile.updating') : t('profile.deleteAccount.submit')}
                   </button>
@@ -1322,7 +1322,7 @@ export default function ProfilePage() {
                       setDeletePassword('');
                       setDeleteAccountStep('confirm');
                     }}
-                    className="w-full min-h-[52px] rounded-xl border border-[var(--border-muted)] text-[10px] font-black uppercase text-[var(--text-muted)] touch-manipulation"
+                    className="w-full min-h-[44px] rounded-xl border border-[var(--line)] text-[10px] font-semibold text-[var(--text-muted)] touch-manipulation"
                   >
                       {t('profile.deleteAccount.back')}
                     </button>
@@ -1347,7 +1347,7 @@ export default function ProfilePage() {
               initial={{ y: 24, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 24, opacity: 0 }}
-              className="relative z-10 w-full max-w-md max-h-[min(92dvh,calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)))] flex flex-col overflow-hidden bg-[var(--card-bg)] rounded-t-[2rem] lg:rounded-[2rem] border border-[var(--border-muted)] shadow-2xl"
+              className="relative z-10 w-full max-w-md max-h-[min(92dvh,calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)))] flex flex-col overflow-hidden bg-[var(--surface)] rounded-t-[2rem] lg:rounded-xl border border-[var(--line)] shadow-2xl"
               onClick={e => e.stopPropagation()}
             >
               <input
@@ -1367,8 +1367,8 @@ export default function ProfilePage() {
                 aria-hidden
                 onChange={onCheckInImageSelected}
               />
-              <div className="flex justify-between items-center gap-3 shrink-0 px-6 pt-[max(1rem,env(safe-area-inset-top))] pb-3 border-b border-[var(--border-muted)]">
-                <p className="text-sm font-black uppercase italic tracking-tighter text-[var(--text-primary)]">{t('profile.checkin')}</p>
+              <div className="flex justify-between items-center gap-3 shrink-0 px-6 pt-[max(1rem,env(safe-area-inset-top))] pb-3 border-b border-[var(--line)]">
+                <p className="text-sm text-[11px] font-semibolder text-[var(--text-primary)]">{t('profile.checkin')}</p>
                 <button
                   type="button"
                   className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl hover:bg-[var(--background)] text-[var(--text-muted)]"
@@ -1382,12 +1382,12 @@ export default function ProfilePage() {
                 <p className="text-[11px] text-[var(--text-muted)] mb-4 leading-relaxed">{t('profile.checkIn.hint')}</p>
                 <div className="space-y-3">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)] mb-2">{t('profile.checkIn.photo')}</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)] mb-2">{t('profile.checkIn.photo')}</p>
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
                         onClick={() => checkInGalleryRef.current?.click()}
-                        className="flex items-center justify-center gap-2 min-h-[52px] rounded-xl border border-[var(--border-muted)] bg-[var(--background)] text-[var(--text-primary)] text-[11px] font-black uppercase tracking-widest hover:border-brand/50 touch-manipulation"
+                        className="flex items-center justify-center gap-2 min-h-[44px] rounded-xl border border-[var(--line)] bg-[var(--background)] text-[var(--text-primary)] text-[11px] font-semibold tracking-widest hover:border-brand/50 touch-manipulation"
                       >
                         <Image size={18} className="text-brand shrink-0" />
                         {t('profile.checkIn.gallery')}
@@ -1395,14 +1395,14 @@ export default function ProfilePage() {
                       <button
                         type="button"
                         onClick={() => checkInCameraRef.current?.click()}
-                        className="flex items-center justify-center gap-2 min-h-[52px] rounded-xl border border-[var(--border-muted)] bg-[var(--background)] text-[var(--text-primary)] text-[11px] font-black uppercase tracking-widest hover:border-brand/50 touch-manipulation"
+                        className="flex items-center justify-center gap-2 min-h-[44px] rounded-xl border border-[var(--line)] bg-[var(--background)] text-[var(--text-primary)] text-[11px] font-semibold tracking-widest hover:border-brand/50 touch-manipulation"
                       >
                         <Camera size={18} className="text-brand shrink-0" />
                         {t('profile.checkIn.camera')}
                       </button>
                     </div>
                     {checkInPhoto && (
-                      <div className="mt-2 relative rounded-xl border border-[var(--border-muted)] overflow-hidden bg-[var(--background)]">
+                      <div className="mt-2 relative rounded-xl border border-[var(--line)] overflow-hidden bg-[var(--background)]">
                         <img src={checkInPhoto.preview} alt="" className="w-full max-h-52 object-cover" />
                         <button
                           type="button"
@@ -1421,12 +1421,12 @@ export default function ProfilePage() {
                     inputMode="decimal"
                     placeholder={t('profile.checkIn.weightPh')}
                     id="ci-weight"
-                    className="w-full min-h-[52px] bg-[var(--background)] border border-[var(--border-muted)] rounded-xl px-3 text-base font-bold text-[var(--text-primary)]"
+                    className="w-full min-h-[44px] bg-[var(--background)] border border-[var(--line)] rounded-xl px-3 text-base font-bold text-[var(--text-primary)]"
                   />
                   <textarea
                     id="ci-note"
                     placeholder={t('profile.checkIn.notePh')}
-                    className="w-full min-h-[88px] bg-[var(--background)] border border-[var(--border-muted)] rounded-xl px-3 py-2 text-base text-[var(--text-primary)]"
+                    className="w-full min-h-[88px] bg-[var(--background)] border border-[var(--line)] rounded-xl px-3 py-2 text-base text-[var(--text-primary)]"
                   />
                   <div className="grid grid-cols-2 gap-2">
                     {(['chest', 'waist', 'hips', 'arms', 'thighs'] as const).map(field => (
@@ -1440,14 +1440,14 @@ export default function ProfilePage() {
                           inputMode="decimal"
                           id={`ci-${field}`}
                           defaultValue={profile?.bodyMeasurements?.[field] ?? ''}
-                          className="w-full min-h-[48px] bg-[var(--background)] border border-[var(--border-muted)] rounded-lg px-2 text-base font-bold text-[var(--text-primary)]"
+                          className="w-full min-h-[48px] bg-[var(--background)] border border-[var(--line)] rounded-lg px-2 text-base font-bold text-[var(--text-primary)]"
                         />
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
-              <div className="shrink-0 px-6 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-[var(--border-muted)] bg-[var(--card-bg)]">
+              <div className="shrink-0 px-6 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-[var(--line)] bg-[var(--surface)]">
                 <button
                   type="button"
                   onClick={async () => {
@@ -1490,7 +1490,7 @@ export default function ProfilePage() {
                     });
                     closeCheckIn();
                   }}
-                  className="w-full min-h-[52px] ui-btn-brand rounded-xl text-[11px] font-black uppercase tracking-widest touch-manipulation"
+                  className="w-full min-h-[44px] ui-btn-brand rounded-xl text-[11px] font-semibold tracking-widest touch-manipulation"
                 >
                   {t('profile.checkIn.save')}
                 </button>

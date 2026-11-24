@@ -59,14 +59,14 @@ export default function ReportHistoryView() {
     return (
       <div className="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-[var(--border-muted)] rounded-3xl mt-4">
         <FileText size={48} className="text-[var(--text-muted)] mb-4 opacity-50" />
-        <h3 className="text-lg font-black uppercase tracking-widest text-[var(--text-muted)]">
+        <h3 className="text-lg font-semibold tracking-widest text-[var(--text-muted)]">
           {t('profile.userReport.emptyTitle')}
         </h3>
         <p className="text-sm font-medium text-[var(--text-muted)] mt-2 max-w-sm">{t('profile.userReport.emptyBody')}</p>
         <button
           type="button"
           onClick={() => void load()}
-          className="mt-4 min-h-[44px] px-5 rounded-xl ui-btn-brand text-[10px] font-black uppercase tracking-widest"
+          className="mt-4 min-h-[44px] px-5 rounded-xl ui-btn-brand text-[10px] font-semibold tracking-widest"
         >
           {t('profile.userReport.checkNow')}
         </button>
@@ -78,7 +78,7 @@ export default function ReportHistoryView() {
     <div className="space-y-6 mt-4 print:space-y-0">
       <div className="flex justify-between items-end print:hidden">
         <div>
-          <h2 className="text-xl font-black uppercase tracking-tighter">{t('profile.userReport.historyTitle')}</h2>
+          <h2 className="text-xl font-semibold tracking-tighter">{t('profile.userReport.historyTitle')}</h2>
           <p className="text-[10px] uppercase font-bold tracking-widest text-[var(--text-muted)]">
             {t('profile.userReport.historySub')}
           </p>
@@ -86,7 +86,7 @@ export default function ReportHistoryView() {
         <button
           type="button"
           onClick={handlePrint}
-          className="flex items-center gap-2 bg-[var(--card-bg)] border border-[var(--border-muted)] hover:border-brand/40 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest touch-manipulation"
+          className="flex items-center gap-2 bg-[var(--card-bg)] border border-[var(--border-muted)] hover:border-brand/40 px-4 py-2.5 rounded-xl text-[10px] font-semibold tracking-widest touch-manipulation"
         >
           <Download size={14} /> {t('profile.userReport.print')}
         </button>
@@ -123,7 +123,7 @@ export default function ReportHistoryView() {
                     <Calendar size={20} />
                   </div>
                   <div>
-                    <h3 className="text-base font-black uppercase tracking-tighter">{payload.weekLabel}</h3>
+                    <h3 className="text-base font-semibold tracking-tighter">{payload.weekLabel}</h3>
                     <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">
                       {dateStr} · {sourceLabel}
                     </p>

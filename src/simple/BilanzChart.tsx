@@ -187,6 +187,48 @@ export default function BilanzChart({
         <span>Tag</span>
       </div>
 
+      {/*
+        Zahlen zum Ablesen. Die Balken zeigen die Richtung, aber nicht den Wert —
+        Tim wollte die Kalorien auch als Zahl sehen, gerade fuer vergangene Tage.
+      */}
+      <details className="mt-3 border-t border-[var(--border-muted)] pt-2.5">
+        <summary className="cursor-pointer list-none text-[10.5px] font-semibold text-[var(--simple-accent)]">
+          Zahlen je Tag anzeigen
+        </summary>
+        <div className="mt-2 overflow-x-auto">
+          <table className="w-full text-[10.5px]">
+            <thead>
+              <tr className="text-[9px] uppercase tracking-[0.1em] text-[var(--text-muted)]">
+                <th className="py-1 text-left font-semibold">Tag</th>
+                <th className="py-1 text-right font-semibold">Gegessen</th>
+                <th className="py-1 text-right font-semibold">Verbraucht</th>
+                <th className="py-1 text-right font-semibold">Bilanz</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--border-muted)]">
+              {[...tage].reverse().map((t) => {
+                const verbraucht = Math.round(t.ziel + t.verbrannt);
+                return (
+                  <tr key={`z-${t.ymd}`}>
+                    <td className="py-1 text-[var(--text-muted)]">{fmtDatum(t.ymd)}</td>
+                    <td className="py-1 text-right tabular-nums">
+                      {t.hatDaten ? fmtZahl(t.kcal) : '—'}
+                    </td>
+                    <td className="py-1 text-right tabular-nums">{fmtZahl(verbraucht)}</td>
+                    <td
+                      className="py-1 text-right font-semibold tabular-nums"
+                      style={{ color: t.hatDaten ? (t.bilanz < 0 ? GRUEN : ROT) : 'var(--text-muted)' }}
+                    >
+                      {t.hatDaten ? `${t.bilanz > 0 ? '+' : ''}${fmtZahl(t.bilanz)}` : '—'}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </details>
+
       {/* Legende */}
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-[var(--border-muted)] pt-2.5 text-[10.5px] text-[var(--text-muted)]">
         <span className="flex items-center gap-1.5">
