@@ -24,6 +24,7 @@ import {
   X,
   Zap,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '@/src/lib/api';
 import { Card, GhostButton, SectionTitle } from '@/src/simple/ui';
 import { todayYmd } from './simpleApi';
@@ -136,6 +137,7 @@ function neueUebung(): Uebung {
 }
 
 export default function TrainingsplanPage() {
+  const navigate = useNavigate();
   const [trainings, setTrainings] = useState<Training[]>([]);
   const [plan, setPlan] = useState<PlanEintrag[]>([]);
   const [woche, setWoche] = useState(() => montagVon(todayYmd()));
@@ -232,7 +234,14 @@ export default function TrainingsplanPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <SectionTitle>Trainingsplan</SectionTitle>
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {/*
+           * Tim baut den Plan hier von Hand. Wer keine Lust auf Kacheln hat, laesst
+           * ihn vom Coach bauen — der Wizard laeuft auf der Trainingsseite.
+           */}
+          <GhostButton onClick={() => navigate('/training', { state: { coachWizard: true } })}>
+            <Zap className="h-3.5 w-3.5" /> Von Coach erstellen lassen
+          </GhostButton>
           <GhostButton onClick={() => setWoche(plusTage(woche, -7))}>← Woche</GhostButton>
           <GhostButton onClick={() => setWoche(montagVon(todayYmd()))}>Heute</GhostButton>
           <GhostButton onClick={() => setWoche(plusTage(woche, 7))}>Woche →</GhostButton>

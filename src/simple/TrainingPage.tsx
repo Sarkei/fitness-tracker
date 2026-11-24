@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useExerciseDetailOptional } from '@/src/lib/exerciseDetailContext';
 import { api } from '../lib/api';
 import EinheitDetailModal, { type EinheitDaten } from '../components/wellness/EinheitDetailModal';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   BarChart3,
   Calendar,
@@ -30,7 +30,6 @@ import {
 } from './ui';
 import WorkoutSheet from './WorkoutSheet';
 import PlanBereich from '../components/coach/CoachPage';
-import { useAiCapabilities } from '../lib/AiCapabilitiesContext';
 import { TrainingTagesdetail } from '../components/training/TrainingTagesdetail';
 import {
   DAY_LABELS,
@@ -90,6 +89,7 @@ function dateOfDayKey(key: string, weekMonday: string = ymdOf(mondayOfYmd(todayY
 
 export default function TrainingPage() {
   const navigate = useNavigate();
+  const ort = useLocation();
   // Uebungen antippbar machen: Erklaerung, Video und eigener Verlauf.
   const exerciseDetail = useExerciseDetailOptional();
   const today = todayYmd();
@@ -110,9 +110,19 @@ export default function TrainingPage() {
   const [tagOffen, setTagOffen] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [laedt, setLaedt] = useState(true);
-  /** Zähler für den äußeren "Neuer Plan"-Button; CoachPage öffnet bei jeder Erhöhung den Wizard. */
+  /** Zähler für den Coach-Wizard; von der Plan-Seite aus über den State ausgelöst. */
   const [neuerPlanToken, setNeuerPlanToken] = useState(0);
-  const aiCaps = useAiCapabilities();
+
+  /*
+   * „Neuer Plan" führt jetzt in die manuelle Planung (/plan). Wer den Plan lieber
+   * vom Coach bauen lässt, kommt von dort mit `state.coachWizard` zurück — dann
+   * öffnet sich der Wizard wie früher über den Zähler.
+   */
+  useEffect(() => {
+    if (!(ort.state as { coachWizard?: boolean } | null)?.coachWizard) return;
+    setNeuerPlanToken((n) => n + 1);
+    navigate('/training', { replace: true });
+  }, [ort.state, navigate]);
 
   const load = useCallback(async () => {
     setError(null);
@@ -251,10 +261,7 @@ export default function TrainingPage() {
             <GhostButton onClick={() => setRunning(true)}>
               <Play className="h-3.5 w-3.5" /> Sofort starten
             </GhostButton>
-            <GhostButton
-              onClick={() => aiCaps.enabled && setNeuerPlanToken((n) => n + 1)}
-              disabled={aiCaps.loading || !aiCaps.enabled}
-            >
+            <GhostButton onClick={() => navigate('/plan')}>
               <Plus className="h-3.5 w-3.5" /> Neuer Plan
             </GhostButton>
           </div>
