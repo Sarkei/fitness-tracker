@@ -3,7 +3,7 @@
  * Schlaf der letzten Nacht, Schritte heute, Form — ein Bild, kein Detail.
  */
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Moon, Footprints, Heart, Activity, ChevronRight, AlertCircle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Card } from '@/src/simple/ui';
@@ -11,9 +11,37 @@ import { useWellness, WellnessAktualisieren } from './WellnessProvider';
 import { KennzahlSheet, KlickKachel, type KennzahlDef, type KennzahlPunkt } from './KennzahlSheet';
 import { Tagesdetail } from './Tagesdetail';
 import EinheitDetailModal, { type EinheitDaten } from './EinheitDetailModal';
-import { formLabel, heuteWert, juengsterTag, schlafBewertung, schlafStunden } from '@/src/lib/wellness';
+import { alsHHMM, formLabel, heuteWert, juengsterTag, schlafBewertung, schlafStunden } from '@/src/lib/wellness';
 
 type Kennzahl = { def: KennzahlDef; punkte: KennzahlPunkt[] };
+
+
+/**
+ * Themenblock auf der Wellness-Uebersicht: Trennlinie, Ueberschrift, kurzer
+ * Satz, darunter die Kacheln im Raster. Gleiche Optik wie im Integrationen-Tab.
+ */
+function Gruppe({
+  titel,
+  hinweis,
+  children,
+}: {
+  titel: string;
+  hinweis: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="space-y-2.5">
+      <div className="flex items-baseline gap-2">
+        <h3 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--foreground)]">
+          {titel}
+        </h3>
+        <span className="h-px flex-1 bg-[var(--border-muted)]" />
+        <span className="text-[10px] text-[var(--text-muted)]">{hinweis}</span>
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{children}</div>
+    </section>
+  );
+}
 
 export default function WellnessUebersicht() {
   const { daten } = useWellness();
@@ -25,6 +53,10 @@ export default function WellnessUebersicht() {
 
   // Bewusst nur der heutige Tag: fehlt ein Wert, steht „—" statt eines alten Stands.
   const schlafLetzte = schlafStunden(heuteWert(tage, 'sleepSecs'));
+  /** Dauer zusaetzlich in hh:mm — Tim will keine Dezimalstunden sehen. */
+  const schlafLetzteHHMM = alsHHMM(
+    [...tage].reverse().find((t) => t.sleepSecs != null && t.sleepSecs > 0)?.sleepSecs,
+  );
   const schlafScore = heuteWert(tage, 'sleepScore');
   const schritte = heuteWert(tage, 'steps');
   const hrv = heuteWert(tage, 'hrv');
@@ -112,10 +144,15 @@ export default function WellnessUebersicht() {
        * Früher hingen Etagen, Fitnessalter, Schlafscore und Atemfrequenz als
        * Untertext an einer anderen Kachel — jetzt hat jeder Wert sein eigenes Feld.
        */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      {/*
+        Kacheln nach Themen gruppiert statt in einem Block aus 14 Feldern.
+        Reihenfolge folgt dem Tagesablauf: erst die Nacht, dann was der Tag
+        verbraucht hat, dann Herz und Kreislauf, zuletzt der Körper.
+      */}
+      <Gruppe titel="Schlaf" hinweis="Die letzte Nacht">
         <KlickKachel
           label="Schlaf"
-          value={schlafLetzte ?? '—'}
+          value={schlafLetzteHHMM ?? '—'}
           unit="h"
           onClick={() => navigate('/wellness/schlaf')}
         />
@@ -123,16 +160,6 @@ export default function WellnessUebersicht() {
           label="Schlafscore"
           value={schlafScore != null ? Math.round(schlafScore) : '—'}
           onClick={() => navigate('/wellness/schlaf')}
-        />
-        <KlickKachel
-          label="Schritte"
-          value={schritte != null ? Math.round(schritte).toLocaleString('de-DE') : '—'}
-          onClick={() => navigate('/wellness/bewegung')}
-        />
-        <KlickKachel
-          label="Etagen"
-          value={etagen != null ? Math.round(etagen) : '—'}
-          onClick={() => navigate('/wellness/bewegung')}
         />
         <KlickKachel
           label="HRV"
@@ -146,29 +173,19 @@ export default function WellnessUebersicht() {
           unit="bpm"
           onClick={() => navigate('/wellness/koerper')}
         />
+      </Gruppe>
+
+      <Gruppe titel="Bewegung & Energie" hinweis="Was der Tag verbraucht hat">
         <KlickKachel
-          label="Stress"
-          value={stress != null ? Math.round(stress) : '—'}
-          onClick={() => navigate('/wellness/koerper')}
+          label="Schritte"
+          value={schritte != null ? Math.round(schritte).toLocaleString('de-DE') : '—'}
+          onClick={() => navigate('/wellness/bewegung')}
         />
         <KlickKachel
-          label="Body Battery"
-          value={bodyBattery != null ? Math.round(bodyBattery) : '—'}
-          onClick={() => navigate('/wellness/koerper')}
+          label="Etagen"
+          value={etagen != null ? Math.round(etagen) : '—'}
+          onClick={() => navigate('/wellness/bewegung')}
         />
-        <KlickKachel
-          label="Sauerstoff"
-          value={spo2 != null ? Math.round(spo2) : '—'}
-          unit="%"
-          onClick={() => navigate('/wellness/koerper')}
-        />
-        <KlickKachel
-          label="Atemfrequenz"
-          value={atem != null ? Math.round(atem) : '—'}
-          unit="/min"
-          onClick={() => navigate('/wellness/koerper')}
-        />
-        {/* Verbrauch heute — Garmin-Gesamtwert, waechst ueber den Tag. */}
         <KlickKachel
           label="Verbrauch"
           value={
@@ -188,6 +205,34 @@ export default function WellnessUebersicht() {
           onClick={() => navigate('/wellness/kalorien')}
         />
         <KlickKachel
+          label="Body Battery"
+          value={bodyBattery != null ? Math.round(bodyBattery) : '—'}
+          onClick={() => navigate('/wellness/koerper')}
+        />
+      </Gruppe>
+
+      <Gruppe titel="Herz & Kreislauf" hinweis="Belastung und Erholung">
+        <KlickKachel
+          label="Stress"
+          value={stress != null ? Math.round(stress) : '—'}
+          onClick={() => navigate('/wellness/koerper')}
+        />
+        <KlickKachel
+          label="Sauerstoff"
+          value={spo2 != null ? Math.round(spo2) : '—'}
+          unit="%"
+          onClick={() => navigate('/wellness/koerper')}
+        />
+        <KlickKachel
+          label="Atemfrequenz"
+          value={atem != null ? Math.round(atem) : '—'}
+          unit="/min"
+          onClick={() => navigate('/wellness/koerper')}
+        />
+      </Gruppe>
+
+      <Gruppe titel="Körper & Leistung" hinweis="Langfristige Entwicklung">
+        <KlickKachel
           label="VO₂max"
           value={vo2 != null ? Math.round(vo2) : '—'}
           onClick={() => navigate('/wellness/form')}
@@ -201,7 +246,7 @@ export default function WellnessUebersicht() {
         {gewicht != null && (
           <KlickKachel label="Gewicht" value={gewicht} unit="kg" onClick={() => navigate('/wellness/koerper')} />
         )}
-      </div>
+      </Gruppe>
 
       <div className="grid grid-cols-2 gap-3">
         <button
