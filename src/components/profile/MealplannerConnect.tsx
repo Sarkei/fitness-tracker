@@ -6,7 +6,7 @@
  * im Coach-Kontext. Der Code bleibt serverseitig und geht nie an den Browser zurück.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, ExternalLink, Link2, Loader2, RefreshCw, Trash2, Utensils } from 'lucide-react';
+import { CheckCircle2, ExternalLink, Link2, Loader2, Trash2, Utensils } from 'lucide-react';
 import { api } from '@/src/lib/api';
 
 type Status = {
@@ -103,29 +103,6 @@ export default function MealplannerConnect() {
     }
   };
 
-  /** Echter Sync: fragt den Mealplanner nach dem aktuellen Wochenplan. */
-  const synchronisieren = async () => {
-    setArbeitet(true);
-    setFehler(null);
-    setErfolg(null);
-    try {
-      const r = await api<{ ms: number; anzahl: number; kcalSumme: number }>(
-        '/api/integrations/mealplanner/sync',
-        { method: 'POST' },
-      );
-      setErfolg(
-        r.anzahl > 0
-          ? `${r.anzahl} Mahlzeiten · ${r.kcalSumme} kcal — in ${r.ms} ms abgeglichen.`
-          : 'Abgeglichen — für diese Woche ist nichts geplant.',
-      );
-      await laden();
-    } catch (e) {
-      setFehler(e instanceof Error ? e.message : 'Sync fehlgeschlagen.');
-    } finally {
-      setArbeitet(false);
-    }
-  };
-
   const trennen = async () => {
     if (!window.confirm('Mealplanner-Verbindung trennen? Der Wochenplan wird dann nicht mehr gelesen.')) return;
     setArbeitet(true);
@@ -171,16 +148,6 @@ export default function MealplannerConnect() {
         <div className="flex shrink-0 items-center gap-1">
           {status?.connected ? (
             <>
-              <button
-                type="button"
-                onClick={() => void synchronisieren()}
-                disabled={arbeitet}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-muted)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-muted)] transition hover:text-[var(--foreground)]"
-                title="Jetzt mit dem Mealplanner abgleichen"
-              >
-                {arbeitet ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                Sync
-              </button>
               <button
                 type="button"
                 onClick={() => void trennen()}

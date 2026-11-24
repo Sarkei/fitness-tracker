@@ -174,9 +174,16 @@ export type BilanzTag = {
   kcal: number;
   /** Ziel des Tages (aus dem aktuellen Tagesziel). */
   ziel: number;
-  /** Training geschätzt verbrannt (aus Dauer). */
+  /**
+   * Verbrauchter Wert des Tages.
+   *
+   * Mit Garmin: Gesamtverbrauch (Grundumsatz + Aktivitaet) — das Ziel steckt
+   * schon darin. Ohne Garmin: nur die Trainings-Schaetzung.
+   */
   verbrannt: number;
-  /** kcal − (Ziel + verbrannt): negativ = Defizit. */
+  /** Tagesbudget, gegen das gegengerechnet wird (Garmin: Verbrauch, sonst Ziel + Training). */
+  budget: number;
+  /** kcal − budget: negativ = Defizit. */
   bilanz: number;
   /** Überhaupt etwas erfasst. */
   hatDaten: boolean;
@@ -259,6 +266,7 @@ export function kcalBilanz(
       kcal,
       ziel,
       verbrannt,
+      budget,
       bilanz: kcal - budget,
       hatDaten: kcal > 0,
       vollstaendig: ziel > 0 && kcal >= ziel * 0.5,

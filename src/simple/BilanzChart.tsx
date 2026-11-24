@@ -56,7 +56,7 @@ export default function BilanzChart({
      * Ohne Garmin ist `verbrannt` nur die Trainings-Schaetzung, dann gilt
      * weiterhin Ziel + Training.
      */
-    const budgets = tage.map((t) => (t.verbrannt > t.ziel ? t.verbrannt : t.ziel + t.verbrannt));
+    const budgets = tage.map((t) => t.budget);
     const ueberzogen = tage.filter((t) => t.hatDaten).map((t) => Math.abs(t.bilanz));
     return rundeGrenze(Math.max(500, ...budgets, ...ueberzogen));
   }, [tage]);
@@ -115,7 +115,7 @@ export default function BilanzChart({
           {/* Balken */}
           <div className="absolute inset-0 flex items-stretch gap-1.5">
             {tage.map((tag) => {
-              const budget = tag.ziel + tag.verbrannt;
+              const budget = tag.budget;
               const offen = budget - tag.kcal;
               const ueberzogen = tag.hatDaten && offen < 0;
               const imZiel = bilanzImZiel(tag.bilanz, zielTyp);
@@ -217,7 +217,7 @@ export default function BilanzChart({
             </thead>
             <tbody className="divide-y divide-[var(--border-muted)]">
               {[...tage].reverse().map((t) => {
-                const verbraucht = Math.round(t.ziel + t.verbrannt);
+                const verbraucht = Math.round(t.budget);
                 return (
                   <tr key={`z-${t.ymd}`}>
                     <td className="py-1 text-[var(--text-muted)]">{fmtDatum(t.ymd)}</td>

@@ -8,7 +8,7 @@
  * Der Key geht nie an den Browser zurück — die Karte zeigt nur, ob einer gesetzt ist.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, ExternalLink, Loader2, RefreshCw, Trash2, Watch } from 'lucide-react';
+import { CheckCircle2, ExternalLink, Loader2, Trash2, Watch } from 'lucide-react';
 import { api } from '@/src/lib/api';
 
 type GarminTag = {
@@ -150,33 +150,6 @@ export default function GarminConnect() {
     }
   };
 
-  const syncen = async () => {
-    setArbeitet(true);
-    setFehler(null);
-    setErfolg(null);
-    try {
-      // Vollstaendiger Abgleich: Tageswerte, Aktivitaeten und Historie.
-      const r = await api<{
-        ms?: number;
-        garmin?: { tage?: number; felder?: { erfolgreich: number; gesamt: number }; aktivitaeten?: number };
-      }>('/api/integrations/refresh', {
-        method: 'POST',
-        body: JSON.stringify({ days: 30 }),
-      });
-      const g = r.garmin;
-      setErfolg(
-        g?.tage != null
-          ? `${g.tage} Tage, ${g.aktivitaeten ?? 0} Einheiten abgeglichen in ${r.ms ?? 0} ms.`
-          : 'Abgleich abgeschlossen.',
-      );
-      await laden();
-    } catch (e) {
-      setFehler(e instanceof Error ? e.message : 'Sync fehlgeschlagen.');
-    } finally {
-      setArbeitet(false);
-    }
-  };
-
   const trennen = async () => {
     if (!window.confirm('Garmin-Verbindung trennen? Die Daten bleiben in der App.')) return;
     setArbeitet(true);
@@ -222,16 +195,6 @@ export default function GarminConnect() {
         <div className="flex shrink-0 items-center gap-1">
           {status?.connected ? (
             <>
-              <button
-                type="button"
-                onClick={() => void syncen()}
-                disabled={arbeitet}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border-muted)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-muted)] transition hover:text-[var(--foreground)]"
-                title="Jetzt abgleichen"
-              >
-                {arbeitet ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                Sync
-              </button>
               {/*
                 Key ersetzen: Garmin-Keys laufen ab. Vorher war das Eingabefeld
                 nur bei getrennter Verbindung sichtbar - ein abgelaufener Key

@@ -19,6 +19,7 @@ import ReportHistoryView from './ReportHistoryView';
 import IntervalsConnect from './IntervalsConnect';
 import MealplannerConnect from './MealplannerConnect';
 import GarminConnect from './GarminConnect';
+import SyncKarte from './SyncKarte';
 import GarminLogin from './GarminLogin';
 import { Card, PageHeader } from '@/src/simple/ui';
 import { motion, AnimatePresence } from 'motion/react';
@@ -826,6 +827,9 @@ export default function ProfilePage() {
             Trennlinie mit kurzer Ueberschrift, damit auf einen Blick klar ist,
             wofuer die Verbindung da ist.
           */}
+
+          {/* Ein Knopf fuer alle Quellen — vorher hatte jede Karte ihren eigenen. */}
+          <SyncKarte />
 
           <Gruppe titel="Datenquellen" hinweis="Woher deine Werte kommen">
             <GarminConnect />

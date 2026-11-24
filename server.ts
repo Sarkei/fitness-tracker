@@ -6807,7 +6807,7 @@ ${JSON.stringify(userCtx, null, 2)}
     try {
       const heute = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" });
       const r = await pool.query(
-        `SELECT total_kcal, active_kcal, steps
+        `SELECT total_kcal, active_kcal, steps, EXTRACT(EPOCH FROM updated_at)::int AS stand
            FROM garmin_days WHERE user_id = $1 AND date = $2 LIMIT 1`,
         [req.userId!, heute],
       );
@@ -6821,9 +6821,37 @@ ${JSON.stringify(userCtx, null, 2)}
         [req.userId!, heute],
       );
 
-      const zeile = r.rows[0] as { total_kcal?: number; active_kcal?: number; steps?: number } | undefined;
-      const total = zeile?.total_kcal ?? null;
-      const aktiv = zeile?.active_kcal ?? null;
+      let zeile = r.rows[0] as
+        | { total_kcal?: number; active_kcal?: number; steps?: number; stand?: number }
+        | undefined;
+      let total = zeile?.total_kcal ?? null;
+      let aktiv = zeile?.active_kcal ?? null;
+      let schritte = zeile?.steps ?? null;
+
+      /*
+       * Der Hintergrund-Abgleich laeuft im 10-Minuten-Takt — der Wert der Uhr
+       * waechst aber minuetlich. Wer die Startseite oeffnet, sah deshalb eine
+       * Zahl von vor bis zu zehn Minuten (1.869 statt 2.431 kcal).
+       *
+       * Deshalb: ist der gespeicherte Stand aelter als zwei Minuten, wird der
+       * heutige Tag hier einmal live geholt. Bewusst kein Schreibvorgang bei
+       * jedem Aufruf — nur wenn der Wert wirklich fehlt oder alt ist.
+       */
+      const stand = zeile?.stand ? zeile.stand * 1000 : 0;
+      const veraltet = !zeile || Date.now() - stand > 2 * 60_000;
+      if (veraltet && g.login?.tokens) {
+        try {
+          const frisch = await tagVoll(entschluesseln(g.login.tokens), heute, { leicht: true });
+          if (frisch.totalCalories != null || frisch.activeCalories != null) {
+            await speichereLoginTage(req.userId!, [frisch]);
+            total = frisch.totalCalories ?? total;
+            aktiv = frisch.activeCalories ?? aktiv;
+            schritte = frisch.steps ?? schritte;
+          }
+        } catch {
+          // Die Uhr ist nicht erreichbar — dann gilt der gespeicherte Stand.
+        }
+      }
 
       // Verlauf der letzten Tage fuer die Bilanzbalken — echter Verbrauch.
       const verlauf = await pool.query(
@@ -6852,7 +6880,7 @@ ${JSON.stringify(userCtx, null, 2)}
         aktiv,
         /** Grundumsatz = gesamt - aktiv. */
         passiv: total != null && aktiv != null ? Math.max(0, total - aktiv) : null,
-        schritte: zeile?.steps ?? null,
+        schritte,
         /** Durchschnitt vollstaendiger Vortage — als Vergleichsmarke. */
         schnitt: {
           gesamt: schnitt.rows[0]?.total ?? null,

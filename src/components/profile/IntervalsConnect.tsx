@@ -7,7 +7,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Activity, CheckCircle2, ExternalLink, Link2, Loader2, RefreshCw, Trash2 } from 'lucide-react';
+import { Activity, CheckCircle2, ExternalLink, Link2, Loader2, Trash2 } from 'lucide-react';
 import { api } from '@/src/lib/api';
 
 type Status = {
@@ -98,35 +98,6 @@ export default function IntervalsConnect() {
       await laden();
     } catch (e) {
       setFehler(e instanceof Error ? e.message : 'Verbindung fehlgeschlagen.');
-    } finally {
-      setArbeitet(false);
-    }
-  };
-
-  const syncen = async () => {
-    setArbeitet(true);
-    setFehler(null);
-    setErfolg(null);
-    try {
-      const res = await api<{
-        activityCount: number;
-        neuSeitLetztemSync: boolean;
-        neuesteAktivitaet: string | null;
-        hinweis: string | null;
-      }>('/api/integrations/intervals/sync', {
-        method: 'POST',
-        body: JSON.stringify({ days: 30 }),
-      });
-      if (res.neuSeitLetztemSync) {
-        setErfolg(`Neue Daten: ${res.neuesteAktivitaet} · ${res.activityCount} Aktivitäten insgesamt.`);
-      } else if (res.hinweis) {
-        setFehler(res.hinweis);
-      } else {
-        setErfolg(`${res.activityCount} Aktivitäten — keine neuen seit dem letzten Abgleich.`);
-      }
-      await laden();
-    } catch (e) {
-      setFehler(e instanceof Error ? e.message : 'Sync fehlgeschlagen.');
     } finally {
       setArbeitet(false);
     }
@@ -324,16 +295,6 @@ export default function IntervalsConnect() {
 
       {status?.connected && (
         <div className="mt-3 space-y-2">
-          <button
-            type="button"
-            onClick={() => void syncen()}
-            disabled={arbeitet}
-            className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--simple-accent)] px-3 py-2.5 text-[12px] font-semibold text-white transition hover:opacity-90 disabled:opacity-50 sm:w-auto"
-          >
-            {arbeitet ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-            Jetzt synchronisieren
-          </button>
-
           <div className="flex flex-wrap items-end gap-2">
             <label className="flex-1 text-[11px] font-semibold text-[var(--text-muted)] sm:max-w-[220px]">
               Automatisch synchronisieren
