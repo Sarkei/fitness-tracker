@@ -287,7 +287,7 @@ export default function TodayPage() {
               <Dumbbell className="h-3.5 w-3.5" /> Training
             </GhostButton>
             <PrimaryButton onClick={() => setShowPhoto(true)}>
-              <Camera className="h-4 w-4" /> Essen erfassen
+              <Camera className="h-4 w-4" /> Erfassen
             </PrimaryButton>
           </div>
         }
