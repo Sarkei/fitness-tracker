@@ -46,6 +46,8 @@ export type GarminTag = {
   /** Aktivität */
   steps?: number;
   floorsClimbed?: number;
+  /** Login-Weg nennt das Feld `floors` — beide zulassen. */
+  floors?: number;
   distanceMeters?: number;
   activeCalories?: number;
   totalCalories?: number;
@@ -57,6 +59,8 @@ export type GarminTag = {
   /** Sauerstoff & Atmung */
   spo2Avg?: number;
   respirationAvg?: number;
+  /** Login-Weg nennt das Feld `respiration` (ohne Avg) — beide zulassen. */
+  respiration?: number;
   /** Körper */
   vo2max?: number;
   fitnessAge?: number;

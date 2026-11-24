@@ -211,6 +211,9 @@ export type LoginTag = {
   sleepHr?: number;
   spo2Night?: number;
   respirationNight?: number;
+  /** Tageswerte — SpO2 und Atemfrequenz ausserhalb des Schlafs. */
+  spo2Avg?: number;
+  respiration?: number;
   hrv?: number;
   hrvStatus?: string;
   restingHr?: number;
@@ -270,8 +273,12 @@ export async function tagVoll(
     const dist = zahl(schrittBlock?.distanceInMeters) ?? zahl(roh.totalDistanceMeters);
     if (dist) tag.distanceMeters = Math.round(dist);
 
-    const etagen = zahl(schrittBlock?.floorsClimbed) ?? zahl(roh.floorsClimbed);
-    if (etagen) tag.floors = etagen;
+    /*
+     * Etagen stehen NICHT in der Tageszusammenfassung (dort ist der
+     * `steps`-Block meist gar nicht vorhanden). Sie haben einen eigenen
+     * Endpunkt: /usersummary-service/stats/floors/daily/<von>/<bis>,
+     * Antwort ein Array mit values.wellnessFloorsAscended.
+     */
 
     /*
      * Kalorien stehen je nach Alter des Tages an verschiedenen Stellen:
@@ -291,38 +298,58 @@ export async function tagVoll(
     if (gesamt) tag.totalCalories = Math.round(gesamt);
     else if (aktiv && ruhe) tag.totalCalories = Math.round(aktiv + ruhe);
 
-    const hf = roh.heartRate as Record<string, unknown> | undefined;
-    if (hf) {
-      const rest = zahl(hf.restingValue) ?? zahl(hf.restingHeartRate);
-      if (rest) tag.restingHr = rest;
-      const min = zahl(hf.minValue);
-      const max = zahl(hf.maxValue);
-      if (min) tag.minHr = min;
-      if (max) tag.maxHr = max;
-    }
+    /*
+     * Puls, Stress, Body Battery und SpO2 kommen FLACH in der Antwort
+     * (restingHeartRate, averageStressLevel, averageSpo2 …), nicht in
+     * Unterobjekten. Wer nur `roh.heartRate` liest, bekommt stumm NULL —
+     * genau deshalb waren diese Kacheln in der App leer, obwohl Garmin
+     * die Werte liefert. Beide Wege lesen, flach zuerst.
+     */
+    const rest =
+      zahl(roh.restingHeartRate) ??
+      zahl((roh.heartRate as Record<string, unknown> | undefined)?.restingValue) ??
+      zahl((roh.heartRate as Record<string, unknown> | undefined)?.restingHeartRate);
+    if (rest) tag.restingHr = Math.round(rest);
 
-    const stress = roh.stress as Record<string, unknown> | undefined;
-    if (stress) {
-      const avg = zahl(stress.avgStressLevel) ?? zahl(stress.averageStressLevel);
-      if (avg) tag.stressAvg = avg;
-      const max = zahl(stress.maxStressLevel);
-      if (max) tag.stressMax = max;
-    }
+    const minHr =
+      zahl(roh.minHeartRate) ?? zahl((roh.heartRate as Record<string, unknown> | undefined)?.minValue);
+    const maxHr =
+      zahl(roh.maxHeartRate) ?? zahl((roh.heartRate as Record<string, unknown> | undefined)?.maxValue);
+    if (minHr) tag.minHr = Math.round(minHr);
+    if (maxHr) tag.maxHr = Math.round(maxHr);
 
-    const bb = roh.bodyBattery as Record<string, unknown> | undefined;
-    if (bb) {
-      const min = zahl(bb.lowestValue);
-      const max = zahl(bb.highestValue);
-      if (min != null) tag.bodyBatteryMin = Math.round(min);
-      if (max != null) tag.bodyBatteryMax = Math.round(max);
-    }
+    const stressBlock = roh.stress as Record<string, unknown> | undefined;
+    const stressAvg =
+      zahl(roh.averageStressLevel) ??
+      zahl(stressBlock?.avgStressLevel) ??
+      zahl(stressBlock?.averageStressLevel);
+    const stressMax = zahl(roh.maxStressLevel) ?? zahl(stressBlock?.maxStressLevel);
+    if (stressAvg != null) tag.stressAvg = Math.round(stressAvg);
+    if (stressMax != null) tag.stressMax = Math.round(stressMax);
 
+    const bbBlock = roh.bodyBattery as Record<string, unknown> | undefined;
+    const bbMax = zahl(roh.bodyBatteryMostRecentValue) ?? zahl(bbBlock?.highestValue);
+    const bbMin = zahl(roh.bodyBatteryLowestValue) ?? zahl(bbBlock?.lowestValue);
+    if (bbMax != null) tag.bodyBatteryMax = Math.round(bbMax);
+    if (bbMin != null) tag.bodyBatteryMin = Math.round(bbMin);
+
+    /* SpO2 und Atmung am Tag — nachts kommen sie aus dem Schlaf-Endpunkt. */
+    const spo2Tag = zahl(roh.averageSpo2);
+    if (spo2Tag) tag.spo2Avg = Math.round(spo2Tag * 10) / 10;
+    const atemTag = zahl(roh.avgWakingRespirationValue);
+    if (atemTag) tag.respiration = Math.round(atemTag * 10) / 10;
+
+    /*
+     * HRV steht NICHT in der Tageszusammenfassung. Eigener Endpunkt:
+     * /hrv-service/hrv/<datum> -> hrvSummary.lastNightAvg / weeklyAvg.
+     */
     const hrvBlock = roh.hrv as Record<string, unknown> | undefined;
-    if (hrvBlock) {
-      const wert = zahl(hrvBlock.lastNightAvg) ?? zahl(hrvBlock.weeklyAvg);
-      if (wert) tag.hrv = Math.round(wert);
-      if (typeof hrvBlock.status === 'string') tag.hrvStatus = hrvBlock.status;
-    }
+    const hrvWert = zahl(hrvBlock?.lastNightAvg) ?? zahl(hrvBlock?.weeklyAvg) ?? zahl(roh.hrvValue);
+    if (hrvWert) tag.hrv = Math.round(hrvWert);
+    const hrvStatus =
+      (typeof hrvBlock?.status === 'string' ? hrvBlock.status : null) ??
+      (typeof roh.hrvStatus === 'string' ? roh.hrvStatus : null);
+    if (hrvStatus) tag.hrvStatus = hrvStatus;
   }
 
   /* 2 - Schlaf mit Phasen */
@@ -369,6 +396,26 @@ export async function tagVoll(
     const respBlock = schlaf.wellnessRespirationSummaryDTO as Record<string, unknown> | undefined;
     const atemNacht = zahl(respBlock?.averageValue);
     if (atemNacht) tag.respirationNight = Math.round(atemNacht * 10) / 10;
+  }
+
+  /* 2a - HRV (eigener Endpunkt, nicht in der Tageszusammenfassung) */
+  if (tag.hrv == null) {
+    const hrvRoh = (await client
+      .connectapi(`/hrv-service/hrv/${datum}`)
+      .catch(() => null)) as Record<string, unknown> | null;
+    const hrvSummary = hrvRoh?.hrvSummary as Record<string, unknown> | undefined;
+    const hrvWert2 = zahl(hrvSummary?.lastNightAvg) ?? zahl(hrvSummary?.weeklyAvg);
+    if (hrvWert2) tag.hrv = Math.round(hrvWert2);
+  }
+
+  /* 2b - Etagen (eigener Endpunkt, nicht Teil der Tageszusammenfassung) */
+  const etagenRoh = (await client
+    .connectapi(`/usersummary-service/stats/floors/daily/${datum}/${datum}`)
+    .catch(() => null)) as Array<Record<string, unknown>> | null;
+  if (Array.isArray(etagenRoh) && etagenRoh.length) {
+    const werte = etagenRoh[0]?.values as Record<string, unknown> | undefined;
+    const hoch = zahl(werte?.wellnessFloorsAscended);
+    if (hoch != null) tag.floors = Math.round(hoch);
   }
 
   /* Leichter Lauf endet hier. */

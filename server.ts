@@ -6366,7 +6366,10 @@ ${JSON.stringify(userCtx, null, 2)}
           t.activeCalories ?? null, t.totalCalories ?? null,
           t.stressAvg ?? null, t.stressMax ?? null,
           t.bodyBatteryMin ?? null, t.bodyBatteryMax ?? null,
-          null, t.respirationNight ?? null, t.vo2max ?? null,
+          // Tagwerte bevorzugen, sonst auf den Nachtwert zurueckfallen.
+          t.spo2Avg ?? t.spo2Night ?? null,
+          t.respiration ?? t.respirationNight ?? null,
+          t.vo2max ?? null,
           t.fitnessAge != null ? Math.round(t.fitnessAge) : null,
           t.weightKg ?? null, t.bodyFat ?? null,
           t.deepSecs ?? null, t.lightSecs ?? null, t.remSecs ?? null, t.awakeSecs ?? null,
@@ -6400,7 +6403,7 @@ ${JSON.stringify(userCtx, null, 2)}
         t.activeCalories ?? null, t.totalCalories ?? null,
         t.stressAvg ?? null, t.stressMax ?? null,
         t.bodyBatteryMin ?? null, t.bodyBatteryMax ?? null,
-        t.spo2Avg ?? null, t.respirationAvg ?? null,
+        t.spo2Avg ?? null, t.respiration ?? null,
         t.vo2max ?? null,
         // Fitnessalter kommt als Kommazahl, die Spalte ist INTEGER — runden.
         t.fitnessAge != null ? Math.round(t.fitnessAge) : null,
@@ -6833,7 +6836,13 @@ ${JSON.stringify(userCtx, null, 2)}
       );
 
       res.json({
-        verbunden: Boolean(g.apiKey),
+        /*
+         * Verbunden ist, wer einen Login-Zugang ODER einen Personal-API-Key
+         * hat. Vorher stand hier nur `apiKey` — die Startseite hielt Garmin
+         * deshalb fuer nicht verbunden und rechnete den Verbrauch selbst
+         * (2.300 statt der echten 1.869 kcal der Uhr).
+         */
+        verbunden: Boolean(g.login?.tokens || g.apiKey),
         datum: heute,
         /** Verbrauch je Tag — Grundlage fuer die Bilanzbalken. */
         verlauf: verlauf.rows,
@@ -6850,7 +6859,7 @@ ${JSON.stringify(userCtx, null, 2)}
           aktiv: schnitt.rows[0]?.aktiv ?? null,
           tage: schnitt.rows[0]?.tage ?? 0,
         },
-        stand: g.cache?.fetchedAt ?? null,
+        stand: g.lastAutoSyncAt ?? g.cache?.fetchedAt ?? null,
       });
     } catch (err: unknown) {
       res.status(500).json({ error: err instanceof Error ? err.message : "load failed" });
@@ -7501,30 +7510,80 @@ ${JSON.stringify(userCtx, null, 2)}
        * bei, weil die Personal API die nicht in dieser Form hergibt.
        */
       const g = await readGarminSettings(req.userId!);
-      let garminTage: GarminCache["tage"] = g.cache?.tage ?? [];
+
+      /*
+       * Datenquelle ist die Tabelle `garmin_days`, nicht der JSON-Cache.
+       *
+       * Der Cache wird beim leichten 5-Minuten-Lauf nur mit den Feldern
+       * gefuellt, die dieser Lauf holt — HRV, Stress, Body Battery und SpO2
+       * fehlen dort also. Die Tabelle wird bei jedem Lauf vollstaendig
+       * geschrieben und haelt die ganze Historie. Deshalb hier aus der
+       * Tabelle lesen und den Cache nur als Rueckfallebene nehmen.
+       */
+      const tabellenTage = await pool.query(
+        `SELECT date::text AS date, sleep_secs, sleep_score, sleep_quality, deep_secs, light_secs,
+                rem_secs, awake_secs, sleep_stress, sleep_hr, spo2_night, respiration_night,
+                hrv, hrv_status, resting_hr, min_hr, max_hr, steps, floors, distance_m,
+                active_kcal, total_kcal, stress_avg, stress_max, bb_min, bb_max,
+                spo2_avg, respiration, vo2max, fitness_age, weight_kg, body_fat,
+                readiness, readiness_level, training_status
+           FROM garmin_days
+          WHERE user_id = $1 AND date >= CURRENT_DATE - ($2 || ' days')::interval
+          ORDER BY date ASC`,
+        [req.userId, tage],
+      );
+
+      const garminTage: GarminCache["tage"] = tabellenTage.rows.length
+        ? (tabellenTage.rows.map((r) => ({
+            date: r.date,
+            sleepSecs: r.sleep_secs ?? undefined,
+            sleepScore: r.sleep_score ?? undefined,
+            sleepQuality: r.sleep_quality ?? undefined,
+            deepSecs: r.deep_secs ?? undefined,
+            lightSecs: r.light_secs ?? undefined,
+            remSecs: r.rem_secs ?? undefined,
+            awakeSecs: r.awake_secs ?? undefined,
+            sleepStress: r.sleep_stress ?? undefined,
+            sleepHr: r.sleep_hr ?? undefined,
+            spo2Night: r.spo2_night != null ? Number(r.spo2_night) : undefined,
+            respirationNight: r.respiration_night != null ? Number(r.respiration_night) : undefined,
+            hrv: r.hrv ?? undefined,
+            hrvStatus: r.hrv_status ?? undefined,
+            restingHr: r.resting_hr ?? undefined,
+            minHr: r.min_hr ?? undefined,
+            maxHr: r.max_hr ?? undefined,
+            steps: r.steps ?? undefined,
+            floors: r.floors ?? undefined,
+            distanceMeters: r.distance_m ?? undefined,
+            activeCalories: r.active_kcal ?? undefined,
+            totalCalories: r.total_kcal ?? undefined,
+            stressAvg: r.stress_avg ?? undefined,
+            stressMax: r.stress_max ?? undefined,
+            bodyBatteryMin: r.bb_min ?? undefined,
+            bodyBatteryMax: r.bb_max ?? undefined,
+            spo2Avg: r.spo2_avg != null ? Number(r.spo2_avg) : undefined,
+            respiration: r.respiration != null ? Number(r.respiration) : undefined,
+            vo2max: r.vo2max != null ? Number(r.vo2max) : undefined,
+            fitnessAge: r.fitness_age ?? undefined,
+            weightKg: r.weight_kg != null ? Number(r.weight_kg) : undefined,
+            bodyFat: r.body_fat != null ? Number(r.body_fat) : undefined,
+            readiness: r.readiness ?? undefined,
+            readinessLevel: r.readiness_level ?? undefined,
+            trainingStatus: r.training_status ?? undefined,
+          })) as GarminCache["tage"])
+        : g.cache?.tage ?? [];
+
       let garminNichtVerfuegbar = g.cache?.nichtVerfuegbar ?? [];
       let garminFehler: string | null = g.lastError ?? null;
 
-      // Garmin bei Bedarf nachziehen (der 10-Minuten-Takt erledigt das im Hintergrund).
-      const letzterGarmin = Date.parse(g.cache?.fetchedAt ?? "");
-      if (g.apiKey && (!Number.isFinite(letzterGarmin) || Date.now() - letzterGarmin > 10 * 60_000)) {
-        try {
-          const cache = await syncGarmin(g.apiKey, Math.max(30, tage));
-          garminTage = cache.tage;
-          garminNichtVerfuegbar = cache.nichtVerfuegbar;
-          garminFehler = null;
-          await writeGarminSettings(req.userId!, {
-            ...g,
-            cache,
-            displayName: cache.displayName ?? g.displayName,
-            lastError: undefined,
-            lastAutoSyncAt: new Date().toISOString(),
-          });
-        } catch (e) {
-          garminFehler = e instanceof Error ? e.message : "Garmin-Sync fehlgeschlagen.";
-          await writeGarminSettings(req.userId!, { ...g, lastError: garminFehler }).catch(() => {});
-        }
-      }
+      /*
+       * Kein eigener Sync mehr an dieser Stelle.
+       *
+       * Der Hintergrund-Takt (5 Min leicht / 30 Min voll) schreibt laufend in
+       * `garmin_days`. Ein zweiter Sync hier brachte nur die Personal-API-Werte
+       * (ohne Schlafphasen, Readiness, SpO2) und ueberschrieb den Cache mit
+       * einem aelteren Stand. Die Tabelle oben ist immer die frischeste Quelle.
+       */
 
       // Trainingslast aus Intervals — nur lesen, wenn verbunden.
       let intervals = await readIntervalsSettings(req.userId!);
@@ -7579,7 +7638,7 @@ ${JSON.stringify(userCtx, null, 2)}
         if (t.minHr != null) e.minHr = t.minHr;
         if (t.maxHr != null) e.maxHr = t.maxHr;
         if (t.steps != null) e.steps = t.steps;
-        if (t.floorsClimbed != null) e.floors = t.floorsClimbed;
+        if (t.floors != null) e.floors = t.floors;
         if (t.distanceMeters != null) e.distanceMeters = t.distanceMeters;
         if (t.vo2max != null) e.vo2max = t.vo2max;
         if (t.fitnessAge != null) e.fitnessAge = t.fitnessAge;
@@ -7596,7 +7655,7 @@ ${JSON.stringify(userCtx, null, 2)}
         if (t.bodyBatteryMin != null) e.bodyBatteryMin = t.bodyBatteryMin;
         if (t.bodyBatteryMax != null) e.bodyBatteryMax = t.bodyBatteryMax;
         if (t.spo2Avg != null) e.spo2 = t.spo2Avg;
-        if (t.respirationAvg != null) e.respiration = t.respirationAvg;
+        if (t.respiration != null) e.respiration = t.respiration;
       }
 
       const alle = [...proTag.values()]
@@ -7629,7 +7688,7 @@ ${JSON.stringify(userCtx, null, 2)}
         },
         nichtVerfuegbar,
         garminNichtVerfuegbar,
-        quelle: g.apiKey ? "garmin" : "intervals",
+        quelle: g.login?.tokens || g.apiKey ? "garmin" : "intervals",
         lastError: garminFehler ?? intervals.lastError ?? null,
       });
     } catch (err) {

@@ -117,7 +117,8 @@ export default function TodayPage() {
         .catch(() => {});
     };
     holen();
-    const timer = window.setInterval(holen, 15 * 60_000);
+    // Alle 5 Minuten nachziehen — im Takt des Hintergrund-Abgleichs.
+    const timer = window.setInterval(holen, 5 * 60_000);
     return () => {
       abgebrochen = true;
       window.clearInterval(timer);
