@@ -47,6 +47,11 @@ export type WellnessTag = {
   readiness?: number | null;
   /** Garmins Stufe dazu: PRIME, HIGH, MODERATE, LOW, POOR. */
   readinessLevel?: string | null;
+  /**
+   * Bis wann Garmin für den Tag Daten hat. Endet beim letzten Sync der Uhr —
+   * nicht beim Abruf durch uns.
+   */
+  datenBis?: string | null;
   weight?: number | null;
   bodyFat?: number | null;
 };

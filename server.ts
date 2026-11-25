@@ -262,6 +262,14 @@ async function initDb(): Promise<void> {
     `ALTER TABLE garmin_days ADD COLUMN IF NOT EXISTS respiration_night REAL`,
     `ALTER TABLE garmin_days ADD COLUMN IF NOT EXISTS readiness INTEGER`,
     `ALTER TABLE garmin_days ADD COLUMN IF NOT EXISTS readiness_level TEXT`,
+    /*
+     * Bis wann Garmin für den Tag Daten hat.
+     *
+     * `updated_at` ist der Abrufzeitpunkt — der ist immer frisch und sagt
+     * nichts darüber, wie alt die Daten sind. `daten_bis` kommt von Garmin
+     * selbst (`wellnessEndTimeLocal`) und endet beim letzten Sync der Uhr.
+     */
+    `ALTER TABLE garmin_days ADD COLUMN IF NOT EXISTS daten_bis TEXT`,
     `ALTER TABLE garmin_days ADD COLUMN IF NOT EXISTS training_status TEXT`,
     /* Merker fuer Rueckschreibvorgaenge — verhindert Endlosschleifen. */
     `CREATE TABLE IF NOT EXISTS garmin_schreibstand (
@@ -6521,10 +6529,12 @@ ${JSON.stringify(userCtx, null, 2)}
            stress_avg, stress_max, bb_min, bb_max, spo2_avg, respiration, vo2max, fitness_age,
            weight_kg, body_fat,
            deep_secs, light_secs, rem_secs, awake_secs, sleep_stress, sleep_hr,
-           spo2_night, respiration_night, readiness, readiness_level, training_status
+           spo2_night, respiration_night, readiness, readiness_level, training_status,
+           daten_bis
          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,
-                   $20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36)
+                   $20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37)
          ON CONFLICT (user_id, date) DO UPDATE SET
+           daten_bis         = COALESCE(EXCLUDED.daten_bis, garmin_days.daten_bis),
            sleep_secs        = COALESCE(EXCLUDED.sleep_secs, garmin_days.sleep_secs),
            sleep_score       = COALESCE(EXCLUDED.sleep_score, garmin_days.sleep_score),
            sleep_quality     = COALESCE(EXCLUDED.sleep_quality, garmin_days.sleep_quality),
@@ -6581,6 +6591,8 @@ ${JSON.stringify(userCtx, null, 2)}
           t.sleepStress ?? null, t.sleepHr ?? null,
           t.spo2Night ?? null, t.respirationNight ?? null,
           t.readiness ?? null, t.readinessLevel ?? null, t.trainingStatus ?? null,
+          /* Bis wann Garmin Daten hat — nicht der Abrufzeitpunkt. */
+          t.datenBis ?? null,
         ],
       );
     }
@@ -7042,7 +7054,7 @@ ${JSON.stringify(userCtx, null, 2)}
                 resting_hr, min_hr, max_hr, steps, floors, distance_m, active_kcal, total_kcal,
                 stress_avg, stress_max, bb_min, bb_max, spo2_avg, respiration, vo2max,
                 fitness_age, weight_kg, body_fat, deep_secs, light_secs, rem_secs, awake_secs,
-                readiness, readiness_level, training_status
+                readiness, readiness_level, training_status, daten_bis
            FROM garmin_days
           WHERE user_id = $1
           ORDER BY date ASC`,
@@ -7081,6 +7093,8 @@ ${JSON.stringify(userCtx, null, 2)}
             readiness: r.readiness ?? undefined,
             readinessLevel: r.readiness_level ?? undefined,
             trainingStatus: r.training_status ?? undefined,
+            /* Bis wann Garmin Daten hat — für den ehrlichen „Stand". */
+            datenBis: r.daten_bis ?? undefined,
           })) as GarminCache["tage"])
         : g.cache?.tage ?? [];
       const stand = felderStand(tage);
@@ -8019,7 +8033,7 @@ ${JSON.stringify(userCtx, null, 2)}
                 hrv, hrv_status, resting_hr, min_hr, max_hr, steps, floors, distance_m,
                 active_kcal, total_kcal, stress_avg, stress_max, bb_min, bb_max,
                 spo2_avg, respiration, vo2max, fitness_age, weight_kg, body_fat,
-                readiness, readiness_level, training_status
+                readiness, readiness_level, training_status, daten_bis
            FROM garmin_days
           WHERE user_id = $1 AND date >= CURRENT_DATE - ($2 || ' days')::interval
           ORDER BY date ASC`,
@@ -8063,6 +8077,8 @@ ${JSON.stringify(userCtx, null, 2)}
             readiness: r.readiness ?? undefined,
             readinessLevel: r.readiness_level ?? undefined,
             trainingStatus: r.training_status ?? undefined,
+            /* Bis wann Garmin Daten hat — für den ehrlichen „Stand". */
+            datenBis: r.daten_bis ?? undefined,
           })) as GarminCache["tage"])
         : g.cache?.tage ?? [];
 
@@ -8156,6 +8172,11 @@ ${JSON.stringify(userCtx, null, 2)}
         if (t.readiness != null) e.readiness = t.readiness;
         if (t.readinessLevel != null) e.readinessLevel = t.readinessLevel;
         if (t.trainingStatus != null) e.trainingStatus = t.trainingStatus;
+        /*
+         * Bis wann Garmin Daten hat. Wird durchgereicht, damit die Anzeige den
+         * echten Datenstand zeigen kann statt des Abrufzeitpunkts.
+         */
+        if (t.datenBis != null) e.datenBis = t.datenBis;
       }
 
       const alle = [...proTag.values()]

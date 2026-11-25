@@ -51,6 +51,11 @@ export type GarminTag = {
   /** Garmin Readiness (0-100) und Einordnung — nur ueber den Login-Weg. */
   readiness?: number;
   readinessLevel?: string;
+  /**
+   * Bis wann Garmin für diesen Tag Daten hat (`wellnessEndTimeLocal`).
+   * Endet beim letzten Sync der Uhr — nicht beim Abruf.
+   */
+  datenBis?: string;
   /** Garmin-Trainingsstatus, z. B. PRODUCTIVE, STRAINED. */
   trainingStatus?: string;
   distanceMeters?: number;

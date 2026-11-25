@@ -242,18 +242,66 @@ export function useWellness(): Kontext {
  */
 export function WellnessAktualisieren() {
   const { laedt, daten, syncJetzt, synct, fortschritt } = useWellness();
+
+  /*
+   * „Stand" war irreführend: Er zeigte den Abrufzeitpunkt (wann wir Garmin
+   * gefragt haben), nicht wann Garmin zuletzt Daten hatte. Wer um 12 Uhr
+   * hinsieht, liest „Stand 11:13" und erwartet aktuelle Werte — dabei enden
+   * Garmins Daten um 07:03, weil die Uhr seit dem Frühstück nichts
+   * hochgeladen hat.
+   *
+   * Jetzt zählt der echte Datenstand (`datenBis` vom jüngsten Tag). Ist er
+   * älter als eine Stunde, steht das dabei — dann weiß Tim sofort, dass die
+   * Uhr bzw. das Handy nicht synchronisiert hat, und sucht nicht in der App.
+   */
+  const juengster = daten.tage.length ? daten.tage[daten.tage.length - 1] : null;
+  const datenBis = juengster?.datenBis ? new Date(juengster.datenBis) : null;
+  const alterMinuten = datenBis
+    ? Math.max(0, Math.round((Date.now() - datenBis.getTime()) / 60000))
+    : null;
+  /* Ab 60 Minuten gilt der Stand als alt — der 5-Minuten-Takt wäre längst durch. */
+  const veraltet = alterMinuten != null && alterMinuten >= 60;
+
+  const zeitText = (d: Date) =>
+    d.toLocaleString('de-DE', {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+  const alterText =
+    alterMinuten == null
+      ? null
+      : alterMinuten < 60
+        ? `vor ${alterMinuten} Min`
+        : alterMinuten < 120
+          ? 'vor über 1 Std'
+          : `vor ${Math.round(alterMinuten / 60)} Std`;
+
   return (
     <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
-      {daten.fetchedAt && (
-        <span>
-          Stand{' '}
-          {new Date(daten.fetchedAt).toLocaleString('de-DE', {
-            day: '2-digit',
-            month: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
+      {datenBis ? (
+        <span
+          className="inline-flex items-center gap-1"
+          title={veraltet
+            ? 'Garmins Daten enden hier — die Uhr hat seither nicht synchronisiert.'
+            : 'Bis hierher hat Garmin Daten für heute.'}
+        >
+          <span>Daten bis {zeitText(datenBis)}</span>
+          {veraltet && (
+            <span
+              className="rounded-full px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide"
+              style={{ background: '#3d2a12', color: '#e8b168' }}
+            >
+              {alterText}
+            </span>
+          )}
         </span>
+      ) : (
+        daten.fetchedAt && (
+          <span>Abgerufen {zeitText(new Date(daten.fetchedAt))}</span>
+        )
       )}
       <button
         type="button"

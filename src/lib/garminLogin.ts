@@ -200,6 +200,18 @@ const sek = (v: unknown): number | undefined => {
 /** Alle Werte eines Tages. */
 export type LoginTag = {
   date: string;
+  /**
+   * Bis wann Garmin für diesen Tag Daten hat (ISO-Zeitstempel aus
+   * `wellnessEndTimeLocal`).
+   *
+   * Tims Beobachtung: „meine kcal werden seit heute früh nicht aktualisiert …
+   * es steht noch auf 800 kcal aber ich bin mittlerweile bei 1450".
+   * Die App zeigte als „Stand" den Abrufzeitpunkt — also wann WIR gefragt
+   * haben, nicht wann Garmin zuletzt Daten hatte. Wenn die Uhr seit Stunden
+   * nichts hochlädt, sieht das aus wie ein Fehler in der App, obwohl der
+   * Abruf tadellos funktioniert.
+   */
+  datenBis?: string;
   sleepSecs?: number;
   sleepScore?: number;
   sleepQuality?: string;
@@ -268,6 +280,15 @@ export async function tagVoll(
     .catch(() => null)) as Record<string, unknown> | null;
 
   if (roh) {
+    /*
+     * Bis wann hat Garmin Daten? `wellnessEndTimeLocal` endet beim letzten
+     * Sync der Uhr. Steht dort 07:03 und es ist 12:15, hat die Uhr seit fünf
+     * Stunden nichts hochgeladen — dann sind Schritte und Kalorien
+     * zwangsläufig veraltet, egal wie oft wir abfragen.
+     */
+    const bisRoh = roh.wellnessEndTimeLocal;
+    if (typeof bisRoh === 'string' && bisRoh.length >= 16) tag.datenBis = bisRoh;
+
     const schrittBlock = roh.steps as Record<string, unknown> | undefined;
     const schritte = zahl(schrittBlock?.value) ?? zahl(roh.totalSteps);
     if (schritte) tag.steps = schritte;
