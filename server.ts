@@ -6312,6 +6312,8 @@ ${JSON.stringify(userCtx, null, 2)}
     quellen?: {
       personalApi?: boolean;
       intervals?: boolean;
+      /** Werte aus der App nach Garmin schreiben (Gewicht, Wasser). */
+      schreiben?: boolean;
     };
   };
 
@@ -6346,11 +6348,12 @@ ${JSON.stringify(userCtx, null, 2)}
   type QuellenSettings = {
     personalApi?: boolean;
     intervals?: boolean;
+    schreiben?: boolean;
   };
 
   const leseQuellen = async (
     userId: number,
-  ): Promise<{ personalApi: boolean; intervals: boolean }> => {
+  ): Promise<{ personalApi: boolean; intervals: boolean; schreiben: boolean }> => {
     const r = await pool.query("SELECT profile_extras FROM users WHERE id=$1", [userId]);
     const extras = (r.rows[0]?.profile_extras || {}) as Record<string, unknown>;
     const garmin = (extras.garmin || {}) as { quellen?: QuellenSettings };
@@ -6359,12 +6362,117 @@ ${JSON.stringify(userCtx, null, 2)}
       // Nur ein ausdrückliches `false` schaltet ab — fehlende Werte bleiben an.
       personalApi: q.personalApi !== false,
       intervals: q.intervals !== false,
+      schreiben: q.schreiben !== false,
     };
   };
 
   const setzeQuellen = async (userId: number, naechste: QuellenSettings): Promise<void> => {
     const g = await readGarminSettings(userId);
     await writeGarminSettings(userId, { ...g, quellen: { ...(g.quellen ?? {}), ...naechste } });
+  };
+
+  /**
+   * Rückschreiben nach Garmin (Gewicht, Wasser).
+   *
+   * Tims Vorgabe: was in der App eingetragen wird, soll auch auf der Uhr
+   * landen — aber ohne Kreislauf. Die Gefahr: App schreibt zu Garmin, der
+   * nächste Abgleich liest denselben Wert zurück und schreibt ihn erneut,
+   * endlos.
+   *
+   * Lösung: `garmin_schreibstand` merkt sich je Nutzer, Art und Tag den
+   * zuletzt geschriebenen Wert. Geschrieben wird nur, wenn sich der Wert
+   * wirklich unterscheidet. Ein erneuter Lauf mit gleichem Wert ist ein
+   * Nichts-Tun — deshalb „idempotent".
+   *
+   * Abschaltbar über `quellen.schreiben` (Standard: an).
+   */
+  const schreibeNachGarmin = async (
+    userId: number,
+  ): Promise<{ gewicht: boolean; wasser: boolean; fehler?: string }> => {
+    const ergebnis = { gewicht: false, wasser: false } as {
+      gewicht: boolean;
+      wasser: boolean;
+      fehler?: string;
+    };
+    const g = await readGarminSettings(userId);
+    if (!g.login?.tokens) return ergebnis;
+    if (g.quellen?.schreiben === false) return ergebnis;
+
+    const heute = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' });
+
+    /** Merker lesen: welcher Wert wurde zuletzt geschrieben? */
+    const letzterStand = async (art: string, schluessel: string): Promise<string | null> => {
+      const r = await pool.query(
+        `SELECT wert FROM garmin_schreibstand WHERE user_id=$1 AND art=$2 AND schluessel=$3`,
+        [userId, art, schluessel],
+      );
+      return r.rows[0]?.wert ?? null;
+    };
+
+    const merken = async (art: string, schluessel: string, wert: string): Promise<void> => {
+      await pool.query(
+        `INSERT INTO garmin_schreibstand (user_id, art, schluessel, wert, geschrieben_am)
+         VALUES ($1,$2,$3,$4,NOW())
+         ON CONFLICT (user_id, art, schluessel)
+         DO UPDATE SET wert=$4, geschrieben_am=NOW()`,
+        [userId, art, schluessel, wert],
+      );
+    };
+
+    let tokens: string;
+    try {
+      tokens = entschluesseln(g.login.tokens);
+    } catch (e) {
+      ergebnis.fehler = e instanceof Error ? e.message : 'Tokens nicht lesbar.';
+      return ergebnis;
+    }
+
+    /* ---------- Gewicht ---------- */
+    try {
+      const r = await pool.query(
+        `SELECT measurements, profile_extras->'dailyWaterLog' AS wasser FROM users WHERE id=$1`,
+        [userId],
+      );
+      const m = (r.rows[0]?.measurements || {}) as { weight?: number };
+      const kg = Number(m.weight);
+      if (Number.isFinite(kg) && kg > 20 && kg < 400) {
+        const wert = String(Math.round(kg * 10) / 10);
+        if ((await letzterStand('gewicht', heute)) !== wert) {
+          const ok = await schreibeGewicht(tokens, heute, kg);
+          if (ok) {
+            await merken('gewicht', heute, wert);
+            ergebnis.gewicht = true;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[garmin-schreiben] Gewicht:', e);
+    }
+
+    /* ---------- Wasser ---------- */
+    try {
+      const r = await pool.query(
+        `SELECT profile_extras->'dailyWaterLog' AS wasser FROM users WHERE id=$1`,
+        [userId],
+      );
+      const tage = (r.rows[0]?.wasser || {}) as Record<string, number>;
+      const ml = Number(tage[heute]);
+      /* Erst ab einem messbaren Wert schreiben — 0 ml würde Garmin nur leeren. */
+      if (Number.isFinite(ml) && ml > 0) {
+        const wert = String(Math.round(ml));
+        if ((await letzterStand('wasser', heute)) !== wert) {
+          const ok = await schreibeWasser(tokens, heute, ml);
+          if (ok) {
+            await merken('wasser', heute, wert);
+            ergebnis.wasser = true;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[garmin-schreiben] Wasser:', e);
+    }
+
+    return ergebnis;
   };
 
   /**
@@ -7539,10 +7647,27 @@ ${JSON.stringify(userCtx, null, 2)}
         res.status(400).json({ error: "Keine Quelle angegeben." });
         return;
       }
-      await setzeQuellen(req.userId!, { personalApi, intervals });
+      const schreiben =
+        typeof req.body?.schreiben === "boolean" ? req.body.schreiben : undefined;
+      await setzeQuellen(req.userId!, { personalApi, intervals, schreiben });
       res.json({ ok: true, quellen: await leseQuellen(req.userId!) });
     } catch (err: unknown) {
       res.status(500).json({ error: err instanceof Error ? err.message : "Speichern fehlgeschlagen." });
+    }
+  });
+
+  /**
+   * Werte aus der App sofort nach Garmin schreiben.
+   *
+   * Getrennt vom Abgleich, damit ein frisch eingetragenes Gewicht nicht erst
+   * auf den naechsten 5-Minuten-Takt warten muss.
+   */
+  app.post("/api/integrations/garmin/schreiben", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const ergebnis = await schreibeNachGarmin(req.userId!);
+      res.json({ ok: !ergebnis.fehler, ...ergebnis });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "Schreiben fehlgeschlagen." });
     }
   });
 
@@ -7750,6 +7875,19 @@ ${JSON.stringify(userCtx, null, 2)}
         }
       } else {
         bericht.garmin = { nichtVerbunden: true };
+      }
+
+      /*
+       * Werte aus der App zurueck auf die Uhr. Laeuft nach dem Lesen, damit
+       * ein gerade eingetragenes Gewicht sofort bei Garmin steht. Der Merker
+       * in `garmin_schreibstand` verhindert Wiederholungen.
+       */
+      if (quellen.schreiben && g.login?.tokens) {
+        try {
+          bericht.geschrieben = await schreibeNachGarmin(req.userId!);
+        } catch (e) {
+          bericht.geschrieben = { fehler: e instanceof Error ? e.message : 'Schreiben fehlgeschlagen.' };
+        }
       }
 
       // Intervals zusaetzlich, falls verbunden und nicht abgeschaltet.
