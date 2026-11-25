@@ -131,25 +131,34 @@ export default function PullToRefresh({ children, onAktualisiert }: Props) {
 
   return (
     <div className="relative">
-      {/* Anzeige über dem Inhalt — nur mobil, auf dem Desktop unnötig. */}
+      {/*
+       * Anzeige über dem Inhalt — ein vollflächiger Streifen, kein Oval.
+       *
+       * Tims Vorgabe: „der ganze bereich vom runter ziehen die farbe hat von dem
+       * aktuellen oval sodass es kein oval mehr gibt quasi."
+       *
+       * Vorher war es eine kleine Pille in der Mitte. Jetzt füllt der Streifen
+       * die volle Breite in derselben Farbe (--card-bg) und wächst mit dem Zug.
+       * Der Inhalt darunter wird um genau diese Höhe nach unten geschoben, damit
+       * sich nichts überlagert.
+       */}
       <div
-        /*
-         * `items-start` ist entscheidend: ohne das streckt der Flex-Container die
-         * Pille auf die volle Zughöhe (bis 110 px). Genau das ließ sie gedrungen
-         * und dick aussehen, wie ein falsch proportioniertes Oval.
-         */
-        className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-center lg:hidden"
+        className="pointer-events-none absolute inset-x-0 top-0 z-30 flex flex-col items-center justify-end overflow-hidden lg:hidden"
         style={{
           height: hoehe,
           opacity: hoehe > 2 ? 1 : 0,
+          background: 'var(--card-bg)',
+          /* Nur unten eine feine Linie — der Streifen soll sich vom Inhalt
+             absetzen, ohne wie ein eigener Kasten zu wirken. */
+          borderBottom: hoehe > 2 ? '1px solid var(--border-muted)' : undefined,
           transition: zieht ? 'none' : 'height 220ms ease, opacity 180ms ease',
+          /* Beim Ziehen sichtbar über dem Inhalt, die Kante wandert mit. */
+          boxShadow: bereit ? '0 1px 0 color-mix(in srgb, var(--simple-accent) 45%, transparent)' : undefined,
         }}
         aria-live="polite"
       >
         <div
-          /* Breit und flach: feste Mindestbreite, wenig vertikales Padding. */
-          className="mt-1.5 inline-flex min-w-[15.5rem] items-center justify-center gap-2 rounded-full border border-[var(--border-muted)] px-5 py-1 text-[11px] font-semibold text-[var(--text-muted)] shadow-sm"
-          style={{ background: 'var(--card-bg)' }}
+          className="inline-flex items-center justify-center gap-2 px-4 pb-2 text-[11px] font-semibold text-[var(--text-muted)]"
         >
           {laeuft ? (
             <>
@@ -170,24 +179,27 @@ export default function PullToRefresh({ children, onAktualisiert }: Props) {
             </>
           )}
         </div>
-      </div>
 
-      {/* Fortschrittsbalken, solange Daten geholt werden. */}
-      {laeuft && (
-        <div
-          className="fixed inset-x-0 top-0 z-40 h-0.5 lg:hidden"
-          style={{ background: 'color-mix(in srgb, var(--text-muted) 18%, transparent)' }}
-        >
+        {/*
+         * Fortschrittsbalken am unteren Rand des Streifens — er zeigt beim
+         * Laden, wie weit der Abgleich ist, ohne eigene Fläche zu belegen.
+         */}
+        {laeuft && (
           <div
-            className="h-full transition-[width] duration-500"
-            style={{
-              width: prozent != null ? `${prozent}%` : '35%',
-              background: 'var(--simple-accent)',
-              animation: prozent == null ? 'pulse 1.4s ease-in-out infinite' : undefined,
-            }}
-          />
-        </div>
-      )}
+            className="absolute inset-x-0 bottom-0 h-0.5"
+            style={{ background: 'color-mix(in srgb, var(--text-muted) 18%, transparent)' }}
+          >
+            <div
+              className="h-full transition-[width] duration-500"
+              style={{
+                width: prozent != null ? `${prozent}%` : '35%',
+                background: 'var(--simple-accent)',
+                animation: prozent == null ? 'pulse 1.4s ease-in-out infinite' : undefined,
+              }}
+            />
+          </div>
+        )}
+      </div>
 
       {/* Inhalt: beim Ziehen leicht nach unten, damit die Anzeige Platz hat. */}
       <div

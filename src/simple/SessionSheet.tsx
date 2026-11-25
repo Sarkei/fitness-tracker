@@ -4,6 +4,7 @@ import { Check, Plus, Trash2, X } from 'lucide-react';
 import { PrimaryButton } from './ui';
 import { saveWorkout, todayYmd, type PlanDay, type SaveExercise } from './simpleApi';
 import { uebungVorschlaege } from './uebungen';
+import { useTastaturOffen } from './useTastaturOffen';
 
 /** Training erfassen — bewusst eine Liste: Übung, Sätze, Wiederholungen, Gewicht. */
 export default function SessionSheet({
@@ -19,6 +20,9 @@ export default function SessionSheet({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  /* Tastatur offen? Dann weicht das Panel nach oben, damit Speichern erreichbar bleibt. */
+  const tastaturOffen = useTastaturOffen();
+
   const initial = useMemo<SaveExercise[]>(() => {
     const fromPlan = (day?.exercises ?? []).map((e) => ({
       name: e.name,
@@ -80,7 +84,8 @@ export default function SessionSheet({
           </button>
         </div>
 
-        <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
+        {/* `min-h-0` hält den Speichern-Knopf sichtbar, auch wenn der Inhalt lang wird. */}
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
           <div className="grid grid-cols-[1fr_84px] gap-2">
             <input
               className="rounded-xl border border-[var(--border-muted)] bg-transparent px-3 py-2 text-sm font-semibold"

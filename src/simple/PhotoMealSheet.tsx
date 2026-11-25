@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Camera, Check, Loader2, ScanBarcode, X } from 'lucide-react';
 import { PrimaryButton } from './ui';
 import { analyzeFood, fileToDataUrl, saveAnalyzedMeal, type V3Result } from './simpleApi';
+import { useTastaturOffen } from './useTastaturOffen';
 
 /**
  * Sichtbarer Bereich inklusive Tastatur.
@@ -111,6 +112,9 @@ export default function PhotoMealSheet({
   }, 0);
 
   const bereich = useSichtbarerBereich(true);
+
+  /* Tastatur offen? Dann weicht das Panel nach oben (siehe Hook). */
+  const tastaturOffen = useTastaturOffen();
 
   const inhalt = (
     <div
