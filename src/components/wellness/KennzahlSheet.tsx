@@ -215,13 +215,15 @@ export function KlickKachel({
 }) {
   return (
     /*
-     * Aufbau bewusst starr: Beschriftung oben in genau einer Zeile, Wert unten.
+     * Fester Aufbau statt frei fließend: Beschriftung (2 Zeilen), Wert, Hinweis.
      *
-     * Vorher standen beide direkt untereinander ohne feste Höhen. Sobald eine
-     * Beschriftung umbrach („REM-Schlaf" auf schmalem Handy), rutschte nur in
-     * dieser einen Kachel der Wert nach unten — die Zahlen einer Reihe standen
-     * also auf verschiedenen Höhen. `h-full` + `mt-auto` halten den Wert am
-     * unteren Rand, `truncate` verhindert das Umbrechen.
+     * Zwei Fehler waren hier drin, beide sichtbar als „Werte stehen nicht auf
+     * einer Höhe":
+     *  1. Lange Beschriftungen brachen um und schoben den Wert nach unten.
+     *  2. Kacheln mit `hint` hatten den Wert weiter oben als Kacheln ohne —
+     *     gemessen 19 px Versatz zwischen „Verbrauch" und „Body Battery".
+     * Deshalb: feste Label-Höhe, und der Hinweis-Bereich existiert immer,
+     * auch wenn er leer ist. Damit sitzt der Wert in jeder Kachel gleich.
      */
     <button
       type="button"
@@ -229,16 +231,19 @@ export function KlickKachel({
       className="group flex h-full min-w-0 flex-col rounded-2xl border border-[var(--border-muted)] bg-[var(--card-bg)] px-3 py-2.5 text-left transition hover:border-[var(--simple-accent)]"
     >
       <p
-        className="truncate text-[9.5px] font-semibold uppercase leading-4 tracking-[0.08em] text-[var(--text-muted)]"
+        className="line-clamp-2 min-h-[2rem] text-[9.5px] font-semibold uppercase leading-4 tracking-[0.06em] text-[var(--text-muted)]"
         title={label}
       >
         {label}
       </p>
-      <p className="mt-auto text-[19px] font-semibold leading-none tabular-nums text-[var(--foreground)]">
+      <p className="text-[19px] font-semibold leading-none tabular-nums text-[var(--foreground)]">
         {value}
         {unit ? <span className="ml-1 text-[10.5px] font-normal text-[var(--text-muted)]">{unit}</span> : null}
       </p>
-      {hint ? <p className="mt-1 truncate text-[10px] text-[var(--text-muted)]">{hint}</p> : null}
+      {/* Immer vorhanden — sonst verschiebt sich der Wert gegenüber Kacheln ohne Hinweis. */}
+      <p className="mt-1 min-h-[0.875rem] truncate text-[10px] leading-[0.875rem] text-[var(--text-muted)]">
+        {hint ?? ''}
+      </p>
     </button>
   );
 }

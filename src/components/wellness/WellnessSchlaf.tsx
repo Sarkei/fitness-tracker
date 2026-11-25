@@ -161,22 +161,23 @@ export default function WellnessSchlaf() {
       {/* Schlafphasen der letzten Nacht — Kacheln oben, Balken darunter */}
       {hatPhasen && (
         <>
-          {/* Vier Phasen nebeneinander, je ein Viertel der Breite. */}
+          {/* Vier Phasen nebeneinander, je ein Viertel der Breite.
+              Kurze Labels, damit sie auf schmalen Handys einzeilig bleiben. */}
           <div className="grid grid-cols-4 gap-2 sm:gap-3">
             <KlickKachel
-              label="Tiefschlaf"
+              label="Tief"
               value={letztePhasen?.tief != null ? (stundenAlsHHMM(letztePhasen.tief) ?? '—') : '—'}
               unit="h"
               onClick={() => setDetail('dauer')}
             />
             <KlickKachel
-              label="REM-Schlaf"
+              label="REM"
               value={letztePhasen?.rem != null ? (stundenAlsHHMM(letztePhasen.rem) ?? '—') : '—'}
               unit="h"
               onClick={() => setDetail('dauer')}
             />
             <KlickKachel
-              label="Leichtschlaf"
+              label="Leicht"
               value={letztePhasen?.leicht != null ? (stundenAlsHHMM(letztePhasen.leicht) ?? '—') : '—'}
               unit="h"
               onClick={() => setDetail('dauer')}
