@@ -23,6 +23,7 @@ import {
   StatTile,
 } from './ui';
 import { fetchMonth, fetchWorkouts, formatDay, type FoodEntry, type WorkoutEntry } from './simpleApi';
+import { aufSyncFertig } from '../lib/syncStatus';
 import { TrainingTagesdetail, TagesZeileKlick } from '../components/training/TrainingTagesdetail';
 import {
   bestleistungen,

@@ -31,6 +31,7 @@ import {
 import WorkoutSheet from './WorkoutSheet';
 import PlanBereich from '../components/coach/CoachPage';
 import { TrainingTagesdetail } from '../components/training/TrainingTagesdetail';
+import { aufSyncFertig } from '../lib/syncStatus';
 import {
   DAY_LABELS,
   dayKeyOf,

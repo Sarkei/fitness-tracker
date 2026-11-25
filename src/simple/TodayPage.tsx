@@ -33,6 +33,7 @@ import {
   type WorkoutEntry,
 } from './simpleApi';
 import { toYmd } from './analytics';
+import { aufSyncFertig } from '../lib/syncStatus';
 import BilanzChart from './BilanzChart';
 import {
   fastenSerie,
@@ -156,7 +157,13 @@ export default function TodayPage() {
 
   useEffect(() => {
     void load();
-  }, [load]);
+    /* Nach einem Abgleich (Pull oder Profil-Knopf) neu laden. */
+    const ab = aufSyncFertig(() => {
+      void load();
+      void holeGarmin();
+    });
+    return ab;
+  }, [load, holeGarmin]);
 
   const sum = totals(entries);
   const goals = (profile?.goals ?? {}) as {

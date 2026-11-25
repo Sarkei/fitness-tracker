@@ -36,6 +36,7 @@ import MealplannerRezeptSheet from './MealplannerRezeptSheet';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { BarcodeSheet } from './BarcodeSheet';
 import { isValidPlan, liegtImFasten, type FastingPlan } from '../lib/fasting';
+import { aufSyncFertig } from '../lib/syncStatus';
 import {
   addFoodEntry,
   dayKeyOf,

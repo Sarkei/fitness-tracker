@@ -6244,6 +6244,49 @@ ${JSON.stringify(userCtx, null, 2)}
    */
   const garminSyncLaufend = new Map<number, { schritt: number; gesamt: number; seit: number }>();
 
+  /**
+   * Letzter Abgleich je Nutzer — der Zustand überlebt den Bereichswechsel.
+   *
+   * Tims Vorgabe: Wer im Profil auf „Aktualisieren" tippt, kurz woanders
+   * hinsieht und zurückkommt, soll weiter den laufenden Fortschritt sehen
+   * (z. B. „12 / 27 Felder"). Vorher war der Stand weg, sobald die Komponente
+   * neu aufgebaut wurde, weil der Zähler nur im Browser-Speicher lag.
+   *
+   * Aufbewahrung bewusst kurz (10 Minuten): danach ist ein Lauf entweder
+   * fertig oder abgebrochen — ein alter Stand würde nur verwirren.
+   */
+  type SyncLauf = {
+    schritt: number;
+    gesamt: number;
+    seit: number;
+    fertigAm?: number;
+    ergebnis?: string;
+    fehler?: string;
+  };
+  const letzteLaeufe = new Map<number, SyncLauf>();
+  const LAUF_ERINNERUNG_MS = 10 * 60_000;
+
+  const merkeLauf = (userId: number, lauf: SyncLauf): void => {
+    letzteLaeufe.set(userId, lauf);
+  };
+
+  const letzterLaufVon = (userId: number): SyncLauf | null => {
+    const l = letzteLaeufe.get(userId);
+    if (!l) return null;
+    const bezug = l.fertigAm ?? l.seit;
+    if (Date.now() - bezug > LAUF_ERINNERUNG_MS) {
+      letzteLaeufe.delete(userId);
+      return null;
+    }
+    return l;
+  };
+
+  /** Fortschritt setzen — auch während eines laufenden Abgleichs. */
+  const setzeLaufSchritt = (userId: number, schritt: number, gesamt: number): void => {
+    const bisher = letzteLaeufe.get(userId);
+    merkeLauf(userId, { schritt, gesamt, seit: bisher?.seit ?? Date.now() });
+  };
+
   type GarminSettings = {
     apiKey?: string;
     connectedAt?: string;
@@ -6260,6 +6303,15 @@ ${JSON.stringify(userCtx, null, 2)}
       tokens?: string;
       verbundenAm?: string;
       fehler?: string;
+    };
+    /**
+     * Welche Datenquellen benutzt werden. Der Login ist immer aktiv, sobald
+     * Tokens da sind; Personal API und Intervals lassen sich getrennt
+     * abschalten, um eine Quelle isoliert zu beurteilen.
+     */
+    quellen?: {
+      personalApi?: boolean;
+      intervals?: boolean;
     };
   };
 
@@ -6278,6 +6330,41 @@ ${JSON.stringify(userCtx, null, 2)}
         WHERE id=$1`,
       [userId, JSON.stringify(next)],
     );
+  };
+
+  /**
+   * Datenquellen-Schalter.
+   *
+   * Tim wollte Personal API und Intervals.icu VORÜBERGEHEND stilllegen, um zu
+   * sehen, was der Garmin-Login allein liefert. Beide Wege sind deshalb
+   * abschaltbar; Standard ist "an", damit sich nichts unbemerkt ändert.
+   *
+   * Ablage in `profile_extras.garmin.quellen`, nicht in den jeweiligen
+   * Zugangsdaten — so bleibt der Schalter erhalten, wenn ein Key neu gesetzt
+   * oder getrennt wird.
+   */
+  type QuellenSettings = {
+    personalApi?: boolean;
+    intervals?: boolean;
+  };
+
+  const leseQuellen = async (
+    userId: number,
+  ): Promise<{ personalApi: boolean; intervals: boolean }> => {
+    const r = await pool.query("SELECT profile_extras FROM users WHERE id=$1", [userId]);
+    const extras = (r.rows[0]?.profile_extras || {}) as Record<string, unknown>;
+    const garmin = (extras.garmin || {}) as { quellen?: QuellenSettings };
+    const q = garmin.quellen ?? {};
+    return {
+      // Nur ein ausdrückliches `false` schaltet ab — fehlende Werte bleiben an.
+      personalApi: q.personalApi !== false,
+      intervals: q.intervals !== false,
+    };
+  };
+
+  const setzeQuellen = async (userId: number, naechste: QuellenSettings): Promise<void> => {
+    const g = await readGarminSettings(userId);
+    await writeGarminSettings(userId, { ...g, quellen: { ...(g.quellen ?? {}), ...naechste } });
   };
 
   /**
@@ -6800,12 +6887,35 @@ ${JSON.stringify(userCtx, null, 2)}
     },
   );
 
+  /**
+   * Fortschritt des laufenden Abgleichs — eigenständig abfragbar.
+   *
+   * Die Statusleiste im Profil fragt diesen Endpunkt im Sekundentakt und zeigt
+   * ihn auch dann weiter, wenn der Nutzer zwischendurch woanders war. Bewusst
+   * getrennt von `/api/integrations/garmin`, damit ein Takt von 1 s nicht die
+   * ganze Garmin-Antwort samt Tagesreihe durch das Netz zieht.
+   */
+  app.get("/api/integrations/sync-status", requireAuth, async (req: AuthRequest, res) => {
+    const laufend = garminSyncLaufend.get(req.userId!);
+    const letzter = letzterLaufVon(req.userId!);
+    res.json({
+      laeuft: Boolean(laufend),
+      schritt: laufend?.schritt ?? letzter?.schritt ?? 0,
+      gesamt: laufend?.gesamt ?? letzter?.gesamt ?? 0,
+      seit: laufend?.seit ?? letzter?.seit ?? null,
+      fertigAm: letzter?.fertigAm ?? null,
+      ergebnis: letzter?.ergebnis ?? null,
+      fehler: letzter?.fehler ?? null,
+    });
+  });
+
   app.get("/api/integrations/garmin", requireAuth, async (req: AuthRequest, res) => {
     try {
       const g = await readGarminSettings(req.userId!);
       const tage = g.cache?.tage ?? [];
       const stand = felderStand(tage);
       const laufend = garminSyncLaufend.get(req.userId!);
+      const quellen = await leseQuellen(req.userId!);
       res.json({
         /*
          * Verbunden ist, wer ENTWEDER einen Login-Zugang ODER einen
@@ -6828,6 +6938,8 @@ ${JSON.stringify(userCtx, null, 2)}
           ? { schritt: laufend.schritt, gesamt: laufend.gesamt }
           : null,
         tage: tage.length,
+        quellen,
+        letzterLauf: letzterLaufVon(req.userId!) ?? null,
       });
     } catch (err: unknown) {
       res.status(500).json({ error: err instanceof Error ? err.message : "load failed" });
@@ -7350,6 +7462,29 @@ ${JSON.stringify(userCtx, null, 2)}
     }
   });
 
+  /**
+   * Datenquellen umschalten.
+   *
+   * Tim wollte Personal API und Intervals.icu VORÜBERGEHEND aus, um den
+   * Garmin-Login allein zu beurteilen. Der Login selbst lässt sich hier nicht
+   * abschalten — er ist die Quelle, die geprüft werden soll.
+   */
+  app.put("/api/integrations/quellen", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const personalApi =
+        typeof req.body?.personalApi === "boolean" ? req.body.personalApi : undefined;
+      const intervals = typeof req.body?.intervals === "boolean" ? req.body.intervals : undefined;
+      if (personalApi === undefined && intervals === undefined) {
+        res.status(400).json({ error: "Keine Quelle angegeben." });
+        return;
+      }
+      await setzeQuellen(req.userId!, { personalApi, intervals });
+      res.json({ ok: true, quellen: await leseQuellen(req.userId!) });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "Speichern fehlgeschlagen." });
+    }
+  });
+
   app.get("/api/integrations/intervals", requireAuth, async (req: AuthRequest, res) => {
     try {
       const s = await readIntervalsSettings(req.userId!);
@@ -7442,10 +7577,12 @@ ${JSON.stringify(userCtx, null, 2)}
 
     try {
       const g = await readGarminSettings(req.userId!);
+      const quellen = await leseQuellen(req.userId!);
 
       /* ---------- Weg 1: Login (bevorzugt, alle Felder) ---------- */
       if (g.login?.tokens) {
         garminSyncLaufend.set(req.userId!, { schritt: 0, gesamt: tage, seit: Date.now() });
+        merkeLauf(req.userId!, { schritt: 0, gesamt: tage, seit: Date.now() });
         try {
           const tokens = entschluesseln(g.login.tokens);
           const heuteYmd = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' });
@@ -7469,6 +7606,7 @@ ${JSON.stringify(userCtx, null, 2)}
             }
             fertig++;
             garminSyncLaufend.set(req.userId!, { schritt: fertig, gesamt: tage, seit: Date.now() });
+            setzeLaufSchritt(req.userId!, fertig, tage);
           }
 
           await speichereLoginTage(req.userId!, sammlung);
@@ -7495,12 +7633,26 @@ ${JSON.stringify(userCtx, null, 2)}
             aktivitaeten: anzahlAktivitaeten,
             quelle: 'login',
           };
+          merkeLauf(req.userId!, {
+            schritt: sammlung.length,
+            gesamt: tage,
+            seit: letzterLaufVon(req.userId!)?.seit ?? Date.now(),
+            fertigAm: Date.now(),
+            ergebnis: `${sammlung.length} Tage · ${anzahlAktivitaeten} Einheiten`,
+          });
         } catch (e) {
           bericht.garmin = { fehler: e instanceof Error ? e.message : 'Garmin-Abgleich fehlgeschlagen.' };
+          merkeLauf(req.userId!, {
+            schritt: letzterLaufVon(req.userId!)?.schritt ?? 0,
+            gesamt: tage,
+            seit: letzterLaufVon(req.userId!)?.seit ?? Date.now(),
+            fertigAm: Date.now(),
+            fehler: e instanceof Error ? e.message : 'Garmin-Abgleich fehlgeschlagen.',
+          });
         } finally {
           garminSyncLaufend.delete(req.userId!);
         }
-      } else if (g.apiKey) {
+      } else if (g.apiKey && quellen.personalApi) {
         // Startwert 0/0 — syncGarmin meldet gleich danach die echte Gesamtzahl.
         garminSyncLaufend.set(req.userId!, { schritt: 0, gesamt: 0, seit: Date.now() });
         try {
@@ -7539,8 +7691,8 @@ ${JSON.stringify(userCtx, null, 2)}
         bericht.garmin = { nichtVerbunden: true };
       }
 
-      // Intervals zusaetzlich, falls verbunden — liefert die Trainingslast.
-      const s = await readIntervalsSettings(req.userId!);
+      // Intervals zusaetzlich, falls verbunden und nicht abgeschaltet.
+      const s = quellen.intervals ? await readIntervalsSettings(req.userId!) : ({} as IntervalsSettings);
       if (s.apiKey) {
         try {
           const cache = await syncIntervals(s.apiKey, s.athleteId ?? "0", tage);
@@ -7717,8 +7869,11 @@ ${JSON.stringify(userCtx, null, 2)}
        * einem aelteren Stand. Die Tabelle oben ist immer die frischeste Quelle.
        */
 
-      // Trainingslast aus Intervals — nur lesen, wenn verbunden.
-      let intervals = await readIntervalsSettings(req.userId!);
+      // Trainingslast aus Intervals — nur lesen, wenn verbunden und nicht abgeschaltet.
+      const quellenWellness = await leseQuellen(req.userId!);
+      let intervals = quellenWellness.intervals
+        ? await readIntervalsSettings(req.userId!)
+        : ({} as IntervalsSettings);
       if (intervals.apiKey && syncFaellig(intervals)) {
         try {
           const cache = await syncIntervals(intervals.apiKey, intervals.athleteId ?? "0", tage);
@@ -7865,12 +8020,15 @@ ${JSON.stringify(userCtx, null, 2)}
     hintergrundLaeuft = true;
     try {
       const rows = await pool.query(
-        `SELECT id, profile_extras->'intervals' AS iv
+        `SELECT id, profile_extras->'intervals' AS iv,
+                COALESCE((profile_extras->'garmin'->'quellen'->>'intervals')::boolean, true) AS intervals_an
            FROM users
           WHERE profile_extras ? 'intervals'
             AND profile_extras->'intervals'->>'apiKey' IS NOT NULL`,
       );
       for (const row of rows.rows) {
+        /* Abgeschaltete Quelle: gar nicht erst abfragen. */
+        if (row.intervals_an === false) continue;
         const s = (row.iv || {}) as IntervalsSettings;
         if (!s.apiKey) continue;
         if (!syncFaellig(s)) continue;
@@ -8046,12 +8204,18 @@ ${JSON.stringify(userCtx, null, 2)}
             const meldung = e instanceof Error ? e.message : 'Login-Abgleich fehlgeschlagen.';
             await writeGarminSettings(userId, { ...g, lastError: meldung }).catch(() => {});
             console.warn('[garmin-login]', userId, meldung);
-            if (!g.apiKey) continue;
+            /* Personal API nur als Rueckfallebene, wenn sie nicht abgeschaltet ist. */
+            const q = await leseQuellen(userId).catch(() => ({ personalApi: true, intervals: true }));
+            if (!g.apiKey || !q.personalApi) continue;
           }
         }
 
         /* ---------- Weg 2: Personal API (Rueckfallebene) ---------- */
         if (!g.apiKey) continue;
+        /* Abgeschaltet: kein einziger Aufruf an die Personal API. */
+        if (!(await leseQuellen(userId).catch(() => ({ personalApi: true, intervals: true }))).personalApi) {
+          continue;
+        }
         const letzter = Date.parse(g.cache?.fetchedAt ?? g.lastAutoSyncAt ?? '');
         if (Number.isFinite(letzter) && Date.now() - letzter < GARMIN_LEICHT_MS) continue;
         try {
@@ -8720,8 +8884,11 @@ function berlinTeile(d: Date = new Date()): { stunde: number; minute: number; hh
       const latestPlan = plansRes.rows[0] ?? null;
 
       // Faelliger Auto-Sync: blockiert den Chat nicht, wenn er scheitert.
-      let intervalsSettings = await readIntervalsSettings(req.userId!);
-      if (syncFaellig(intervalsSettings)) {
+      const chatQuellen = await leseQuellen(req.userId!);
+      let intervalsSettings = chatQuellen.intervals
+        ? await readIntervalsSettings(req.userId!)
+        : ({} as IntervalsSettings);
+      if (intervalsSettings.apiKey && syncFaellig(intervalsSettings)) {
         try {
           const cache = await syncIntervals(
             intervalsSettings.apiKey!,
