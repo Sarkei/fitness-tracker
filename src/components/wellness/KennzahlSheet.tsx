@@ -214,20 +214,31 @@ export function KlickKachel({
   onClick: () => void;
 }) {
   return (
+    /*
+     * Aufbau bewusst starr: Beschriftung oben in genau einer Zeile, Wert unten.
+     *
+     * Vorher standen beide direkt untereinander ohne feste Höhen. Sobald eine
+     * Beschriftung umbrach („REM-Schlaf" auf schmalem Handy), rutschte nur in
+     * dieser einen Kachel der Wert nach unten — die Zahlen einer Reihe standen
+     * also auf verschiedenen Höhen. `h-full` + `mt-auto` halten den Wert am
+     * unteren Rand, `truncate` verhindert das Umbrechen.
+     */
     <button
       type="button"
       onClick={onClick}
-      className="group rounded-2xl border border-[var(--border-muted)] bg-[var(--card-bg)] px-4 py-3 text-left transition hover:border-[var(--simple-accent)]"
+      className="group flex h-full min-w-0 flex-col rounded-2xl border border-[var(--border-muted)] bg-[var(--card-bg)] px-3 py-2.5 text-left transition hover:border-[var(--simple-accent)]"
     >
-      <p className="flex items-center gap-1 text-[9.5px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+      <p
+        className="truncate text-[9.5px] font-semibold uppercase leading-4 tracking-[0.08em] text-[var(--text-muted)]"
+        title={label}
+      >
         {label}
-        <TrendingUp className="h-2.5 w-2.5 opacity-0 transition group-hover:opacity-100" />
       </p>
-      <p className="mt-1 text-[20px] font-semibold leading-none tabular-nums text-[var(--foreground)]">
+      <p className="mt-auto text-[19px] font-semibold leading-none tabular-nums text-[var(--foreground)]">
         {value}
         {unit ? <span className="ml-1 text-[10.5px] font-normal text-[var(--text-muted)]">{unit}</span> : null}
       </p>
-      {hint ? <p className="mt-1 text-[10.5px] text-[var(--text-muted)]">{hint}</p> : null}
+      {hint ? <p className="mt-1 truncate text-[10px] text-[var(--text-muted)]">{hint}</p> : null}
     </button>
   );
 }
