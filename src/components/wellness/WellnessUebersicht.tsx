@@ -88,6 +88,26 @@ export default function WellnessUebersicht() {
    */
   const trainingsStatus =
     [...tage].reverse().find((t) => typeof t.trainingStatus === 'string' && t.trainingStatus)?.trainingStatus ?? null;
+
+  /*
+   * Readiness (Trainingsbereitschaft) — Garmins morgendlicher Score.
+   * Wird seit dem Login-Abgleich geliefert, fehlte aber in der Oberfläche.
+   * Der jüngste Tag mit Wert, nicht der von heute: früh am Morgen ist er oft
+   * noch nicht berechnet.
+   */
+  const readinessLetzte = [...tage]
+    .reverse()
+    .find((t) => typeof t.readiness === 'number' && t.readiness != null);
+  const readiness = readinessLetzte?.readiness ?? null;
+  const readinessStufe = readinessLetzte?.readinessLevel ?? null;
+  /** Garmins Stufen auf Deutsch. */
+  const READINESS_STUFE: Record<string, string> = {
+    PRIME: 'Top',
+    HIGH: 'Hoch',
+    MODERATE: 'Mittel',
+    LOW: 'Niedrig',
+    POOR: 'Schlecht',
+  };
   const gewicht = heuteWert(tage, 'weight');
   const etagen = heuteWert(tage, 'floors');
 
@@ -281,6 +301,14 @@ export default function WellnessUebersicht() {
           unit="Jahre"
           onClick={() => navigate('/health/form')}
         />
+        {readiness != null && (
+          <KlickKachel
+            label="Bereitschaft"
+            value={Math.round(readiness)}
+            unit={readinessStufe ? (READINESS_STUFE[readinessStufe] ?? '') : undefined}
+            onClick={() => navigate('/health/form')}
+          />
+        )}
         {gewicht != null && (
           <KlickKachel label="Gewicht" value={gewicht} unit="kg" onClick={() => navigate('/health/koerper')} />
         )}

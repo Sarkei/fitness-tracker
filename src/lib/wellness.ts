@@ -45,6 +45,8 @@ export type WellnessTag = {
   trainingStatus?: string | null;
   /** Garmin Readiness (0-100). */
   readiness?: number | null;
+  /** Garmins Stufe dazu: PRIME, HIGH, MODERATE, LOW, POOR. */
+  readinessLevel?: string | null;
   weight?: number | null;
   bodyFat?: number | null;
 };
