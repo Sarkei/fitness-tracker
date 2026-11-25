@@ -237,15 +237,21 @@ export default function BilanzChart({
           {tage.map((tag) => {
             const aktiv = tag.ymd === heute || tag.ymd === gewaehlt;
             return (
-              <div key={`x-${tag.ymd}`} className="min-w-0 flex-1 text-center">
+              /*
+               * `min-w-0` allein schnitt die Tageszahl ab: bei 360 px ist die
+               * Spalte schmaler als „12." und die Ziffer wurde beschnitten.
+               * `whitespace-nowrap` plus sichtbarer Überlauf hält sie ganz —
+               * die Zahl ist kurz, sie überlappt nichts.
+               */
+              <div key={`x-${tag.ymd}`} className="min-w-0 flex-1 overflow-visible text-center">
                 <p
-                  className="text-[9.5px] font-bold uppercase leading-tight tracking-wide"
+                  className="whitespace-nowrap text-[9.5px] font-bold uppercase leading-tight tracking-wide"
                   style={{ color: aktiv ? 'var(--simple-accent)' : 'var(--text-muted)' }}
                 >
                   {wochentagKurz(tag.ymd)}
                 </p>
                 <p
-                  className="text-[9px] leading-tight tabular-nums"
+                  className="whitespace-nowrap text-[9px] leading-tight tabular-nums"
                   style={{
                     color: aktiv
                       ? 'var(--simple-accent)'
