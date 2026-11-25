@@ -113,7 +113,7 @@ export default function PhotoMealSheet({
 
   const bereich = useSichtbarerBereich(true);
 
-  /* Tastatur offen? Dann weicht das Panel nach oben (siehe Hook). */
+  /* Tastatur offen? Dann weicht das Panel nach oben statt mittig zu sitzen. */
   const tastaturOffen = useTastaturOffen();
 
   const inhalt = (
@@ -126,7 +126,9 @@ export default function PhotoMealSheet({
        * zwar richtig hoch, saß aber komplett darunter und man sah nichts mehr von
        * der Eingabe.
        */
-      className="fixed inset-x-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-6"
+      className={`fixed inset-x-0 z-50 flex justify-center bg-black/40 px-3 sm:p-6 ${
+        tastaturOffen ? 'items-start pt-3' : 'items-center'
+      }`}
       style={
         bereich.hoehe > 0
           ? { top: bereich.top, height: bereich.hoehe }
@@ -135,7 +137,7 @@ export default function PhotoMealSheet({
       onClick={onClose}
     >
       <div
-        className="flex max-h-full w-full max-w-lg flex-col rounded-t-3xl border border-[var(--border-muted)] bg-[var(--card-bg)] sm:rounded-3xl"
+        className="flex max-h-full w-full max-w-lg flex-col rounded-3xl border border-[var(--border-muted)] bg-[var(--card-bg)]"
         onClick={(e) => e.stopPropagation()}
       >
 
@@ -146,7 +148,7 @@ export default function PhotoMealSheet({
           </button>
         </div>
 
-        <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
           {phase === 'pick' && (
             <>
               <input

@@ -72,9 +72,15 @@ export default function SessionSheet({
   };
 
   const inhalt = (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-6" onClick={onClose}>
+    <div
+      className={`fixed inset-x-0 z-50 flex justify-center bg-black/40 px-3 sm:p-6 ${
+        tastaturOffen ? 'items-start pt-3' : 'items-center'
+      }`}
+      style={{ top: 0, height: 'var(--vv-height, 100dvh)' }}
+      onClick={onClose}
+    >
       <div
-        className="flex max-h-[var(--vv-height,92dvh)] w-full max-w-lg flex-col rounded-t-3xl border border-[var(--border-muted)] bg-[var(--card-bg)] sm:rounded-3xl"
+        className="flex max-h-full w-full max-w-lg flex-col rounded-3xl border border-[var(--border-muted)] bg-[var(--card-bg)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-[var(--border-muted)] px-4 py-3">
