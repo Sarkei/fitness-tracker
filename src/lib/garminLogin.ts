@@ -652,3 +652,97 @@ export async function aktivitaeten(
     return [];
   }
 }
+
+/**
+ * Zeitreihe einer Einheit über den Login-Zugang (Puls, Pace, Höhe, Kadenz).
+ *
+ * Warum über den Login und nicht die Personal API: Tim nutzt ausschließlich den
+ * Login. Die Personal-API-Variante (`ladeEinheitZeitreihen`) braucht einen
+ * API-Key, den es hier nicht gibt — die Detailseite blieb deshalb leer.
+ *
+ * Garmin liefert die Werte als zwei getrennte Listen: eine Beschreibung der
+ * Spalten (`metricDescriptors`, mit `metricsIndex`) und die Zeilen
+ * (`activityDetailMetrics`). Die Reihenfolge der Spalten ist nicht stabil,
+ * deshalb wird über den Namen gesucht und nicht über die Position.
+ */
+export async function garminZeitreiheLogin(
+  tokensJson: string,
+  activityId: number,
+): Promise<Array<{ t: number; hr?: number; speed?: number; elevation?: number; cadence?: number; power?: number }>> {
+  try {
+    const client = clientAusTokens(tokensJson);
+    const roh = (await client.connectapi(
+      `/activity-service/activity/${activityId}/details?maxChartSize=2000&maxPolylineSize=5000`,
+    )) as {
+      metricDescriptors?: Array<{ key: string; metricsIndex: number }>;
+      activityDetailMetrics?: Array<{ metrics: Array<number | null> }>;
+    } | null;
+
+    if (!roh?.metricDescriptors || !roh.activityDetailMetrics) return [];
+
+    const idx = new Map<string, number>();
+    for (const d of roh.metricDescriptors) idx.set(d.key, d.metricsIndex);
+
+    /** Ersten passenden Wert aus mehreren möglichen Feldnamen holen. */
+    const wert = (zeile: Array<number | null>, ...keys: string[]): number | undefined => {
+      for (const k of keys) {
+        const i = idx.get(k);
+        if (i == null) continue;
+        const v = zeile[i];
+        if (typeof v === 'number' && Number.isFinite(v)) return v;
+      }
+      return undefined;
+    };
+
+    const punkte: Array<{ t: number; hr?: number; speed?: number; elevation?: number; cadence?: number; power?: number }> = [];
+
+    for (const zeile of roh.activityDetailMetrics) {
+      const m = zeile.metrics;
+      if (!Array.isArray(m)) continue;
+
+      /* `sumElapsedDuration` ist die Sekunde seit Start — der Anker der Reihe. */
+      const sekunden = wert(m, 'sumElapsedDuration', 'sumDuration');
+      if (sekunden == null) continue;
+
+      const punkt: {
+        t: number; hr?: number; speed?: number; elevation?: number; cadence?: number; power?: number;
+      } = { t: Math.round(sekunden) };
+
+      const hr = wert(m, 'directHeartRate', 'heartRate');
+      if (hr != null && hr > 0) punkt.hr = Math.round(hr);
+
+      const speed = wert(m, 'directSpeed', 'speed');
+      if (speed != null && speed >= 0) punkt.speed = Math.round(speed * 100) / 100;
+
+      const elev = wert(m, 'directElevation', 'elevation');
+      if (elev != null) punkt.elevation = Math.round(elev * 10) / 10;
+
+      const cad = wert(m, 'directDoubleCadence', 'directCadence', 'cadence');
+      if (cad != null && cad > 0) punkt.cadence = Math.round(cad);
+
+      const pw = wert(m, 'directPower', 'power');
+      if (pw != null && pw > 0) punkt.power = Math.round(pw);
+
+      punkte.push(punkt);
+    }
+
+    /*
+     * Auf 400 Punkte ausdünnen: Mehr zeigt kein Diagramm sinnvoll, und die
+     * JSONB-Spalte soll klein bleiben. Die Form bleibt erhalten, weil
+     * gleichmäßig ausgewählt wird und der letzte Punkt immer dabei ist.
+     */
+    if (punkte.length > 400) {
+      const schritt = punkte.length / 400;
+      const duenn = punkte.filter((_, i) => i % Math.ceil(schritt) === 0);
+      if (duenn[duenn.length - 1] !== punkte[punkte.length - 1]) {
+        duenn.push(punkte[punkte.length - 1]);
+      }
+      return duenn;
+    }
+
+    return punkte;
+  } catch (e) {
+    console.warn('[garmin] Zeitreihe:', e instanceof Error ? e.message : e);
+    return [];
+  }
+}

@@ -58,13 +58,44 @@ export default function TodayPage() {
   /**
    * Garmin-Verbrauch von heute: `gesamt` = Grundumsatz + Aktivitaet, waechst ueber
    * den Tag. Damit steigt das Kalorienbudget auf der Startseite mit.
+   *
+   * Der Startwert kommt aus dem lokalen Speicher — der zuletzt bekannte Stand
+   * aus der Datenbank. Tims Vorgabe: „ich will das bitte instant der letzte wert
+   * angezeigt wird". Ohne das stünde beim Öffnen kurz das Profilziel (2.300) da,
+   * bis die Server-Antwort eintrifft.
    */
+  const garminStartwert = (): {
+    gesamt: number | null; aktiv: number | null; passiv: number | null; schnitt: number | null;
+  } | null => {
+    try {
+      const roh = localStorage.getItem('vrtx_garmin_heute');
+      if (!roh) return null;
+      const d = JSON.parse(roh) as { gesamt?: number; aktiv?: number; passiv?: number; gemerkt?: number };
+      if (!d?.gesamt || d.gesamt <= 0) return null;
+      /*
+       * Nur verwenden, wenn der Wert von heute ist. Ein Stand von gestern wäre
+       * irreführend — morgens beginnt der Verbrauch wieder klein.
+       */
+      const gemerktTag = new Date(d.gemerkt ?? 0).toLocaleDateString('sv-SE');
+      const heuteTag = new Date().toLocaleDateString('sv-SE');
+      if (gemerktTag !== heuteTag) return null;
+      return {
+        gesamt: d.gesamt,
+        aktiv: d.aktiv ?? null,
+        passiv: d.passiv ?? null,
+        schnitt: null,
+      };
+    } catch {
+      return null;
+    }
+  };
+
   const [garminHeute, setGarminHeute] = useState<{
     gesamt: number | null;
     aktiv: number | null;
     passiv: number | null;
     schnitt: number | null;
-  } | null>(null);
+  } | null>(garminStartwert);
   const [einheitOffen, setEinheitOffen] = useState<EinheitDaten | null>(null);
 
   useEffect(() => {
@@ -104,6 +135,7 @@ export default function TodayPage() {
         passiv?: number | null;
         schnitt?: { gesamt?: number | null };
         verlauf?: Array<{ date: string; total: number }>;
+        standSek?: number | null;
       }>('/api/integrations/garmin/heute');
       if (!r.verbunden) return;
       if (Array.isArray(r.verlauf)) {
@@ -115,6 +147,23 @@ export default function TodayPage() {
         passiv: r.passiv ?? null,
         schnitt: r.schnitt?.gesamt ?? null,
       });
+
+      /*
+       * Den Wert lokal merken.
+       *
+       * Tims Vorgabe: „ich will das bitte instant der letzte wert aus der
+       * datenbank angezeigt wird." Beim nächsten Öffnen der App steht der
+       * zuletzt bekannte Verbrauch sofort da, bevor die Antwort vom Server
+       * eintrifft — kein Sprung von 2.300 auf den echten Wert mehr.
+       */
+      try {
+        if (r.gesamt != null && r.gesamt > 0) {
+          localStorage.setItem('vrtx_garmin_heute', JSON.stringify({
+            gesamt: r.gesamt, aktiv: r.aktiv ?? null, passiv: r.passiv ?? null,
+            stand: r.standSek ?? null, gemerkt: Date.now(),
+          }));
+        }
+      } catch { /* privater Modus — dann gibt es eben keinen Startwert */ }
     } catch {
       /* Aussetzer: die Seite behaelt den letzten Stand. */
     }

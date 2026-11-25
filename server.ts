@@ -36,7 +36,7 @@ import {
   SYNC_INTERVAL_OPTIONS,
   type IntervalsSettings,
 } from "./src/lib/intervals";
-import { anmelden, bestaetigeMfa, entschluesseln, verschluesseln, tagVoll, historieVoll, koerperWerte, aktivitaeten as garminAktivitaetenLogin, schreibeGewicht, schreibeWasser, tokensGueltig, type LoginTag } from "./src/lib/garminLogin";
+import { anmelden, bestaetigeMfa, entschluesseln, verschluesseln, tagVoll, historieVoll, koerperWerte, aktivitaeten as garminAktivitaetenLogin, schreibeGewicht, schreibeWasser, tokensGueltig, garminZeitreiheLogin, type LoginTag } from "./src/lib/garminLogin";
 import { syncGarmin, syncGarminHeute, garminToken, syncGarminAktivitaeten, ladeEinheitZeitreihen, felderStand, type GarminCache, type GarminAktivitaet } from "./src/lib/garmin";
 import {
   deleteEvent as intervalsDeleteEvent,
@@ -270,6 +270,21 @@ async function initDb(): Promise<void> {
      * selbst (`wellnessEndTimeLocal`) und endet beim letzten Sync der Uhr.
      */
     `ALTER TABLE garmin_days ADD COLUMN IF NOT EXISTS daten_bis TEXT`,
+    /*
+     * Zeitreihen je Einheit (Puls, Pace, Höhe, Kadenz).
+     *
+     * Tims Vorgabe: Alles, was die App zeigt, soll aus der Datenbank kommen —
+     * damit keine Seite auf Garmin warten muss. Die Detailseite einer Einheit
+     * brauchte diese Werte bisher live; hier liegen sie jetzt einmal abgelegt
+     * und werden beim Abgleich mitgeschrieben.
+     */
+    `CREATE TABLE IF NOT EXISTS garmin_activity_timeseries (
+       user_id     INTEGER NOT NULL,
+       activity_id BIGINT  NOT NULL,
+       punkte      JSONB   NOT NULL,
+       erstellt_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+       PRIMARY KEY (user_id, activity_id)
+     )`,
     `ALTER TABLE garmin_days ADD COLUMN IF NOT EXISTS training_status TEXT`,
     /* Merker fuer Rueckschreibvorgaenge — verhindert Endlosschleifen. */
     `CREATE TABLE IF NOT EXISTS garmin_schreibstand (
@@ -6950,55 +6965,44 @@ ${JSON.stringify(userCtx, null, 2)}
     }
   });
 
+  /**
+   * Aktivitäten — ausschließlich aus der Datenbank.
+   *
+   * Tims Vorgabe: „über die garmin api soll quasi nur zusätzliche werte in die
+   * Datenbank kommen aber alles in der app soll direkt auf die datenbankwerte
+   * zugreifen … damit alle daten instant überall zu sehen sind und ich keine
+   * lade screens habe."
+   *
+   * Vorher holte dieser Endpunkt bei veraltetem Stand selbst bei Garmin — das
+   * dauerte Sekunden und die Liste war leer, solange es lief. Zusätzlich stand
+   * in der Prüfung nur `apiKey`, im Login-Betrieb also immer „nicht verbunden":
+   * Die Uhr-Einheiten fehlten auf der Trainingsseite komplett.
+   *
+   * Jetzt: nur `garmin_activities` lesen. Gefüllt wird die Tabelle vom
+   * Hintergrund-Takt und vom Abgleich.
+   */
   app.get("/api/integrations/garmin/activities", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const g = await readGarminSettings(req.userId!);
-      if (!g.apiKey) {
-        res.json({ aktivitaeten: [] });
-        return;
-      }
       const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 40));
-      /*
-       * Bei Bedarf nachziehen. Entscheidend ist die Tabelle, nicht der Cache:
-       * nach dem ersten Deploy ist der Cache schon frisch, die Aktivitaeten-Tabelle
-       * aber noch leer — dann darf der Abruf nicht uebersprungen werden.
-       */
-      const vorhanden = await pool.query(
-        "SELECT 1 FROM garmin_activities WHERE user_id = $1 LIMIT 1",
-        [req.userId],
-      );
-      const letzter = Date.parse(g.cache?.fetchedAt ?? "");
-      const tabelleLeer = (vorhanden.rowCount ?? 0) === 0;
-      if (tabelleLeer || !Number.isFinite(letzter) || Date.now() - letzter > 5 * 60_000) {
-        try {
-          const liste = await syncGarminAktivitaeten(g.apiKey, 40);
-          await speichereGarminAktivitaeten(req.userId!, liste);
-        } catch (e) {
-          console.warn("[garmin] Aktivitaeten:", e);
-        }
-      }
-      res.json({ aktivitaeten: await ladeGarminAktivitaeten(req.userId!, limit) });
+      const aktivitaeten = await ladeGarminAktivitaeten(req.userId!, limit);
+      res.json({ aktivitaeten });
     } catch (err: unknown) {
       res.status(500).json({ error: err instanceof Error ? err.message : "activities failed" });
     }
   });
 
   /**
-   * Zeitreihen einer Einheit — Grundlage der Diagramme.
+   * Zeitreihen einer Einheit — aus der Datenbank.
    *
-   * Die Detailseite zeigt damit Puls, Pace, Höhe und Kadenz im Verlauf. Ohne
-   * diese Werte bleiben es Einzelzahlen, aus denen man nichts ablesen kann.
+   * Tims Vorgabe: Alles, was die App zeigt, kommt aus der Datenbank. Die
+   * Detailseite lädt damit sofort; fehlen die Werte noch, werden sie im
+   * Hintergrund geholt und beim nächsten Öffnen angezeigt. Kein Warten.
    */
   app.get(
     "/api/integrations/garmin/activities/:id/timeseries",
     requireAuth,
     async (req: AuthRequest, res) => {
       try {
-        const g = await readGarminSettings(req.userId!);
-        if (!g.apiKey) {
-          res.json({ punkte: [] });
-          return;
-        }
         // Nur Einheiten des angemeldeten Nutzers — keine fremden IDs abrufen.
         const id = String(req.params.id).replace(/^garmin_/, "");
         const gehoert = await pool.query(
@@ -7009,8 +7013,44 @@ ${JSON.stringify(userCtx, null, 2)}
           res.status(404).json({ error: "Einheit nicht gefunden." });
           return;
         }
-        const punkte = await ladeEinheitZeitreihen(g.apiKey, Number(id));
-        res.json({ aktivitaetId: id, punkte });
+
+        const gespeichert = await pool.query(
+          "SELECT punkte FROM garmin_activity_timeseries WHERE user_id = $1 AND activity_id = $2",
+          [req.userId, Number(id)],
+        );
+
+        if (gespeichert.rowCount) {
+          res.json({ aktivitaetId: id, punkte: gespeichert.rows[0].punkte, quelle: "datenbank" });
+          return;
+        }
+
+        /*
+         * Noch nicht vorhanden: leere Antwort, dafür im Hintergrund holen.
+         * Die Seite zeigt „wird geladen" — beim nächsten Aufruf stehen die
+         * Werte bereit. Das ist die einzige Stelle, die noch nachladen muss,
+         * weil Garmin die Zeitreihen nur je Einheit herausgibt.
+         */
+        res.json({ aktivitaetId: id, punkte: [], quelle: "wird_geladen" });
+
+        const g = await readGarminSettings(req.userId!);
+        if (!g.login?.tokens) return;
+
+        void (async () => {
+          try {
+            const tokens = entschluesseln(g.login!.tokens!);
+            const punkte = await garminZeitreiheLogin(tokens, Number(id));
+            if (punkte.length) {
+              await pool.query(
+                `INSERT INTO garmin_activity_timeseries (user_id, activity_id, punkte)
+                 VALUES ($1,$2,$3::jsonb)
+                 ON CONFLICT (user_id, activity_id) DO UPDATE SET punkte = $3::jsonb`,
+                [req.userId, Number(id), JSON.stringify(punkte)],
+              );
+            }
+          } catch (e) {
+            console.warn("[garmin] Zeitreihe:", e);
+          }
+        })();
       } catch (err: unknown) {
         res.status(500).json({ error: err instanceof Error ? err.message : "timeseries failed" });
       }
@@ -7164,14 +7204,6 @@ ${JSON.stringify(userCtx, null, 2)}
       );
       const g = await readGarminSettings(req.userId!);
 
-      // Durchschnitt der letzten vollstaendigen Tage — fuer den Vergleich.
-      const schnitt = await pool.query(
-        `SELECT AVG(total_kcal)::int AS total, AVG(active_kcal)::int AS aktiv, COUNT(*)::int AS tage
-           FROM garmin_days
-          WHERE user_id = $1 AND date < $2 AND total_kcal IS NOT NULL AND total_kcal > 0`,
-        [req.userId!, heute],
-      );
-
       let zeile = r.rows[0] as
         | { total_kcal?: number; active_kcal?: number; steps?: number; stand?: number }
         | undefined;
@@ -7180,59 +7212,82 @@ ${JSON.stringify(userCtx, null, 2)}
       let schritte = zeile?.steps ?? null;
 
       /*
-       * Der Hintergrund-Abgleich laeuft im 10-Minuten-Takt — der Wert der Uhr
-       * waechst aber minuetlich. Wer die Startseite oeffnet, sah deshalb eine
-       * Zahl von vor bis zu zehn Minuten (1.869 statt 2.431 kcal).
+       * Antwort sofort — noch bevor Garmin gefragt wird.
        *
-       * Deshalb: ist der gespeicherte Stand aelter als zwei Minuten, wird der
-       * heutige Tag hier einmal live geholt. Bewusst kein Schreibvorgang bei
-       * jedem Aufruf — nur wenn der Wert wirklich fehlt oder alt ist.
+       * Tims Beobachtung: „wenn man die app lädt, steht erst 2.300 drin, obwohl
+       * Garmin geladen ist". Ursache: Der Endpunkt holte bei altem Stand erst
+       * live bei Garmin und antwortete dann — bis dahin zeigte die Seite das
+       * Profilziel. Jetzt geht der gespeicherte Wert sofort raus, das
+       * Nachholen passiert danach.
+       */
+      const antwortSenden = (nachgeholt: boolean) => {
+        res.json({
+          verbunden: Boolean(g.login?.tokens || g.apiKey),
+          datum: heute,
+          gesamt: total,
+          aktiv,
+          passiv: total != null && aktiv != null ? Math.max(0, total - aktiv) : null,
+          schritte,
+          /** Wurde für diese Antwort live bei Garmin nachgefragt? */
+          nachgeholt,
+          /** Zeitpunkt des gespeicherten Werts (Unix-Sekunden) — für „vor X Min". */
+          standSek: zeile?.stand ?? null,
+        });
+      };
+
+      /*
+       * Ist der gespeicherte Stand älter als zwei Minuten? Dann im Hintergrund
+       * nachziehen und die Seite beim nächsten Abruf den frischeren Wert zeigen
+       * lassen. Bewusst kein Warten: Die Anzeige soll sofort stehen.
        */
       const stand = zeile?.stand ? zeile.stand * 1000 : 0;
       const veraltet = !zeile || Date.now() - stand > 2 * 60_000;
+
       if (veraltet && g.login?.tokens) {
-        try {
-          const frisch = await tagVoll(entschluesseln(g.login.tokens), heute, { leicht: true });
-          if (frisch.totalCalories != null || frisch.activeCalories != null) {
-            await speichereLoginTage(req.userId!, [frisch]);
-            total = frisch.totalCalories ?? total;
-            aktiv = frisch.activeCalories ?? aktiv;
-            schritte = frisch.steps ?? schritte;
+        /* Antwort zuerst raus — dann in Ruhe nachholen. */
+        antwortSenden(false);
+
+        void (async () => {
+          try {
+            const frisch = await tagVoll(entschluesseln(g.login.tokens!), heute, { leicht: true });
+            if (frisch.totalCalories != null || frisch.activeCalories != null) {
+              await speichereLoginTage(req.userId!, [frisch]);
+            }
+          } catch {
+            /* Uhr nicht erreichbar — der gespeicherte Stand bleibt gültig. */
           }
-        } catch {
-          // Die Uhr ist nicht erreichbar — dann gilt der gespeicherte Stand.
-        }
+        })();
+        return;
       }
 
-      // Verlauf der letzten Tage fuer die Bilanzbalken — echter Verbrauch.
-      const verlauf = await pool.query(
-        `SELECT date::text AS date, total_kcal::int AS total
-           FROM garmin_days
-          WHERE user_id = $1 AND date >= ($2::date - INTERVAL '13 days')
-            AND date <= $2::date AND total_kcal IS NOT NULL AND total_kcal > 0
-          ORDER BY date`,
-        [req.userId!, heute],
-      );
+      /* Frisch genug: Bilanzverlauf und Schnitt mitgeben, dann antworten. */
+      const [schnitt, verlauf] = await Promise.all([
+        pool.query(
+          `SELECT AVG(total_kcal)::int AS total, AVG(active_kcal)::int AS aktiv, COUNT(*)::int AS tage
+             FROM garmin_days
+            WHERE user_id = $1 AND date < $2 AND total_kcal IS NOT NULL AND total_kcal > 0`,
+          [req.userId!, heute],
+        ),
+        pool.query(
+          `SELECT date::text AS date, total_kcal::int AS total
+             FROM garmin_days
+            WHERE user_id = $1 AND date >= ($2::date - INTERVAL '13 days')
+              AND date <= $2::date AND total_kcal IS NOT NULL AND total_kcal > 0
+            ORDER BY date`,
+          [req.userId!, heute],
+        ),
+      ]);
 
       res.json({
-        /*
-         * Verbunden ist, wer einen Login-Zugang ODER einen Personal-API-Key
-         * hat. Vorher stand hier nur `apiKey` — die Startseite hielt Garmin
-         * deshalb fuer nicht verbunden und rechnete den Verbrauch selbst
-         * (2.300 statt der echten 1.869 kcal der Uhr).
-         */
         verbunden: Boolean(g.login?.tokens || g.apiKey),
         datum: heute,
-        /** Verbrauch je Tag — Grundlage fuer die Bilanzbalken. */
         verlauf: verlauf.rows,
-        /** Gesamtverbrauch heute (Grundumsatz + Aktivitaet), waechst ueber den Tag. */
         gesamt: total,
-        /** Davon durch Bewegung. */
         aktiv,
-        /** Grundumsatz = gesamt - aktiv. */
         passiv: total != null && aktiv != null ? Math.max(0, total - aktiv) : null,
         schritte,
-        /** Durchschnitt vollstaendiger Vortage — als Vergleichsmarke. */
+        nachgeholt: false,
+        standSek: zeile?.stand ?? null,
         schnitt: {
           gesamt: schnitt.rows[0]?.total ?? null,
           aktiv: schnitt.rows[0]?.aktiv ?? null,
