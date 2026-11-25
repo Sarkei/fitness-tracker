@@ -133,7 +133,12 @@ export default function PullToRefresh({ children, onAktualisiert }: Props) {
     <div className="relative">
       {/* Anzeige über dem Inhalt — nur mobil, auf dem Desktop unnötig. */}
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 z-30 flex justify-center lg:hidden"
+        /*
+         * `items-start` ist entscheidend: ohne das streckt der Flex-Container die
+         * Pille auf die volle Zughöhe (bis 110 px). Genau das ließ sie gedrungen
+         * und dick aussehen, wie ein falsch proportioniertes Oval.
+         */
+        className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-center lg:hidden"
         style={{
           height: hoehe,
           opacity: hoehe > 2 ? 1 : 0,
@@ -142,7 +147,8 @@ export default function PullToRefresh({ children, onAktualisiert }: Props) {
         aria-live="polite"
       >
         <div
-          className="mt-1 inline-flex items-center gap-2 rounded-full border border-[var(--border-muted)] px-3 py-1.5 text-[11px] font-semibold text-[var(--text-muted)] shadow-sm"
+          /* Breit und flach: feste Mindestbreite, wenig vertikales Padding. */
+          className="mt-1.5 inline-flex min-w-[15.5rem] items-center justify-center gap-2 rounded-full border border-[var(--border-muted)] px-5 py-1 text-[11px] font-semibold text-[var(--text-muted)] shadow-sm"
           style={{ background: 'var(--card-bg)' }}
         >
           {laeuft ? (
