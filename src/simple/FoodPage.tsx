@@ -601,7 +601,9 @@ export default function FoodPage() {
                         )}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[12.5px] font-semibold">{vorlage.titel}</span>
+                        {/* Zweizeilig statt gekürzt: Gerichtnamen sind sonst
+                            nach 20 Zeichen abgeschnitten. */}
+                        <span className="line-clamp-2 block text-[12.5px] font-semibold leading-snug">{vorlage.titel}</span>
                         <span className="block text-[11px] text-[var(--text-muted)]">
                           aus dem Mealplanner
                           {vorlage.kcal ? ` · ${vorlage.kcal} kcal` : ''}

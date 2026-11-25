@@ -779,7 +779,9 @@ export default function TrainingPage() {
                       onClick={() => setTagOffen(String(workout.date).slice(0, 10))}
                       className="min-w-0 flex-1 text-left transition hover:opacity-80"
                     >
-                      <p className="truncate text-sm font-medium">{workout.name}</p>
+                      {/* Zweizeilig statt abgeschnitten: Trainingsnamen wie
+                          „Stephanskirchen - Coach: Mittag" sind sonst unlesbar. */}
+                      <p className="line-clamp-2 text-sm font-medium leading-snug">{workout.name}</p>
                       <p className="text-[11px] text-[var(--text-muted)]">
                         {formatDay(toYmd(workout.date))} · {workout.duration} min
                         {uebungen ? ` · ${uebungen} Übungen` : ''}
