@@ -6457,7 +6457,6 @@ ${JSON.stringify(userCtx, null, 2)}
       );
       const tage = (r.rows[0]?.wasser || {}) as Record<string, number>;
       const ml = Number(tage[heute]);
-      /* Erst ab einem messbaren Wert schreiben — 0 ml würde Garmin nur leeren. */
       if (Number.isFinite(ml) && ml > 0) {
         const wert = String(Math.round(ml));
         if ((await letzterStand('wasser', heute)) !== wert) {
@@ -6467,6 +6466,17 @@ ${JSON.stringify(userCtx, null, 2)}
             ergebnis.wasser = true;
           }
         }
+      } else {
+        /*
+         * In der App kein Wasser (mehr) eingetragen: Merker loeschen.
+         * Sonst bliebe nach einem geloeschten Eintrag der alte Stand stehen,
+         * und ein spaeter wieder eingegebener gleicher Wert wuerde nie
+         * geschrieben, weil der Merker ihn fuer erledigt haelt.
+         */
+        await pool.query(
+          `DELETE FROM garmin_schreibstand WHERE user_id=$1 AND art='wasser' AND schluessel=$2`,
+          [userId, heute],
+        );
       }
     } catch (e) {
       console.warn('[garmin-schreiben] Wasser:', e);

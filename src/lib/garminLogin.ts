@@ -560,16 +560,28 @@ export async function koerperWerte(
  */
 export async function schreibeGewicht(tokensJson: string, datum: string, kg: number): Promise<boolean> {
   try {
-    await clientAusTokens(tokensJson).connectapi('/weight-service/weight/dateWeight', {
+    /*
+     * Route und Körper aus der Bibliothek uebernommen (addWeighIn):
+     * `/weight-service/user-weight` mit value/unitKey/sourceType und beiden
+     * Zeitstempeln. Die frueher geratene Route `.../dateWeight` antwortet mit
+     * HTTP 405 — der Eintrag kam nie an.
+     */
+    const lokal = `${datum}T12:00:00.000`;
+    await clientAusTokens(tokensJson).connectapi('/weight-service/user-weight', {
       method: 'POST',
       json: {
-        dateTimestamp: `${datum}T12:00:00.000`,
-        weight: Math.round(kg * 1000),
+        dateTimestamp: lokal,
+        gmtTimestamp: lokal.replace('T12:00:00.000', 'T10:00:00.000'),
         unitKey: 'kg',
+        sourceType: 'MANUAL',
+        value: Math.round(kg * 100) / 100,
       },
     });
     return true;
-  } catch {
+  } catch (e) {
+    /* Nicht stumm verschlucken: ohne Meldung ist nicht zu erkennen, ob die
+       Route falsch ist oder Garmin den Aufruf ablehnt. */
+    console.warn('[garmin] Gewicht schreiben fehlgeschlagen:', e instanceof Error ? e.message : e);
     return false;
   }
 }
@@ -577,18 +589,21 @@ export async function schreibeGewicht(tokensJson: string, datum: string, kg: num
 /** Wasser in Garmin eintragen (Milliliter, Tageswert). */
 export async function schreibeWasser(tokensJson: string, datum: string, ml: number): Promise<boolean> {
   try {
+    /*
+     * Wie `addHydration` in der Bibliothek: `timestampLocal` gehoert dazu,
+     * ohne das Feld lehnt Garmin den Aufruf ab.
+     */
     await clientAusTokens(tokensJson).connectapi('/usersummary-service/usersummary/hydration/log', {
       method: 'PUT',
       json: {
         calendarDate: datum,
+        timestampLocal: `${datum}T12:00:00.000`,
         valueInML: Math.round(ml),
-        goalInML: 2500,
-        sweatLossInML: 0,
-        activityIntensityLevelUpdateThreshold: 0,
       },
     });
     return true;
-  } catch {
+  } catch (e) {
+    console.warn('[garmin] Wasser schreiben fehlgeschlagen:', e instanceof Error ? e.message : e);
     return false;
   }
 }
