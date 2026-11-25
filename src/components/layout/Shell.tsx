@@ -8,6 +8,7 @@ import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/src/lib/AuthContext';
 import { useI18n } from '@/src/lib/i18n';
 import { initMobileViewportInsets, resetMobileChromeAfterRouteChange } from '@/src/lib/mobileViewport';
+import PullToRefresh from './PullToRefresh';
 
 import { applyTheme, persistTheme, resolveTheme } from '@/src/lib/themePreference';
 import { ExerciseDetailProvider } from '@/src/lib/exerciseDetailContext';
@@ -47,13 +48,16 @@ export default function Shell({ children }: ShellProps) {
         <AppHeader />
 
         <main>
-          {fullBleed ? (
-            children
-          ) : (
-            <div className="shell-page mx-auto max-w-[1360px] px-4 pt-4 pb-16 sm:px-5 sm:pt-6 lg:px-5 lg:pt-8 lg:pb-20">
-              {children}
-            </div>
-          )}
+          {/* Herunterziehen aktualisiert überall — auf dem Desktop wirkungslos. */}
+          <PullToRefresh>
+            {fullBleed ? (
+              children
+            ) : (
+              <div className="shell-page mx-auto max-w-[1360px] px-4 pt-4 pb-16 sm:px-5 sm:pt-6 lg:px-5 lg:pt-8 lg:pb-20">
+                {children}
+              </div>
+            )}
+          </PullToRefresh>
         </main>
       </div>
     </ExerciseDetailProvider>

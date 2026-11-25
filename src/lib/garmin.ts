@@ -98,7 +98,19 @@ const LANGSAME_FELDER = new Set(['vo2max', 'fitnessAge', 'weightKg', 'bodyFat'])
 export function felderStand(tage: GarminTag[]): { gesamt: number; erfolgreich: number; fehlend: string[] } {
   const gesamt = GARMIN_FELDER.length;
   if (!tage.length) return { gesamt, erfolgreich: 0, fehlend: [...GARMIN_FELDER] };
-  const juengster = tage[tage.length - 1] as Record<string, unknown>;
+  /*
+   * Nicht blind den Kalendertag von heute nehmen: frueh am Morgen hat er nur
+   * Schritte und Puls, die Nacht fehlt noch — dann meldete die Anzeige
+   * "11 Felder fehlen", obwohl gestern alles da war.
+   * Deshalb der juengste Tag mit echter Datengrundlage (Schlaf oder Schritte).
+   */
+  const aussagekraeftig = [...tage]
+    .reverse()
+    .find((t) => {
+      const r = t as Record<string, unknown>;
+      return r.sleepSecs != null || Number(r.steps ?? 0) > 500;
+    });
+  const juengster = (aussagekraeftig ?? tage[tage.length - 1]) as Record<string, unknown>;
 
   const hatWert = (feld: string): boolean => {
     if (juengster[feld] != null) return true;

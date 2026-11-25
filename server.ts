@@ -6912,7 +6912,59 @@ ${JSON.stringify(userCtx, null, 2)}
   app.get("/api/integrations/garmin", requireAuth, async (req: AuthRequest, res) => {
     try {
       const g = await readGarminSettings(req.userId!);
-      const tage = g.cache?.tage ?? [];
+      /*
+       * Quelle ist die Tabelle, nicht der JSON-Cache.
+       *
+       * Der Login-Refresh schreibt nach `garmin_days`, laesst den Cache aber
+       * stehen — der zeigte dann „2 Tage", obwohl 8 in der Tabelle liegen.
+       * Der Cache bleibt Rueckfallebene fuer den Fall, dass die Tabelle leer ist.
+       */
+      const ausTabelle = await pool.query(
+        `SELECT date::text AS date, sleep_secs, sleep_score, sleep_quality, hrv, hrv_status,
+                resting_hr, min_hr, max_hr, steps, floors, distance_m, active_kcal, total_kcal,
+                stress_avg, stress_max, bb_min, bb_max, spo2_avg, respiration, vo2max,
+                fitness_age, weight_kg, body_fat, deep_secs, light_secs, rem_secs, awake_secs,
+                readiness, readiness_level, training_status
+           FROM garmin_days
+          WHERE user_id = $1
+          ORDER BY date ASC`,
+        [req.userId],
+      );
+      const tage: GarminCache["tage"] = ausTabelle.rows.length
+        ? (ausTabelle.rows.map((r) => ({
+            date: r.date,
+            sleepSecs: r.sleep_secs ?? undefined,
+            sleepScore: r.sleep_score ?? undefined,
+            sleepQuality: r.sleep_quality ?? undefined,
+            hrv: r.hrv ?? undefined,
+            hrvStatus: r.hrv_status ?? undefined,
+            restingHr: r.resting_hr ?? undefined,
+            minHr: r.min_hr ?? undefined,
+            maxHr: r.max_hr ?? undefined,
+            steps: r.steps ?? undefined,
+            floors: r.floors ?? undefined,
+            distanceMeters: r.distance_m ?? undefined,
+            activeCalories: r.active_kcal ?? undefined,
+            totalCalories: r.total_kcal ?? undefined,
+            stressAvg: r.stress_avg ?? undefined,
+            stressMax: r.stress_max ?? undefined,
+            bodyBatteryMin: r.bb_min ?? undefined,
+            bodyBatteryMax: r.bb_max ?? undefined,
+            spo2Avg: r.spo2_avg != null ? Number(r.spo2_avg) : undefined,
+            respiration: r.respiration != null ? Number(r.respiration) : undefined,
+            vo2max: r.vo2max != null ? Number(r.vo2max) : undefined,
+            fitnessAge: r.fitness_age ?? undefined,
+            weightKg: r.weight_kg != null ? Number(r.weight_kg) : undefined,
+            bodyFat: r.body_fat != null ? Number(r.body_fat) : undefined,
+            deepSecs: r.deep_secs ?? undefined,
+            lightSecs: r.light_secs ?? undefined,
+            remSecs: r.rem_secs ?? undefined,
+            awakeSecs: r.awake_secs ?? undefined,
+            readiness: r.readiness ?? undefined,
+            readinessLevel: r.readiness_level ?? undefined,
+            trainingStatus: r.training_status ?? undefined,
+          })) as GarminCache["tage"])
+        : g.cache?.tage ?? [];
       const stand = felderStand(tage);
       const laufend = garminSyncLaufend.get(req.userId!);
       const quellen = await leseQuellen(req.userId!);
@@ -6930,7 +6982,16 @@ ${JSON.stringify(userCtx, null, 2)}
         lastSync: g.lastAutoSyncAt ?? g.cache?.fetchedAt ?? null,
         lastVollSync: g.lastVollSyncAt ?? null,
         lastError: g.lastError ?? null,
-        nichtVerfuegbar: g.cache?.nichtVerfuegbar ?? [],
+        /* Aus der Tabelle abgeleitet, damit die Anzeige zum echten Bestand passt. */
+        nichtVerfuegbar: (() => {
+          const hat = (f: string) => tage.some((t) => typeof (t as Record<string, unknown>)[f] === "number");
+          const fehlt: string[] = [];
+          if (!hat("stressAvg")) fehlt.push("Stress");
+          if (!hat("bodyBatteryMax")) fehlt.push("Body Battery");
+          if (!hat("spo2Avg")) fehlt.push("SpO2");
+          if (!hat("respiration")) fehlt.push("Atemfrequenz");
+          return fehlt;
+        })(),
         /** Wie viele der gewuenschten Felder beim juengsten Tag gefuellt sind. */
         felder: stand,
         /** Laufender Abgleich: null wenn fertig, sonst Fortschritt. */
