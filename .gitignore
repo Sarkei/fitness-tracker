@@ -48,3 +48,6 @@ dumps/
 
 # Build-Artefakt (npm run build:server)
 server.js
+
+# VAPID-Schlüssel (Push) — gehören nicht ins Repo, liegen im Container unter /app/push-keys.env
+push-keys.env

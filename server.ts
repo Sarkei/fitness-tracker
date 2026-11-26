@@ -8927,7 +8927,7 @@ function berlinTeile(d: Date = new Date()): { stunde: number; minute: number; hh
               const teile: string[] = [`${kcal} kcal`];
               if (zielKcal) teile.push(`noch ${Math.max(zielKcal - kcal, 0)} von ${zielKcal}`);
               teile.push(`${prot} g Eiweiß`);
-              if (zielProt) teile.push(`noch ${Math.max(zielProt - prot, 0)} g`);
+              if (zielProt) teile.push(`noch ${Math.round(Math.max(zielProt - prot, 0))} g`);
               await benachrichtige(pool as never, sendeAn(u.id), u.id, {
                 kategorie: "ernaehrung",
                 ereignis: "ernaehrung-nachmittag",
@@ -8936,7 +8936,7 @@ function berlinTeile(d: Date = new Date()): { stunde: number; minute: number; hh
                 text: `${teile.join(" · ")}. ${Number(w?.mahlzeiten ?? 0)} Mahlzeiten erfasst.`,
                 url: "https://fitness.nas-timgreen.com/#/nutrition",
                 tag: "ernaehrung-stand",
-                rhythmus: "mittag",
+                rhythmus: "nachmittag",
               });
             }
           }
