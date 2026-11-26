@@ -37,6 +37,16 @@ import {
   type IntervalsSettings,
 } from "./src/lib/intervals";
 import { anmelden, bestaetigeMfa, entschluesseln, verschluesseln, tagVoll, historieVoll, koerperWerte, aktivitaeten as garminAktivitaetenLogin, schreibeGewicht, schreibeWasser, tokensGueltig, garminZeitreiheLogin, type LoginTag } from "./src/lib/garminLogin";
+import {
+  HEALTH_FELDER,
+  HEALTH_FELD_LABEL,
+  parseHealthNutzlast,
+  tagVon as healthTagVon,
+  zeit as healthZeit,
+  type HealthFeld,
+  type HealthQuelle,
+  type TagesWerte,
+} from "./src/lib/healthQuellen";
 import { syncGarmin, syncGarminHeute, garminToken, syncGarminAktivitaeten, ladeEinheitZeitreihen, felderStand, type GarminCache, type GarminAktivitaet } from "./src/lib/garmin";
 import {
   deleteEvent as intervalsDeleteEvent,
@@ -287,6 +297,36 @@ async function initDb(): Promise<void> {
        PRIMARY KEY (user_id, activity_id)
      )`,
     `ALTER TABLE garmin_days ADD COLUMN IF NOT EXISTS training_status TEXT`,
+    /*
+     * Zweite Datenquelle neben Garmin (Health Connect / Apple Health).
+     *
+     * Tims Vorgabe: Sind beide verbunden, gilt je Feld immer der aktuellere
+     * Wert — nicht pauschal Garmin und nicht pauschal das Handy.
+     *
+     * Dafür braucht es pro Feld den Zeitpunkt, bis zu dem die dort stehende
+     * Zahl reicht. `feld_stand` ist ein JSONB-Objekt der Form
+     * `{"steps": "2026-11-26T06:29:00Z", "weightKg": "..."}`; `quelle` nennt
+     * die Herkunft des zuletzt geschriebenen Felds (nur zur Anzeige).
+     */
+    `ALTER TABLE garmin_days ADD COLUMN IF NOT EXISTS feld_stand JSONB NOT NULL DEFAULT '{}'::jsonb`,
+    `ALTER TABLE garmin_days ADD COLUMN IF NOT EXISTS quelle TEXT`,
+    /*
+     * Zeile ein Merker für Handy-Quellen, damit ein Gerät seine Verbindung
+     * bestätigen kann, ohne dass Tim ein Passwort in eine Fremd-App tippt.
+     * Der Schlüssel steht in `profile_extras.health.token` und ist zufällig.
+     */
+    `CREATE TABLE IF NOT EXISTS health_webhook_ereignisse (
+       id          BIGSERIAL PRIMARY KEY,
+       user_id     INTEGER NOT NULL,
+       quelle      TEXT    NOT NULL,
+       empfangen_am TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+       tage        INTEGER NOT NULL DEFAULT 0,
+       felder      TEXT[]  NOT NULL DEFAULT '{}',
+       unbekannt   TEXT[]  NOT NULL DEFAULT '{}',
+       fehler      TEXT
+     )`,
+    `CREATE INDEX IF NOT EXISTS health_webhook_ereignisse_user_idx
+       ON health_webhook_ereignisse (user_id, empfangen_am DESC)`,
     /* Merker fuer Rueckschreibvorgaenge — verhindert Endlosschleifen. */
     `CREATE TABLE IF NOT EXISTS garmin_schreibstand (
        user_id INTEGER NOT NULL,
@@ -6542,148 +6582,285 @@ ${JSON.stringify(userCtx, null, 2)}
     VERY_POOR: 1,
   };
 
-  const speichereLoginTage = async (userId: number, tage: LoginTag[]): Promise<void> => {
-    if (!tage.length) return;
-    for (const t of tage) {
+  /**
+   * Spalte je Health-Feld.
+   *
+   * Nur diese Felder laufen durch den Frische-Vergleich — sie können aus
+   * Garmin ODER vom Handy kommen. Alles andere (Stress, Body Battery,
+   * Readiness, HRV-Status, Schlafscore) liefert ausschließlich Garmin und wird
+   * unverändert geschrieben.
+   */
+  const FELD_SPALTE: Record<HealthFeld, string> = {
+    steps: "steps",
+    distanceMeters: "distance_m",
+    activeCalories: "active_kcal",
+    totalCalories: "total_kcal",
+    restingHr: "resting_hr",
+    minHr: "min_hr",
+    maxHr: "max_hr",
+    sleepSecs: "sleep_secs",
+    deepSecs: "deep_secs",
+    lightSecs: "light_secs",
+    remSecs: "rem_secs",
+    awakeSecs: "awake_secs",
+    spo2Avg: "spo2_avg",
+    vo2max: "vo2max",
+    weightKg: "weight_kg",
+    bodyFat: "body_fat",
+  };
+
+  /**
+   * Bestandszeilen ohne Marker nachziehen.
+   *
+   * Vor diesem Umbau gab es kein `feld_stand`. Ohne Marker gilt ein Tag als
+   * „unbekannt" — dann würde der erste Handy-Upload einen beliebig alten Wert
+   * über die vorhandenen Garmin-Zahlen schreiben. Beim Nachziehen bekommen
+   * bestehende Werte den Tag ihres `daten_bis` (falls vorhanden) oder den
+   * Zeitpunkt der letzten Änderung; damit liegt der Marker nie in der Zukunft
+   * und ein echter neuer Wert kommt weiter durch.
+   *
+   * Läuft einmal je Start — idempotent, weil nur leere Marker gefüllt werden.
+   */
+  const migriereFeldStand = async (): Promise<void> => {
+    const r = await pool.query(
+      `SELECT user_id, date, daten_bis, updated_at, feld_stand,
+              ${HEALTH_FELDER.map((f) => FELD_SPALTE[f]).join(", ")}
+         FROM garmin_days
+        WHERE feld_stand = '{}'::jsonb
+        LIMIT 5000`,
+    );
+    for (const zeile of r.rows as Array<Record<string, unknown>>) {
+      const stand =
+        (typeof zeile.daten_bis === "string" ? healthZeit(zeile.daten_bis) : null) ??
+        (zeile.updated_at ? new Date(String(zeile.updated_at)) : new Date());
+      if (Number.isNaN(stand.getTime())) continue;
+      const marker: Record<string, string> = {};
+      for (const feld of HEALTH_FELDER) {
+        const wert = zeile[FELD_SPALTE[feld]];
+        if (wert != null) marker[feld] = stand.toISOString();
+      }
+      if (!Object.keys(marker).length) continue;
       await pool.query(
-        `INSERT INTO garmin_days (
-           user_id, date, sleep_secs, sleep_score, sleep_quality, hrv, hrv_status,
-           resting_hr, min_hr, max_hr, steps, floors, distance_m, active_kcal, total_kcal,
-           stress_avg, stress_max, bb_min, bb_max, spo2_avg, respiration, vo2max, fitness_age,
-           weight_kg, body_fat,
-           deep_secs, light_secs, rem_secs, awake_secs, sleep_stress, sleep_hr,
-           spo2_night, respiration_night, readiness, readiness_level, training_status,
-           daten_bis
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,
-                   $20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37)
-         ON CONFLICT (user_id, date) DO UPDATE SET
-           daten_bis         = COALESCE(EXCLUDED.daten_bis, garmin_days.daten_bis),
-           sleep_secs        = COALESCE(EXCLUDED.sleep_secs, garmin_days.sleep_secs),
-           sleep_score       = COALESCE(EXCLUDED.sleep_score, garmin_days.sleep_score),
-           sleep_quality     = COALESCE(EXCLUDED.sleep_quality, garmin_days.sleep_quality),
-           hrv               = COALESCE(EXCLUDED.hrv, garmin_days.hrv),
-           hrv_status        = COALESCE(EXCLUDED.hrv_status, garmin_days.hrv_status),
-           resting_hr        = COALESCE(EXCLUDED.resting_hr, garmin_days.resting_hr),
-           min_hr            = COALESCE(EXCLUDED.min_hr, garmin_days.min_hr),
-           max_hr            = COALESCE(EXCLUDED.max_hr, garmin_days.max_hr),
-           steps             = COALESCE(EXCLUDED.steps, garmin_days.steps),
-           floors            = COALESCE(EXCLUDED.floors, garmin_days.floors),
-           distance_m        = COALESCE(EXCLUDED.distance_m, garmin_days.distance_m),
-           active_kcal       = COALESCE(EXCLUDED.active_kcal, garmin_days.active_kcal),
-           total_kcal        = COALESCE(EXCLUDED.total_kcal, garmin_days.total_kcal),
-           stress_avg        = COALESCE(EXCLUDED.stress_avg, garmin_days.stress_avg),
-           stress_max        = COALESCE(EXCLUDED.stress_max, garmin_days.stress_max),
-           bb_min            = COALESCE(EXCLUDED.bb_min, garmin_days.bb_min),
-           bb_max            = COALESCE(EXCLUDED.bb_max, garmin_days.bb_max),
-           spo2_avg          = COALESCE(EXCLUDED.spo2_avg, garmin_days.spo2_avg),
-           respiration       = COALESCE(EXCLUDED.respiration, garmin_days.respiration),
-           vo2max            = COALESCE(EXCLUDED.vo2max, garmin_days.vo2max),
-           fitness_age       = COALESCE(EXCLUDED.fitness_age, garmin_days.fitness_age),
-           weight_kg         = COALESCE(EXCLUDED.weight_kg, garmin_days.weight_kg),
-           body_fat          = COALESCE(EXCLUDED.body_fat, garmin_days.body_fat),
-           deep_secs         = COALESCE(EXCLUDED.deep_secs, garmin_days.deep_secs),
-           light_secs        = COALESCE(EXCLUDED.light_secs, garmin_days.light_secs),
-           rem_secs          = COALESCE(EXCLUDED.rem_secs, garmin_days.rem_secs),
-           awake_secs        = COALESCE(EXCLUDED.awake_secs, garmin_days.awake_secs),
-           sleep_stress      = COALESCE(EXCLUDED.sleep_stress, garmin_days.sleep_stress),
-           sleep_hr          = COALESCE(EXCLUDED.sleep_hr, garmin_days.sleep_hr),
-           spo2_night        = COALESCE(EXCLUDED.spo2_night, garmin_days.spo2_night),
-           respiration_night = COALESCE(EXCLUDED.respiration_night, garmin_days.respiration_night),
-           readiness         = COALESCE(EXCLUDED.readiness, garmin_days.readiness),
-           readiness_level   = COALESCE(EXCLUDED.readiness_level, garmin_days.readiness_level),
-           training_status   = COALESCE(EXCLUDED.training_status, garmin_days.training_status),
-           updated_at        = NOW()`,
-        [
-          userId, t.date,
-          t.sleepSecs ?? null, t.sleepScore ?? null,
-          // Text-Qualitaet auf die Zahlenskala 1-5 abbilden (Spalte ist INTEGER).
-          t.sleepQuality != null ? (SCHLAF_QUALITAET[t.sleepQuality] ?? null) : null,
-          t.hrv ?? null, t.hrvStatus ?? null,
-          t.restingHr ?? null, t.minHr ?? null, t.maxHr ?? null,
-          t.steps ?? null, t.floors ?? null, t.distanceMeters ?? null,
-          t.activeCalories ?? null, t.totalCalories ?? null,
-          t.stressAvg ?? null, t.stressMax ?? null,
-          t.bodyBatteryMin ?? null, t.bodyBatteryMax ?? null,
-          // Tagwerte bevorzugen, sonst auf den Nachtwert zurueckfallen.
-          t.spo2Avg ?? t.spo2Night ?? null,
-          t.respiration ?? t.respirationNight ?? null,
-          t.vo2max ?? null,
-          t.fitnessAge != null ? Math.round(t.fitnessAge) : null,
-          t.weightKg ?? null, t.bodyFat ?? null,
-          t.deepSecs ?? null, t.lightSecs ?? null, t.remSecs ?? null, t.awakeSecs ?? null,
-          t.sleepStress ?? null, t.sleepHr ?? null,
-          t.spo2Night ?? null, t.respirationNight ?? null,
-          t.readiness ?? null, t.readinessLevel ?? null, t.trainingStatus ?? null,
-          /* Bis wann Garmin Daten hat — nicht der Abrufzeitpunkt. */
-          t.datenBis ?? null,
-        ],
+        `UPDATE garmin_days SET feld_stand = $3::jsonb
+          WHERE user_id = $1 AND date = $2 AND feld_stand = '{}'::jsonb`,
+        [zeile.user_id, zeile.date, JSON.stringify(marker)],
       );
     }
   };
 
+  type SchreibTag = {
+    date: string;
+    /** Bis wann die Werte dieses Tages reichen. */
+    stand: Date;
+    werte: Partial<Record<HealthFeld, number>>;
+    /** Felder, die nur Garmin kennt — ohne Frische-Vergleich. */
+    nurGarmin?: Record<string, number | string | null>;
+  };
+
+  /**
+   * Einen Tag schreiben — je Feld gewinnt der neuere Datenstand.
+   *
+   * Tims Vorgabe: „wenn man beides verbunden hat dann soll auch beides
+   * hergenommen werden aber halt immer nur das aktuellere." Deshalb liegt in
+   * `feld_stand` je Feld der Zeitpunkt, bis zu dem der gespeicherte Wert
+   * reicht. Ein eintreffender Wert überschreibt nur, wenn er neuer ist —
+   * unabhängig davon, ob er von der Uhr oder vom Handy kommt. Ältere
+   * Nachzügler werden verworfen, nicht eingemischt.
+   *
+   * Garmin-exklusive Felder (Stress, Body Battery, Readiness, …) laufen
+   * weiter wie bisher: neuer Wert überschreibt, fehlender lässt den alten
+   * stehen.
+   */
+  const schreibeTageMitFrische = async (
+    userId: number,
+    quelle: HealthQuelle,
+    tage: SchreibTag[],
+  ): Promise<{ uebernommen: number; verworfen: number }> => {
+    let uebernommen = 0;
+    let verworfen = 0;
+
+    for (const tag of tage) {
+      if (!tag.date) continue;
+      const r = await pool.query(
+        `SELECT * FROM garmin_days WHERE user_id=$1 AND date=$2 LIMIT 1`,
+        [userId, tag.date],
+      );
+      const alt = (r.rows[0] ?? null) as Record<string, unknown> | null;
+      const altStand = ((alt?.feld_stand ?? {}) as Record<string, string>) || {};
+
+      const neu: Record<string, unknown> = {};
+      const standNeu: Record<string, string> = { ...altStand };
+
+      for (const feld of HEALTH_FELDER) {
+        const wert = tag.werte[feld];
+        if (wert == null || !Number.isFinite(wert)) continue;
+        const spalte = FELD_SPALTE[feld];
+        const altWert = alt?.[spalte];
+        const altZeit = altStand[feld] ? healthZeit(altStand[feld]) : null;
+
+        /* Alter Wert mit gleichem oder neuerem Stand bleibt stehen. */
+        if (altWert != null && altZeit && altZeit.getTime() >= tag.stand.getTime()) {
+          verworfen += 1;
+          continue;
+        }
+        neu[spalte] = wert;
+        standNeu[feld] = tag.stand.toISOString();
+        uebernommen += 1;
+      }
+
+      for (const [spalte, wert] of Object.entries(tag.nurGarmin ?? {})) {
+        if (wert == null) continue;
+        neu[spalte] = wert;
+      }
+
+      const spalten = Object.keys(neu);
+      if (!spalten.length) continue;
+
+      if (!alt) {
+        const cols = ["user_id", "date", "quelle", "feld_stand", ...spalten];
+        const vals: unknown[] = [
+          userId,
+          tag.date,
+          quelle,
+          JSON.stringify(standNeu),
+          ...spalten.map((s) => neu[s]),
+        ];
+        const ph = vals.map((_, i) => `$${i + 1}`).join(",");
+        await pool.query(
+          `INSERT INTO garmin_days (${cols.join(",")}) VALUES (${ph})`,
+          vals,
+        );
+      } else {
+        const sets = spalten.map((s, i) => `${s}=$${i + 1}`);
+        const vals: unknown[] = spalten.map((s) => neu[s]);
+        vals.push(quelle, JSON.stringify(standNeu));
+        const iq = vals.length - 1;
+        const ij = vals.length;
+        vals.push(userId, tag.date);
+        await pool.query(
+          `UPDATE garmin_days SET ${sets.join(", ")},
+                  quelle=$${iq}, feld_stand=$${ij}::jsonb, updated_at=NOW()
+            WHERE user_id=$${ij + 1} AND date=$${ij + 2}`,
+          vals,
+        );
+      }
+    }
+
+    return { uebernommen, verworfen };
+  };
+
+  const speichereLoginTage = async (userId: number, tage: LoginTag[]): Promise<void> => {
+    if (!tage.length) return;
+
+    for (const t of tage) {
+      /*
+       * Zeitpunkt, bis zu dem Garmin diesen Tag wirklich hat. Fehlt er,
+       * nehmen wir den aktuellen Abruf — dann gilt der Wert als frisch.
+       */
+      const stand = (t.datenBis ? healthZeit(t.datenBis) : null) ?? new Date();
+
+      await schreibeTageMitFrische(userId, "garmin", [
+        {
+          date: t.date,
+          stand,
+          werte: {
+            sleepSecs: t.sleepSecs,
+            deepSecs: t.deepSecs,
+            lightSecs: t.lightSecs,
+            remSecs: t.remSecs,
+            awakeSecs: t.awakeSecs,
+            restingHr: t.restingHr,
+            minHr: t.minHr,
+            maxHr: t.maxHr,
+            steps: t.steps,
+            distanceMeters: t.distanceMeters,
+            activeCalories: t.activeCalories,
+            totalCalories: t.totalCalories,
+            // Tagwerte bevorzugen, sonst auf den Nachtwert zurueckfallen.
+            spo2Avg: t.spo2Avg ?? t.spo2Night,
+            vo2max: t.vo2max,
+            weightKg: t.weightKg,
+            bodyFat: t.bodyFat,
+          },
+          nurGarmin: {
+            sleep_score: t.sleepScore ?? null,
+            sleep_quality:
+              t.sleepQuality != null ? (SCHLAF_QUALITAET[t.sleepQuality] ?? null) : null,
+            hrv: t.hrv ?? null,
+            hrv_status: t.hrvStatus ?? null,
+            floors: t.floors ?? null,
+            stress_avg: t.stressAvg ?? null,
+            stress_max: t.stressMax ?? null,
+            bb_min: t.bodyBatteryMin ?? null,
+            bb_max: t.bodyBatteryMax ?? null,
+            respiration: t.respiration ?? t.respirationNight ?? null,
+            fitness_age: t.fitnessAge != null ? Math.round(t.fitnessAge) : null,
+            sleep_stress: t.sleepStress ?? null,
+            sleep_hr: t.sleepHr ?? null,
+            spo2_night: t.spo2Night ?? null,
+            respiration_night: t.respirationNight ?? null,
+            readiness: t.readiness ?? null,
+            readiness_level: t.readinessLevel ?? null,
+            training_status: t.trainingStatus ?? null,
+            daten_bis: t.datenBis ?? null,
+          },
+        },
+      ]);
+    }
+  };
+
+  /**
+   * Tage aus der Personal API speichern.
+   *
+   * Läuft über dieselbe Frische-Logik wie der Login-Weg: Je Feld gewinnt der
+   * neuere Datenstand. Sonst würden zwei Garmin-Wege und das Handy
+   * gegeneinander schreiben und der zuletzt eintreffende — nicht der
+   * aktuellste — Wert bliebe stehen.
+   *
+   * Die Personal API nennt das Feld `floorsClimbed` (nicht `floors`) und hat
+   * keine Schlafphasen. Beides wird hier übersetzt.
+   */
   const speichereGarminTage = async (userId: number, tage: GarminCache["tage"]): Promise<void> => {
     if (!tage.length) return;
-    const werte: unknown[] = [];
-    const platzhalter: string[] = [];
-    let i = 0;
     for (const t of tage) {
-      i += 1;
-      const b = (i - 1) * 25;
-      platzhalter.push(
-        `($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5},$${b + 6},$${b + 7},$${b + 8},$${b + 9},$${b + 10},` +
-          `$${b + 11},$${b + 12},$${b + 13},$${b + 14},$${b + 15},$${b + 16},$${b + 17},$${b + 18},$${b + 19},` +
-          `$${b + 20},$${b + 21},$${b + 22},$${b + 23},$${b + 24},$${b + 25})`,
-      );
-      werte.push(
-        userId, t.date,
-        t.sleepSecs ?? null, t.sleepScore ?? null, t.sleepQuality ?? null,
-        t.hrv ?? null, t.hrvStatus ?? null,
-        t.restingHr ?? null, t.minHr ?? null, t.maxHr ?? null,
-        t.steps ?? null, t.floorsClimbed ?? null, t.distanceMeters ?? null,
-        t.activeCalories ?? null, t.totalCalories ?? null,
-        t.stressAvg ?? null, t.stressMax ?? null,
-        t.bodyBatteryMin ?? null, t.bodyBatteryMax ?? null,
-        t.spo2Avg ?? null, t.respiration ?? null,
-        t.vo2max ?? null,
-        // Fitnessalter kommt als Kommazahl, die Spalte ist INTEGER — runden.
-        t.fitnessAge != null ? Math.round(t.fitnessAge) : null,
-        t.weightKg ?? null, t.bodyFat ?? null,
-      );
+      const roh = t as unknown as Record<string, unknown>;
+      const datenBis = typeof roh.datenBis === "string" ? healthZeit(roh.datenBis) : null;
+      await schreibeTageMitFrische(userId, "garmin", [
+        {
+          date: t.date,
+          /* Ohne Zeitstempel von Garmin gilt der Abruf als Stand. */
+          stand: datenBis ?? new Date(),
+          werte: {
+            sleepSecs: t.sleepSecs,
+            restingHr: t.restingHr,
+            minHr: t.minHr,
+            maxHr: t.maxHr,
+            steps: t.steps,
+            distanceMeters: t.distanceMeters,
+            activeCalories: t.activeCalories,
+            totalCalories: t.totalCalories,
+            spo2Avg: t.spo2Avg,
+            vo2max: t.vo2max,
+            weightKg: t.weightKg,
+            bodyFat: t.bodyFat,
+          },
+          nurGarmin: {
+            sleep_score: t.sleepScore ?? null,
+            sleep_quality: t.sleepQuality ?? null,
+            hrv: t.hrv ?? null,
+            hrv_status: t.hrvStatus ?? null,
+            floors: t.floorsClimbed ?? null,
+            stress_avg: t.stressAvg ?? null,
+            stress_max: t.stressMax ?? null,
+            bb_min: t.bodyBatteryMin ?? null,
+            bb_max: t.bodyBatteryMax ?? null,
+            respiration: t.respiration ?? null,
+            fitness_age: t.fitnessAge != null ? Math.round(t.fitnessAge) : null,
+            daten_bis: typeof roh.datenBis === "string" ? roh.datenBis : null,
+          },
+        },
+      ]);
     }
-    await pool.query(
-      `INSERT INTO garmin_days (
-         user_id, date, sleep_secs, sleep_score, sleep_quality, hrv, hrv_status,
-         resting_hr, min_hr, max_hr, steps, floors, distance_m, active_kcal, total_kcal,
-         stress_avg, stress_max, bb_min, bb_max, spo2_avg, respiration, vo2max, fitness_age,
-         weight_kg, body_fat
-       ) VALUES ${platzhalter.join(",")}
-       ON CONFLICT (user_id, date) DO UPDATE SET
-         sleep_secs = COALESCE(EXCLUDED.sleep_secs, garmin_days.sleep_secs),
-         sleep_score = COALESCE(EXCLUDED.sleep_score, garmin_days.sleep_score),
-         sleep_quality = COALESCE(EXCLUDED.sleep_quality, garmin_days.sleep_quality),
-         hrv = COALESCE(EXCLUDED.hrv, garmin_days.hrv),
-         hrv_status = COALESCE(EXCLUDED.hrv_status, garmin_days.hrv_status),
-         resting_hr = COALESCE(EXCLUDED.resting_hr, garmin_days.resting_hr),
-         min_hr = COALESCE(EXCLUDED.min_hr, garmin_days.min_hr),
-         max_hr = COALESCE(EXCLUDED.max_hr, garmin_days.max_hr),
-         steps = COALESCE(EXCLUDED.steps, garmin_days.steps),
-         floors = COALESCE(EXCLUDED.floors, garmin_days.floors),
-         distance_m = COALESCE(EXCLUDED.distance_m, garmin_days.distance_m),
-         active_kcal = COALESCE(EXCLUDED.active_kcal, garmin_days.active_kcal),
-         total_kcal = COALESCE(EXCLUDED.total_kcal, garmin_days.total_kcal),
-         stress_avg = COALESCE(EXCLUDED.stress_avg, garmin_days.stress_avg),
-         stress_max = COALESCE(EXCLUDED.stress_max, garmin_days.stress_max),
-         bb_min = COALESCE(EXCLUDED.bb_min, garmin_days.bb_min),
-         bb_max = COALESCE(EXCLUDED.bb_max, garmin_days.bb_max),
-         spo2_avg = COALESCE(EXCLUDED.spo2_avg, garmin_days.spo2_avg),
-         respiration = COALESCE(EXCLUDED.respiration, garmin_days.respiration),
-         vo2max = COALESCE(EXCLUDED.vo2max, garmin_days.vo2max),
-         fitness_age = COALESCE(EXCLUDED.fitness_age, garmin_days.fitness_age),
-         weight_kg = COALESCE(EXCLUDED.weight_kg, garmin_days.weight_kg),
-         body_fat = COALESCE(EXCLUDED.body_fat, garmin_days.body_fat),
-         updated_at = NOW()`,
-      werte,
-    );
   };
 
   /**
@@ -7744,11 +7921,207 @@ ${JSON.stringify(userCtx, null, 2)}
   });
 
   /**
-   * Werte aus der App sofort nach Garmin schreiben.
+   * Handy-Health als zweite Quelle: Einstellungen und Webhook.
    *
-   * Getrennt vom Abgleich, damit ein frisch eingetragenes Gewicht nicht erst
-   * auf den naechsten 5-Minuten-Takt warten muss.
+   * Hintergrund: Garmin liefert einen Tag erst, wenn die Uhr hochgeladen hat —
+   * laut Geräteeinstellungen `autoSyncMinutesBeforeSync = 240`, also durchaus
+   * erst nach vier Stunden. Health Connect (Android) bzw. Apple Health (iOS)
+   * haben Schritte und Kalorien deutlich früher. Tim will deshalb beides, aber
+   * ohne Doppelzählung: je Feld gilt der aktuellere Stand.
+   *
+   * Die Oberfläche zeigt nur die Quelle, die zum Gerät passt — Android Health
+   * Connect, iPhone Apple Health, Desktop Garmin. Der Server entscheidet das
+   * nicht, er nimmt jede Nutzlast an, die den Schlüssel kennt.
    */
+
+  type HealthEinstellung = {
+    /** Zufälliger Schlüssel, den die Exporter-App als `?key=` mitschickt. */
+    token?: string;
+    /** Zuletzt bestätigte Quelle und Zeitpunkt. */
+    quelle?: string;
+    letzterEmpfang?: string;
+    aktiv?: boolean;
+  };
+
+  const leseHealthEinstellung = async (userId: number): Promise<HealthEinstellung> => {
+    const r = await pool.query("SELECT profile_extras FROM users WHERE id=$1", [userId]);
+    const extras = (r.rows[0]?.profile_extras || {}) as Record<string, unknown>;
+    return ((extras.health as HealthEinstellung) || {}) as HealthEinstellung;
+  };
+
+  const schreibeHealthEinstellung = async (
+    userId: number,
+    naechste: HealthEinstellung,
+  ): Promise<void> => {
+    await pool.query(
+      `UPDATE users
+          SET profile_extras = jsonb_set(
+                COALESCE(profile_extras,'{}'::jsonb), '{health}', $2::jsonb, true
+              ),
+              updated_at = NOW()
+        WHERE id=$1`,
+      [userId, JSON.stringify(naechste)],
+    );
+  };
+
+  app.get("/api/integrations/health", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const h = await leseHealthEinstellung(req.userId!);
+      const ereignisse = await pool.query(
+        `SELECT empfangen_am, quelle, tage, felder, unbekannt, fehler
+           FROM health_webhook_ereignisse WHERE user_id=$1
+          ORDER BY empfangen_am DESC LIMIT 5`,
+        [req.userId!],
+      );
+      /*
+       * Der Schlüssel wird nur zurückgegeben, wenn es schon einen gibt — sonst
+       * legt ihn `POST` an. So steht in der Oberfläche nie ein Schlüssel, der
+       * gar nicht gilt.
+       */
+      res.json({
+        verbunden: Boolean(h.token),
+        token: h.token ?? null,
+        letzterEmpfang: h.letzterEmpfang ?? null,
+        quelle: h.quelle ?? null,
+        aktiv: h.aktiv !== false,
+        ereignisse: ereignisse.rows,
+        felder: HEALTH_FELDER.map((f) => ({
+          feld: f,
+          label: HEALTH_FELD_LABEL[f],
+          /** Kann diese Größe überhaupt vom Handy kommen? */
+          vomHandy: true,
+        })),
+      });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "load failed" });
+    }
+  });
+
+  /** Schlüssel anlegen — oder neu erzeugen, wenn der alte abhandenkam. */
+  app.post("/api/integrations/health/token", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const h = await leseHealthEinstellung(req.userId!);
+      const neu = String(req.body?.neu ?? "") === "true" || !h.token;
+      const token = neu ? randomBytes(24).toString("hex") : h.token!;
+      const naechste: HealthEinstellung = { ...h, token, aktiv: true };
+      await schreibeHealthEinstellung(req.userId!, naechste);
+      res.json({ ok: true, token });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "token failed" });
+    }
+  });
+
+  /** Handy-Quelle abschalten — der Schlüssel bleibt, damit nichts neu muss. */
+  app.delete("/api/integrations/health", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const h = await leseHealthEinstellung(req.userId!);
+      await schreibeHealthEinstellung(req.userId!, { ...h, aktiv: false });
+      res.json({ ok: true });
+    } catch (err: unknown) {
+      res.status(500).json({ error: err instanceof Error ? err.message : "disconnect failed" });
+    }
+  });
+
+  /**
+   * Der Webhook selbst.
+   *
+   * Bewusst außerhalb von `requireAuth`: Die Exporter-App kann keinen
+   * Bearer-Token setzen, sondern nur eine URL aufrufen. Der zufällige
+   * Schlüssel steht deshalb in der URL (`?key=`), alternativ im Header
+   * `x-api-key`. Beides wird geprüft, ein Treffer genügt.
+   *
+   * Kein Rate-Limit pro IP: Unterwegs kommt der Upload über den Tunnel, da
+   * teilen sich alle Nutzer eine Adresse. Stattdessen zählt die Trefferquote
+   * des Schlüssels — er hat 48 Hex-Zeichen, ein Erraten ist praktisch aus.
+   */
+  app.post("/api/integrations/health/webhook", async (req, res) => {
+    const start = Date.now();
+    const key = String(
+      (req.query.key as string | undefined) ??
+        req.get("x-api-key") ??
+        (req.body as { key?: string })?.key ??
+        "",
+    ).trim();
+
+    if (!key) {
+      res.status(401).json({ error: "key fehlt" });
+      return;
+    }
+
+    try {
+      const r = await pool.query(
+        `SELECT id, profile_extras FROM users
+          WHERE profile_extras->'health'->>'token' = $1 LIMIT 1`,
+        [key],
+      );
+      if (!r.rows.length) {
+        res.status(401).json({ error: "key unbekannt" });
+        return;
+      }
+      const userId = Number(r.rows[0].id);
+      const extras = (r.rows[0].profile_extras || {}) as Record<string, unknown>;
+      const h = (extras.health || {}) as HealthEinstellung;
+      if (h.aktiv === false) {
+        res.status(403).json({ error: "Handy-Quelle ist abgeschaltet" });
+        return;
+      }
+
+      const geparst = parseHealthNutzlast(req.body);
+      const tage: SchreibTag[] = geparst.tage.map((t) => ({
+        date: t.date,
+        stand: t.stand,
+        werte: t.werte,
+      }));
+
+      const ergebnis = tage.length
+        ? await schreibeTageMitFrische(userId, geparst.quelle, tage)
+        : { uebernommen: 0, verworfen: 0 };
+
+      await pool.query(
+        `INSERT INTO health_webhook_ereignisse
+           (user_id, quelle, tage, felder, unbekannt)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [userId, geparst.quelle, tage.length, geparst.felder, geparst.unbekannt],
+      );
+      await schreibeHealthEinstellung(userId, {
+        ...h,
+        aktiv: true,
+        quelle: geparst.quelle,
+        letzterEmpfang: new Date().toISOString(),
+      });
+
+      /*
+       * Alte Ereignisse wegräumen: Die letzten 200 reichen für die Anzeige und
+       * die Fehlersuche, alles darüber ist Ballast.
+       */
+      void pool
+        .query(
+          `DELETE FROM health_webhook_ereignisse
+            WHERE user_id=$1 AND id NOT IN (
+              SELECT id FROM health_webhook_ereignisse
+               WHERE user_id=$1 ORDER BY empfangen_am DESC LIMIT 200
+            )`,
+          [userId],
+        )
+        .catch(() => undefined);
+
+      res.json({
+        ok: true,
+        quelle: geparst.quelle,
+        tage: tage.length,
+        uebernommen: ergebnis.uebernommen,
+        verworfen: ergebnis.verworfen,
+        felder: geparst.felder,
+        unbekannt: geparst.unbekannt,
+        ms: Date.now() - start,
+      });
+    } catch (err: unknown) {
+      const text = err instanceof Error ? err.message : "webhook failed";
+      res.status(500).json({ error: text });
+    }
+  });
+
+
   app.post("/api/integrations/garmin/schreiben", requireAuth, async (req: AuthRequest, res) => {
     try {
       const ergebnis = await schreibeNachGarmin(req.userId!);
@@ -9829,6 +10202,17 @@ function berlinTeile(d: Date = new Date()): { stunde: number; minute: number; hh
 
   const PORT = parseInt(process.env.PORT || "3000");
   await initDb();
+  /*
+   * Bestandszeilen ohne Frische-Marker nachziehen, bevor der Server Anfragen
+   * annimmt. Sonst könnte der erste Handy-Upload einen alten Wert über
+   * vorhandene Garmin-Zahlen schreiben. Ein Fehler hier darf den Start nicht
+   * verhindern — die App läuft auch ohne Marker, nur eben ohne Vorrangschutz.
+   */
+  try {
+    await migriereFeldStand();
+  } catch (e) {
+    console.warn("[health] Nachziehen der Feld-Marker fehlgeschlagen:", e);
+  }
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`🚀 VRTX server → http://localhost:${PORT}`);
     console.log(`🔐 Admin panel → http://localhost:${PORT}/admin`);

@@ -21,6 +21,7 @@ import MealplannerConnect from './MealplannerConnect';
 import GarminConnect from './GarminConnect';
 import SyncKarte from './SyncKarte';
 import GarminLogin from './GarminLogin';
+import HandyHealthKarte from './HandyHealthKarte';
 import { Card, PageHeader } from '@/src/simple/ui';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
@@ -840,6 +841,12 @@ export default function ProfilePage() {
             {/* Zweiter Weg zur Uhr: kein Tageslimit, alle Schlafwerte. */}
             <GarminLogin />
             <IntervalsConnect />
+            {/*
+              Handy-Health: zeigt sich nur auf dem Handy und dort nur mit der
+              Plattform, die es gibt (Android → Health Connect, iPhone → Apple
+              Health). Am Rechner steht stattdessen ein Hinweis.
+            */}
+            <HandyHealthKarte />
           </Gruppe>
 
           <Gruppe titel="Benachrichtigungen" hinweis="Wie du erinnert wirst">
