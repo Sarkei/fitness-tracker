@@ -197,6 +197,7 @@ import {
 import type { BatchMigrationResult } from "./src/lib/server/migrateUserData";
 import { pushoverRouter } from "./src/lib/server/pushover-route.ts";
 import { pushRouter, sendePushAnNutzer, sendeEreignis } from "./server/push-route";
+import { benachrichtige, benachrichtigungsRouter } from "./server/benachrichtigungen";
 const { Pool } = pg;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1069,6 +1070,13 @@ async function startServer(): Promise<void> {
     "/api/push",
     requireAuth,
     pushRouter(pool as never, (req: Request) => (req as AuthRequest).userId ?? null, "Fitness-Tracker"),
+  );
+
+  /* Kategorien, Ruhezeit und Verlauf — Einstellungen → Benachrichtigungen. */
+  app.use(
+    "/api/benachrichtigungen",
+    requireAuth,
+    benachrichtigungsRouter(pool as never, (req: Request) => (req as AuthRequest).userId ?? null),
   );
 
   // ── Health ────────────────────────────────────────────────────────────────
@@ -8600,6 +8608,12 @@ function berlinTeile(d: Date = new Date()): { stunde: number; minute: number; hh
 }
 
   let erinnerungLaeuft = false;
+
+  /** Versand an einen Nutzer in der Form, die `benachrichtige` erwartet. */
+  const sendeAn =
+    (nutzerId: number | string | null) =>
+    (n: { titel: string; text: string; url?: string; tag?: string; dringend?: boolean }) =>
+      sendePushAnNutzer(pool, nutzerId, n);
   const erinnerungTick = async () => {
     if (erinnerungLaeuft) return;
     const jetzt = new Date();
@@ -8672,11 +8686,15 @@ function berlinTeile(d: Date = new Date()): { stunde: number; minute: number; hh
           );
           if (schon.rowCount) continue;
 
-          await sendePushAnNutzer(pool, k.user_id, {
+          await benachrichtige(pool as never, sendeAn(k.user_id), k.user_id, {
+            kategorie: "training",
+            ereignis: "training-ausstehend",
+            schluessel: heute,
             titel: "Training steht noch aus",
             text: "Für heute ist eine Einheit geplant. Noch ist Zeit.",
             url: "https://fitness.nas-timgreen.com/",
             tag: "training-erinnerung",
+            rhythmus: "abend",
           });
 
           await pool.query(
@@ -8725,7 +8743,7 @@ function berlinTeile(d: Date = new Date()): { stunde: number; minute: number; hh
           };
 
           /* ---- 1. Morgenbericht: Schlaf der letzten Nacht ---- */
-          if (stunde >= 6 && stunde <= 11) {
+          if (stunde >= 6 && stunde <= 9) {
             const g = await pool.query(
               `SELECT sleep_secs, sleep_score, hrv, resting_hr, hrv_status
                  FROM garmin_days WHERE user_id = $1 AND date = $2 LIMIT 1`,
@@ -8784,11 +8802,15 @@ function berlinTeile(d: Date = new Date()): { stunde: number; minute: number; hh
                 if (hrv != null) teile.push(`HRV ${hrv} ms`);
                 if (ruhe != null) teile.push(`Ruhepuls ${ruhe}`);
 
-                await sendeEreignis(pool, u.id, "morgenbericht", heute, {
+                await benachrichtige(pool as never, sendeAn(u.id), u.id, {
+                  kategorie: "tagesstart",
+                  ereignis: "morgenbericht",
+                  schluessel: heute,
                   titel: "Deine Nacht",
                   text: [teile.join(" · ") + ".", urteil, planText].filter(Boolean).join(" "),
                   url: "https://fitness.nas-timgreen.com/",
                   tag: "morgenbericht",
+                  rhythmus: "morgen",
                 });
               }
             }
@@ -8808,7 +8830,10 @@ function berlinTeile(d: Date = new Date()): { stunde: number; minute: number; hh
 
             // Start des Fastens
             if (vergangen >= 0 && vergangen <= 15) {
-              await sendeEreignis(pool, u.id, "fasten-start", heute, {
+              await benachrichtige(pool as never, sendeAn(u.id), u.id, {
+                kategorie: "ernaehrung",
+                ereignis: "fasten-start",
+                schluessel: heute,
                 titel: "Fasten beginnt",
                 text: `${f.label ?? `${f.fastHours}:${f.eatHours}`} läuft — nächste Mahlzeit ab ${endeZeit(startMin + fastMin)}.`,
                 url: "https://fitness.nas-timgreen.com/",
@@ -8818,7 +8843,10 @@ function berlinTeile(d: Date = new Date()): { stunde: number; minute: number; hh
             // Halbzeit
             const halb = Math.floor(fastMin / 2);
             if (vergangen >= halb && vergangen <= halb + 15) {
-              await sendeEreignis(pool, u.id, "fasten-halbzeit", heute, {
+              await benachrichtige(pool as never, sendeAn(u.id), u.id, {
+                kategorie: "ernaehrung",
+                ereignis: "fasten-halbzeit",
+                schluessel: heute,
                 titel: "Halbzeit beim Fasten",
                 text: `Die Hälfte ist geschafft — noch ${Math.round((fastMin - vergangen) / 60)} Stunden bis zum Essen.`,
                 url: "https://fitness.nas-timgreen.com/",
@@ -8827,7 +8855,10 @@ function berlinTeile(d: Date = new Date()): { stunde: number; minute: number; hh
             }
             // Eine Stunde vor Ende
             if (vergangen >= fastMin - 60 && vergangen <= fastMin - 45) {
-              await sendeEreignis(pool, u.id, "fasten-bald", heute, {
+              await benachrichtige(pool as never, sendeAn(u.id), u.id, {
+                kategorie: "ernaehrung",
+                ereignis: "fasten-bald",
+                schluessel: heute,
                 titel: "Eine Stunde noch",
                 text: `Dein Essensfenster öffnet um ${endeZeit(startMin + fastMin)}.`,
                 url: "https://fitness.nas-timgreen.com/",
@@ -8859,13 +8890,215 @@ function berlinTeile(d: Date = new Date()): { stunde: number; minute: number; hh
               const tag = plan.find((d) => d.day === wochentag);
               if (tag && !tag.isRest) {
                 const anzahl = Array.isArray(tag.exercises) ? tag.exercises.length : null;
-                await sendeEreignis(pool, u.id, "training-heute", heute, {
+                await benachrichtige(pool as never, sendeAn(u.id), u.id, {
+                  kategorie: "training",
+                  ereignis: "training-heute",
+                  schluessel: heute,
                   titel: "Dein Training heute",
                   text: `${tag.title ?? tag.label ?? "Einheit"}${anzahl ? ` · ${anzahl} Übungen` : ""}. Du schaffst das.`,
                   url: "https://fitness.nas-timgreen.com/",
                   tag: "training",
+                  rhythmus: "morgen",
                 });
               }
+            }
+          }
+          /* ---- 4. Ernährungsstand am Nachmittag -------------------------- */
+          /*
+           * Bisher erfuhr Tim nur etwas, wenn eine Mahlzeit erfasst wurde —
+           * nie, wie weit er am Tag steht. Diese Meldung schließt das Fenster
+           * um 15 Uhr und nennt Kalorien, Eiweiß und was noch übrig ist.
+           */
+          if (stunde === 15) {
+            const g = goals as { dailyCalories?: number; protein?: number };
+            const heuteWerte = await pool.query<{ kcal: string; protein: string; mahlzeiten: string }>(
+              `SELECT COALESCE(SUM(calories),0)::text AS kcal,
+                      COALESCE(SUM(protein),0)::text AS protein,
+                      COUNT(*)::text AS mahlzeiten
+                 FROM nutrition WHERE user_id = $1 AND date = $2`,
+              [u.id, heute],
+            );
+            const w = heuteWerte.rows[0];
+            const kcal = Math.round(Number(w?.kcal ?? 0));
+            const prot = Math.round(Number(w?.protein ?? 0));
+            const zielKcal = g.dailyCalories ?? null;
+            const zielProt = g.protein ?? null;
+            if (kcal > 0 || prot > 0) {
+              const teile: string[] = [`${kcal} kcal`];
+              if (zielKcal) teile.push(`noch ${Math.max(zielKcal - kcal, 0)} von ${zielKcal}`);
+              teile.push(`${prot} g Eiweiß`);
+              if (zielProt) teile.push(`noch ${Math.max(zielProt - prot, 0)} g`);
+              await benachrichtige(pool as never, sendeAn(u.id), u.id, {
+                kategorie: "ernaehrung",
+                ereignis: "ernaehrung-nachmittag",
+                schluessel: heute,
+                titel: "Dein Stand heute",
+                text: `${teile.join(" · ")}. ${Number(w?.mahlzeiten ?? 0)} Mahlzeiten erfasst.`,
+                url: "https://fitness.nas-timgreen.com/#/nutrition",
+                tag: "ernaehrung-stand",
+                rhythmus: "mittag",
+              });
+            }
+          }
+
+          /* ---- 5. Auffälliger Schlaf und Erholung ----------------------- */
+          /*
+           * Der Morgenbericht sagt, wie es war. Diese Meldung kommt nur, wenn
+           * zwei Werte zugleich aus dem eigenen Rahmen fallen — sonst wäre sie
+           * Rauschen. Eigene Kategorie, damit sie getrennt schaltbar ist.
+           */
+          if (stunde >= 6 && stunde <= 10) {
+            const g = await pool.query(
+              `SELECT sleep_secs, sleep_score, hrv, resting_hr FROM garmin_days
+                WHERE user_id = $1 AND date = $2 LIMIT 1`,
+              [u.id, heute],
+            );
+            const r = g.rows[0] as Record<string, unknown> | undefined;
+            const score = r?.sleep_score ? Number(r.sleep_score) : null;
+            const std = r?.sleep_secs ? Math.round((Number(r.sleep_secs) / 3600) * 10) / 10 : null;
+            const hrv = r?.hrv ? Math.round(Number(r.hrv)) : null;
+            const ruhe = r?.resting_hr ? Number(r.resting_hr) : null;
+
+            const schnitt = await pool.query<{ hrv: string | null; ruhe: string | null }>(
+              `SELECT AVG(hrv)::text AS hrv, AVG(resting_hr)::text AS ruhe
+                 FROM garmin_days
+                WHERE user_id = $1 AND date < $2 AND date >= $2::date - INTERVAL '14 days'
+                  AND (hrv IS NOT NULL OR resting_hr IS NOT NULL)`,
+              [u.id, heute],
+            );
+            const hrvSchnitt = schnitt.rows[0]?.hrv ? Number(schnitt.rows[0].hrv) : null;
+            const ruheSchnitt = schnitt.rows[0]?.ruhe ? Number(schnitt.rows[0].ruhe) : null;
+
+            const gruende: string[] = [];
+            if (std != null && std < 6) gruende.push(`nur ${String(std).replace(".", ",")} Stunden Schlaf`);
+            if (score != null && score < 50) gruende.push(`Schlafscore ${score}`);
+            if (hrv != null && hrvSchnitt != null && hrv < hrvSchnitt * 0.85) {
+              gruende.push(`HRV ${hrv} ms (Schnitt ${Math.round(hrvSchnitt)})`);
+            }
+            if (ruhe != null && ruheSchnitt != null && ruhe > ruheSchnitt + 5) {
+              gruende.push(`Ruhepuls ${ruhe} (Schnitt ${Math.round(ruheSchnitt)})`);
+            }
+
+            if (gruende.length >= 2) {
+              await benachrichtige(pool as never, sendeAn(u.id), u.id, {
+                kategorie: "gesundheit",
+                ereignis: "gesundheit-auffaellig",
+                schluessel: heute,
+                titel: "Heute lieber ruhiger",
+                text: `${gruende.join(", ")}. Ein lockerer Tag bringt mehr als ein harter.`,
+                url: "https://fitness.nas-timgreen.com/#/wellness",
+                tag: "gesundheit",
+                rhythmus: "morgen",
+              });
+            }
+          }
+
+          /* ---- 6. Abendrückblick ---------------------------------------- */
+          /*
+           * Tagesbilanz um 20 Uhr: was gegessen, was verbraucht, was trainiert.
+           * Genau das, was Tim abends wissen will, ohne die App zu öffnen.
+           */
+          if (stunde === 20) {
+            const [ess, verbrannt, einheiten] = await Promise.all([
+              pool.query<{ kcal: string; protein: string }>(
+                `SELECT COALESCE(SUM(calories),0)::text AS kcal, COALESCE(SUM(protein),0)::text AS protein
+                   FROM nutrition WHERE user_id = $1 AND date = $2`,
+                [u.id, heute],
+              ),
+              pool.query<{ kcal: string; n: string }>(
+                `SELECT COALESCE(SUM(calories_burned),0)::text AS kcal, COUNT(*)::text AS n
+                   FROM workouts WHERE user_id = $1 AND date = $2`,
+                [u.id, heute],
+              ),
+              pool.query<{ n: string }>(
+                `SELECT COUNT(*)::text AS n FROM garmin_activities WHERE user_id = $1 AND date = $2`,
+                [u.id, heute],
+              ),
+            ]);
+            const gegessen = Math.round(Number(ess.rows[0]?.kcal ?? 0));
+            const prot = Math.round(Number(ess.rows[0]?.protein ?? 0));
+            const verbraucht = Math.round(Number(verbrannt.rows[0]?.kcal ?? 0));
+            const anzahlEinheiten = Number(verbrannt.rows[0]?.n ?? 0) + Number(einheiten.rows[0]?.n ?? 0);
+            const zielKcal = (goals as { dailyCalories?: number }).dailyCalories ?? null;
+
+            if (gegessen > 0 || anzahlEinheiten > 0) {
+              const teile: string[] = [`${gegessen} kcal gegessen`];
+              if (verbraucht > 0) teile.push(`${verbraucht} kcal verbrannt`);
+              if (prot > 0) teile.push(`${prot} g Eiweiß`);
+              if (zielKcal) {
+                const rest = zielKcal - gegessen;
+                teile.push(rest >= 0 ? `${rest} kcal übrig` : `${Math.abs(rest)} kcal drüber`);
+              }
+              const bilanz = zielKcal ? gegessen - zielKcal : null;
+              const urteil =
+                bilanz == null ? "" :
+                bilanz > 300 ? "Damit liegst du deutlich über dem Ziel." :
+                bilanz > 0 ? "Knapp über dem Ziel — morgen wieder ausgleichen." :
+                "Im Ziel — gut gelaufen.";
+
+              await benachrichtige(pool as never, sendeAn(u.id), u.id, {
+                kategorie: "rueckblick",
+                ereignis: "abendrueckblick",
+                schluessel: heute,
+                titel: anzahlEinheiten > 0 ? "Dein Tag — mit Training" : "Dein Tag",
+                text: [teile.join(" · ") + ".", anzahlEinheiten > 0 ? `${anzahlEinheiten} Einheit${anzahlEinheiten > 1 ? "en" : ""} absolviert.` : "Kein Training heute.", urteil]
+                  .filter(Boolean)
+                  .join(" "),
+                url: "https://fitness.nas-timgreen.com/",
+                tag: "abendrueckblick",
+                rhythmus: "abend",
+              });
+            }
+          }
+
+          /* ---- 7. Wochenrückblick am Sonntag ---------------------------- */
+          /*
+           * Sonntags 18 Uhr: die Woche in Zahlen. Genau der Punkt, an dem Tim
+           * sonst selbst zusammenzählt, wie oft er trainiert hat.
+           */
+          if (wochentag === "Sunday" && stunde === 18) {
+            const woche = await pool.query<{
+              einheiten: string;
+              kcal_schnitt: string;
+              schlaf_schnitt: string;
+            }>(
+              `SELECT (SELECT COUNT(*)::text FROM workouts w
+                        WHERE w.user_id = $1 AND w.date >= $2::date - INTERVAL '6 days') AS einheiten,
+                      (SELECT COALESCE(ROUND(AVG(t.kcal)),0)::text FROM (
+                         SELECT SUM(calories) AS kcal FROM nutrition
+                          WHERE user_id = $1 AND date >= $2::date - INTERVAL '6 days'
+                          GROUP BY date) t) AS kcal_schnitt,
+                      (SELECT COALESCE(ROUND(AVG(sleep_secs/3600.0)*10)/10,0)::text FROM garmin_days
+                        WHERE user_id = $1 AND date >= $2::date - INTERVAL '6 days'
+                          AND sleep_secs IS NOT NULL) AS schlaf_schnitt`,
+              [u.id, heute],
+            );
+            const w = woche.rows[0];
+            const einheiten = Number(w?.einheiten ?? 0);
+            const kcalSchnitt = Number(w?.kcal_schnitt ?? 0);
+            const schlaf = Number(w?.schlaf_schnitt ?? 0);
+
+            if (einheiten > 0 || kcalSchnitt > 0) {
+              const teile: string[] = [];
+              if (einheiten > 0) teile.push(`${einheiten} Einheit${einheiten > 1 ? "en" : ""}`);
+              if (kcalSchnitt > 0) teile.push(`Ø ${kcalSchnitt} kcal`);
+              if (schlaf > 0) teile.push(`Ø ${String(schlaf).replace(".", ",")} h Schlaf`);
+              const ziel = (goals as { trainingDaysPerWeek?: number }).trainingDaysPerWeek ?? null;
+              const urteil =
+                ziel == null ? "" :
+                einheiten >= ziel ? `${einheiten} von ${ziel} geplanten Tagen — Woche erfüllt.` :
+                `${einheiten} von ${ziel} geplanten Tagen.`;
+
+              await benachrichtige(pool as never, sendeAn(u.id), u.id, {
+                kategorie: "rueckblick",
+                ereignis: "wochenrueckblick",
+                schluessel: heute,
+                titel: "Deine Woche",
+                text: [teile.join(" · ") + ".", urteil].filter(Boolean).join(" "),
+                url: "https://fitness.nas-timgreen.com/#/stats",
+                tag: "wochenrueckblick",
+                rhythmus: "abend",
+              });
             }
           }
         } catch (e) {
