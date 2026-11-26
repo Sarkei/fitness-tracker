@@ -1,3 +1,8 @@
+/* === FARBEN AUS DEM KIT (knowledge/design-system/kit) === */
+@import './design/farben.css';
+/* Farben kommen ab hier aus knowledge/design-system/kit/paletten.json.
+   Das Gerüst (geruest.css) bleibt bewusst draußen — diese App hat eigene Komponenten. */
+
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
@@ -47,34 +52,14 @@
 /* Light mode (default) */
 :root {
   /* Flächen: neutrales Grau, kein Blau-, kein Creme-Stich */
-  --bg: #f3f5f4;
-  --surface: #ffffff;
-  --surface-2: #eaeeec;
-  --surface-3: #e1e6e3;
 
   /* Text */
-  --ink: #121a16;
-  --muted: #55635c;
-  --placeholder: #8a978f;
 
   /* Linien */
-  --line: #dde3df;
-  --line-strong: #c6cfc9;
 
   /* Akzent: Grün */
-  --accent: #2f7d5a;
-  --accent-hover: #276a4b;
-  --accent-soft: #e6f1eb;
-  --accent-ink: #123a28;
-  --on-accent: #ffffff;
 
   /* Status */
-  --danger: #b4453a;
-  --danger-soft: #fbecea;
-  --warn: #8a5410;
-  --warn-soft: #f8eede;
-  --success: #2f7d5a;
-  --success-soft: #e6f1eb;
 
   /* Form — eigener Namensraum, die Tailwind-Radius-Skala bleibt unangetastet */
   --ds-radius-sm: 8px;
@@ -87,14 +72,9 @@
   color-scheme: light;
 
   /* Alte App-Variablen → neue Tokens (Bestandsklassen laufen weiter) */
-  --background: var(--bg);
-  --foreground: var(--ink);
   --text-primary: var(--ink);
-  --card-bg: var(--surface);
   --border-muted: var(--line);
-  --text-muted: var(--muted);
   --text-placeholder: var(--placeholder);
-  --brand: var(--accent);
   --text-success: var(--success);
 
   /* Vereinfachte Oberfläche */
@@ -110,30 +90,10 @@
 /* Dark mode */
 [data-theme='dark'],
 .dark {
-  --bg: #101312;
-  --surface: #16211c;
-  --surface-2: #1b1e1d;
-  --surface-3: #242625;
 
-  --ink: #e9edeb;
-  --muted: #a4aaa7;
-  --placeholder: #7b807d;
 
-  --line: #2b2f2d;
-  --line-strong: #383c3a;
 
-  --accent: #4fbf8b;
-  --accent-hover: #63cf9b;
-  --accent-soft: rgb(79 191 139 / 0.14);
-  --accent-ink: #b9e8d0;
-  --on-accent: #08150f;
 
-  --danger: #f08a7a;
-  --danger-soft: rgb(240 138 122 / 0.14);
-  --warn: #e8b25f;
-  --warn-soft: rgb(232 178 95 / 0.14);
-  --success: #4fbf8b;
-  --success-soft: rgb(79 191 139 / 0.14);
 
   --ds-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
   --ds-shadow: 0 1px 2px rgb(0 0 0 / 0.35), 0 12px 32px -24px rgb(0 0 0 / 0.9);
@@ -141,14 +101,9 @@
   color-scheme: dark;
 
   /* Alias-Mapping im Dark-Mode erneut auflösen */
-  --background: var(--bg);
-  --foreground: var(--ink);
   --text-primary: var(--ink);
-  --card-bg: var(--surface);
   --border-muted: var(--line);
-  --text-muted: var(--muted);
   --text-placeholder: var(--placeholder);
-  --brand: var(--accent);
   --text-success: var(--success);
 
   --simple-accent: var(--accent);
@@ -471,26 +426,8 @@ body {
 /* Admin-Panel: immer Light Mode (unabhängig von .dark auf html) */
 .admin-page {
   color-scheme: light;
-  --bg: #f3f5f4;
-  --surface: #ffffff;
-  --surface-2: #eaeeec;
-  --surface-3: #e1e6e3;
-  --ink: #121a16;
-  --muted: #55635c;
-  --placeholder: #8a978f;
-  --line: #dde3df;
-  --line-strong: #c6cfc9;
-  --accent: #2f7d5a;
-  --accent-hover: #276a4b;
-  --accent-soft: #e6f1eb;
-  --accent-ink: #123a28;
-  --on-accent: #ffffff;
-  --background: var(--bg);
-  --foreground: var(--ink);
   --text-primary: var(--ink);
-  --card-bg: var(--surface);
   --border-muted: var(--line);
-  --text-muted: var(--muted);
   --text-placeholder: var(--placeholder);
   background-color: var(--bg);
   color: var(--ink);
