@@ -161,7 +161,7 @@ export default function HandyHealthKarte() {
       : null;
 
   const istAndroid = geraet === 'android';
-  const appName = istAndroid ? 'HC Webhook' : 'Health Auto Export';
+  const appName = istAndroid ? 'Life Dashboard' : 'Health Auto Export';
   const plattform = istAndroid ? 'Health Connect' : 'Apple Health';
 
   const kopieren = async () => {
@@ -201,6 +201,11 @@ export default function HandyHealthKarte() {
         Sind Garmin und {plattform} beide verbunden, gilt je Wert immer der
         aktuellere Stand.
       </p>
+      {istAndroid && (
+        <p className="mt-1 text-[10px] leading-relaxed text-[var(--text-muted)] opacity-80">
+          Kostenlos über F-Droid oder GitHub — nicht im Play Store kaufen.
+        </p>
+      )}
 
       {laedt ? (
         <div className="mt-2 flex items-center gap-2 text-[10.5px] text-[var(--text-muted)]">
@@ -254,19 +259,25 @@ export default function HandyHealthKarte() {
                 {istAndroid ? (
                   <>
                     <li>
-                      Im Play Store <strong>{appName}</strong> installieren, öffnen und die
-                      Berechtigungen für Health Connect erteilen.
+                      <strong>Life Dashboard</strong> installieren — kostenlos über F-Droid
+                      (f-droid.org), GitHub Releases oder Obtainium. Die Play-Store-Version
+                      kostet 5 € für denselben Code; zahl sie nicht, wenn du sie nicht brauchst.
                     </li>
-                    <li>Webhook anlegen und die Adresse von oben als URL eintragen.</li>
+                    <li>App öffnen, Health Connect freigeben und die Adresse von oben als
+                      Webhook-Ziel eintragen.
+                    </li>
                     <li>
-                      Als Datenarten Schritte, Kalorien (aktiv und gesamt), Herzfrequenz,
-                      Ruhepuls, Schlaf, Gewicht, Körperfett und Sauerstoffsättigung wählen.
+                      Unter „What to send" Schritte, Distanz, Kalorien, Herzfrequenz,
+                      Ruhepuls, Schlaf, Gewicht, Körperfett, Sauerstoffsättigung und VO₂max
+                      einschalten. „Daily totals" eingeschaltet lassen — damit zählt ein
+                      Spaziergang, den Handy und Uhr beide sehen, nur einmal.
                     </li>
                     <li>
                       Sync-Intervall auf 15 oder 30 Minuten stellen — dann kommen die Werte
                       deutlich früher als über die Uhr.
                     </li>
-                    <li>Einmal „Test" antippen; hier muss „verbunden" erscheinen.</li>
+                    <li>„Send test" antippen; hier muss „Schlüssel und Adresse stimmen"
+                      erscheinen.</li>
                   </>
                 ) : (
                   <>
@@ -301,10 +312,14 @@ export default function HandyHealthKarte() {
           {status.ereignisse.length > 0 && (
             <div className="mt-2 space-y-1">
               {status.ereignisse.slice(0, 3).map((e, i) => (
-                <p key={`${e.empfangen_am}-${i}`} className="text-[9.5px] text-[var(--text-muted)]">
+                <p
+                  key={`${e.empfangen_am}-${i}`}
+                  className={`text-[9.5px] ${e.fehler ? 'text-[#e06c75]' : 'text-[var(--text-muted)]'}`}
+                >
                   {seit(e.empfangen_am)}: {e.tage} {e.tage === 1 ? 'Tag' : 'Tage'},{' '}
                   {e.felder.length} {e.felder.length === 1 ? 'Feld' : 'Felder'} übernommen
-                  {e.unbekannt.length > 0 && `, ${e.unbekannt.length} unbekannt`}
+                  {e.unbekannt.length > 0 && `, ${e.unbekannt.join(', ')} unbekannt`}
+                  {e.fehler && ` — Fehler: ${e.fehler}`}
                 </p>
               ))}
             </div>

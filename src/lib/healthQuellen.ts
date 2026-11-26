@@ -220,6 +220,27 @@ class Sammler {
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
   }
+
+  /**
+   * Einen kompletten Tag setzen — für Quellen, die Tageswerte schon fertig
+   * liefern (`daily_totals` von Health Connect).
+   *
+   * Hier wird **nicht** summiert, sondern ersetzt: Der Wert gilt für den ganzen
+   * Tag. Zuvor gesammelte Roh-Records desselben Tages werden verworfen, sonst
+   * käme der Wert doppelt heraus.
+   */
+  setzeTag(date: string, stand: Date, werte: Partial<Record<HealthFeld, number | undefined>>): void {
+    let eintrag = this.tage.get(date);
+    if (!eintrag) {
+      eintrag = { stand, werte: new Map() };
+      this.tage.set(date, eintrag);
+    }
+    if (stand > eintrag.stand) eintrag.stand = stand;
+    for (const [feld, wert] of Object.entries(werte) as [HealthFeld, number | undefined][]) {
+      if (wert == null || !Number.isFinite(wert)) continue;
+      eintrag.werte.set(feld, wert);
+    }
+  }
 }
 
 export type ParseErgebnis = {
@@ -229,7 +250,38 @@ export type ParseErgebnis = {
   felder: HealthFeld[];
   /** Schlüssel der Nutzlast, die nicht zugeordnet werden konnten (Diagnose). */
   unbekannt: string[];
+  /**
+   * Bekannte Health-Connect-Typen, für die die App keine Spalte hat
+   * (Wasser, Blutdruck, Zyklus …). Kein Fehler — aber sichtbar.
+   */
+  nichtGespeichert?: string[];
+  /**
+   * Test-Ping der Exporter-App: prüft nur Adresse und Schlüssel, enthält keine
+   * Daten. Der Empfänger antwortet „ok", speichert aber nichts.
+   */
+  test?: boolean;
 };
+
+/**
+ * Alle Datentypen, die Health Connect kennt (Stand Android 14/15).
+ *
+ * Dient nur der Unterscheidung „bekannter Typ, den wir nicht speichern" von
+ * „unbekannter Schlüssel, also anderes Format". Wird nicht geparst.
+ */
+const HEALTH_CONNECT_TYPEN = new Set([
+  "steps", "distance", "speed", "active_calories", "total_calories",
+  "floors_climbed", "elevation_gained", "exercise", "wheelchair_pushes",
+  "power", "cadence", "activity_intensity",
+  "heart_rate", "resting_heart_rate", "heart_rate_variability",
+  "oxygen_saturation", "respiratory_rate", "body_temperature", "skin_temperature",
+  "basal_body_temperature", "blood_pressure", "blood_glucose",
+  "weight", "height", "body_fat", "lean_body_mass", "bone_mass",
+  "body_water_mass", "basal_metabolic_rate", "vo2_max",
+  "sleep", "hydration", "nutrition", "mindfulness",
+  "menstruation_period", "menstruation_flow", "intermenstrual_bleeding",
+  "ovulation_test", "cervical_mucus", "sexual_activity",
+  "systolic", "diastolic",
+]);
 
 /**
  * Health Connect (Android).
@@ -237,6 +289,24 @@ export type ParseErgebnis = {
  * Aufbau laut „HC Webhook"-Schema: ein Objekt mit `timestamp` und je Datentyp
  * ein snake_case-Array. Zeitintervalle haben `start_time`/`end_time`,
  * Einzelwerte einen Zeitpunkt. Wir mitteln/summieren auf den Kalendertag.
+ */
+/**
+ * Health Connect (Android).
+ *
+ * Versteht zwei Erzeuger-Formate:
+ *
+ * 1. „HC Webhook" (mcnaveen): snake_case-Arrays mit `count`/`calories`/`meters`,
+ *    Schlaf mit `duration` in Sekunden.
+ * 2. „Life Dashboard Companion" (owen282000, MIT, kostenlos über F-Droid):
+ *    gleiche Arrays, aber Schlaf mit `duration_seconds`, VO₂max als
+ *    `vo2_ml_per_min_per_kg`, dazu Aggregate mit `bucket_start`/`total` bzw.
+ *    `avg`/`min`/`max` — und **`daily_totals`**, die Health Connect selbst
+ *    dedupliziert hat.
+ *
+ * `daily_totals` hat Vorrang für Schritte, Distanz und Kalorien: Health Connect
+ * rechnet dort überlappende Quellen zusammen, sodass ein Spaziergang, den
+ * Telefon und Uhr beide aufgezeichnet haben, nur einmal zählt. Würde man
+ * zusätzlich die Roh-Records summieren, käme der doppelte Wert heraus.
  */
 export function parseHealthConnect(json: unknown): ParseErgebnis {
   const root = objekt(json);
@@ -248,59 +318,88 @@ export function parseHealthConnect(json: unknown): ParseErgebnis {
 
   /** Zeitintervall eines Datensatzes: Ende ist der maßgebliche Zeitpunkt. */
   const intervall = (e: Record<string, unknown>): { start: Date; ende: Date } | null => {
-    const ende = zeit(e.end_time) ?? zeit(e.endTime) ?? zeit(e.time) ?? zeit(e.date);
-    const start = zeit(e.start_time) ?? zeit(e.startTime) ?? ende;
+    const ende =
+      zeit(e.end_time) ?? zeit(e.endTime) ?? zeit(e.bucket_end) ??
+      zeit(e.time) ?? zeit(e.date) ?? null;
+    const start = zeit(e.start_time) ?? zeit(e.startTime) ?? zeit(e.bucket_start) ?? ende;
     if (!ende) return null;
     return { start: start ?? ende, ende };
   };
 
   const markiere = (feld: HealthFeld) => gesehen.add(feld);
 
+  /*
+   * ── Tageswerte aus Health Connect (dedupliziert) ──
+   *
+   * Vorrang vor den Roh-Records. Der Stand ist der Zeitpunkt der Nutzlast:
+   * `daily_totals` ist für den heutigen Tag ein laufender Gesamtwert, für
+   * vergangene Tage ein abgeschlossener.
+   */
+  const nutzlastZeit = zeit(root.timestamp) ?? new Date();
+  const tagesWerte = liste(root.daily_totals);
+  for (const t of tagesWerte) {
+    const tag = typeof t.date === "string" ? t.date.slice(0, 10) : null;
+    if (!tag) continue;
+    s.setzeTag(tag, nutzlastZeit, {
+      steps: zahl(t.steps) ?? undefined,
+      distanceMeters: zahl(t.distance_meters) ?? undefined,
+      activeCalories: zahl(t.active_calories) ?? undefined,
+      totalCalories: zahl(t.total_calories) ?? undefined,
+    });
+    if (zahl(t.steps) != null) markiere("steps");
+    if (zahl(t.distance_meters) != null) markiere("distanceMeters");
+    if (zahl(t.active_calories) != null) markiere("activeCalories");
+    if (zahl(t.total_calories) != null) markiere("totalCalories");
+  }
+  const hatTagesWerte = tagesWerte.length > 0;
+
   /* ── Aktivität ── */
-  for (const e of liste(root.steps)) {
-    const t = intervall(e);
-    const n = zahl(e.count) ?? zahl(e.steps);
-    if (t && n != null) {
-      s.add(t.ende, "steps", n, "summe");
-      markiere("steps");
+  if (!hatTagesWerte) {
+    for (const e of liste(root.steps)) {
+      const t = intervall(e);
+      const n = zahl(e.count) ?? zahl(e.total) ?? zahl(e.steps);
+      if (t && n != null) {
+        s.add(t.ende, "steps", n, "summe");
+        markiere("steps");
+      }
     }
-  }
-  for (const e of liste(root.distance)) {
-    const t = intervall(e);
-    const n = zahl(e.meters) ?? zahl(e.distance_meters);
-    if (t && n != null) {
-      s.add(t.ende, "distanceMeters", n, "summe");
-      markiere("distanceMeters");
+    for (const e of liste(root.distance)) {
+      const t = intervall(e);
+      const n = zahl(e.meters) ?? zahl(e.total) ?? zahl(e.distance_meters);
+      if (t && n != null) {
+        s.add(t.ende, "distanceMeters", n, "summe");
+        markiere("distanceMeters");
+      }
     }
-  }
-  for (const e of liste(root.active_calories)) {
-    const t = intervall(e);
-    const n = zahl(e.calories) ?? zahl(e.kcal);
-    if (t && n != null) {
-      s.add(t.ende, "activeCalories", n, "summe");
-      markiere("activeCalories");
+    for (const e of liste(root.active_calories)) {
+      const t = intervall(e);
+      const n = zahl(e.calories) ?? zahl(e.total) ?? zahl(e.kcal);
+      if (t && n != null) {
+        s.add(t.ende, "activeCalories", n, "summe");
+        markiere("activeCalories");
+      }
     }
-  }
-  for (const e of liste(root.total_calories)) {
-    const t = intervall(e);
-    const n = zahl(e.calories) ?? zahl(e.kcal);
-    if (t && n != null) {
-      s.add(t.ende, "totalCalories", n, "summe");
-      markiere("totalCalories");
+    for (const e of liste(root.total_calories)) {
+      const t = intervall(e);
+      const n = zahl(e.calories) ?? zahl(e.total) ?? zahl(e.kcal);
+      if (t && n != null) {
+        s.add(t.ende, "totalCalories", n, "summe");
+        markiere("totalCalories");
+      }
     }
   }
 
   /* ── Herz ── */
   for (const e of liste(root.resting_heart_rate)) {
-    const t = zeit(e.time) ?? zeit(e.date);
-    const n = zahl(e.bpm);
+    const t = zeit(e.time) ?? zeit(e.date) ?? zeit(e.bucket_end);
+    const n = zahl(e.bpm) ?? zahl(e.avg);
     if (t && n != null) {
       s.add(t, "restingHr", n, "letzter");
       markiere("restingHr");
     }
   }
   for (const e of liste(root.heart_rate)) {
-    const t = zeit(e.time) ?? zeit(e.date);
+    const t = zeit(e.time) ?? zeit(e.date) ?? zeit(e.bucket_end);
     const agg = objekt(e.aggregate);
     if (!t) continue;
     /*
@@ -308,27 +407,30 @@ export function parseHealthConnect(json: unknown): ParseErgebnis {
      * eigenen Datentyp (`resting_heart_rate`); ihn hier mit dem Tagesmittel zu
      * überschreiben wäre falsch — genau das hat der Selbsttest aufgedeckt
      * (64 → 70). Ruhepuls bleibt deshalb dem eigenen Typ vorbehalten.
+     *
+     * Life Dashboard schickt Aggregate direkt mit `min`/`max` auf der obersten
+     * Ebene (`bucket_start` + `avg`/`min`/`max`), HC Webhook verschachtelt sie
+     * unter `aggregate`. Beides wird gelesen.
      */
-    if (agg) {
-      const min = zahl(agg.min);
-      const max = zahl(agg.max);
-      if (min != null) {
-        s.add(t, "minHr", min, "min");
-        markiere("minHr");
-      }
-      if (max != null) {
-        s.add(t, "maxHr", max, "max");
-        markiere("maxHr");
-      }
-    } else {
-      const probe = objekt(e.sample);
-      const bpm = zahl(probe?.bpm) ?? zahl(e.bpm);
-      if (bpm != null) {
-        s.add(t, "minHr", bpm, "min");
-        s.add(t, "maxHr", bpm, "max");
-        markiere("minHr");
-        markiere("maxHr");
-      }
+    const min = zahl(agg?.min) ?? zahl(e.min);
+    const max = zahl(agg?.max) ?? zahl(e.max);
+    if (min != null) {
+      s.add(t, "minHr", min, "min");
+      markiere("minHr");
+    }
+    if (max != null) {
+      s.add(t, "maxHr", max, "max");
+      markiere("maxHr");
+    }
+    if (min != null || max != null) continue;
+
+    const probe = objekt(e.sample);
+    const bpm = zahl(probe?.bpm) ?? zahl(e.bpm);
+    if (bpm != null) {
+      s.add(t, "minHr", bpm, "min");
+      s.add(t, "maxHr", bpm, "max");
+      markiere("minHr");
+      markiere("maxHr");
     }
   }
 
@@ -336,7 +438,8 @@ export function parseHealthConnect(json: unknown): ParseErgebnis {
   for (const e of liste(root.sleep)) {
     const ende = zeit(e.session_end_time) ?? zeit(e.end_time) ?? zeit(e.date);
     if (!ende) continue;
-    const dauer = zahl(e.duration) ?? zahl(e.duration_secs);
+    /* `duration` (HC Webhook) und `duration_seconds` (Life Dashboard) — beide lesen. */
+    const dauer = zahl(e.duration_seconds) ?? zahl(e.duration) ?? zahl(e.duration_secs);
     const phasen = liste(e.stages);
     if (dauer != null && dauer > 0) {
       s.add(ende, "sleepSecs", dauer, "summe");
@@ -344,7 +447,7 @@ export function parseHealthConnect(json: unknown): ParseErgebnis {
     }
     for (const p of phasen) {
       const name = String(p.stage ?? "").toLowerCase();
-      const d = zahl(p.duration) ?? (() => {
+      const d = zahl(p.duration_seconds) ?? zahl(p.duration) ?? (() => {
         const a = zeit(p.start_time);
         const b = zeit(p.end_time);
         return a && b ? (b.getTime() - a.getTime()) / 1000 : null;
@@ -386,9 +489,10 @@ export function parseHealthConnect(json: unknown): ParseErgebnis {
     }
   }
   for (const e of liste(root.oxygen_saturation)) {
-    const t = zeit(e.time) ?? zeit(e.date);
+    const t = zeit(e.time) ?? zeit(e.date) ?? zeit(e.bucket_end);
     const agg = objekt(e.aggregate);
-    const n = zahl(agg?.avg) ?? zahl(objekt(e.sample)?.percentage) ?? zahl(e.percentage);
+    const n =
+      zahl(agg?.avg) ?? zahl(e.avg) ?? zahl(objekt(e.sample)?.percentage) ?? zahl(e.percentage);
     if (t && n != null) {
       s.add(t, "spo2Avg", n, "letzter");
       markiere("spo2Avg");
@@ -396,24 +500,41 @@ export function parseHealthConnect(json: unknown): ParseErgebnis {
   }
   for (const e of liste(root.vo2_max)) {
     const t = zeit(e.time) ?? zeit(e.date);
-    const n = zahl(e.ml_per_kg_per_min) ?? zahl(e.value);
+    const n =
+      zahl(e.vo2_ml_per_min_per_kg) ?? zahl(e.ml_per_kg_per_min) ?? zahl(e.value) ?? zahl(e.avg);
     if (t && n != null) {
       s.add(t, "vo2max", n, "letzter");
       markiere("vo2max");
     }
   }
 
-  /* Alles, was wir sehen, aber nicht ablegen — sichtbar machen statt schweigen. */
+  /*
+   * Zwei Arten von „kommt an, wird nicht gespeichert":
+   *
+   * - `nichtGespeichert`: bekannte Health-Connect-Typen, für die die App keine
+   *   Spalte hat (Wasser, Blutdruck, Zyklus …). Kein Fehler, aber sichtbar —
+   *   sonst wundert man sich, warum eine Größe nirgends auftaucht.
+   * - `unbekannt`: Schlüssel, die zu keinem bekannten Typ gehören. Das ist der
+   *   Hinweis auf ein neues App-Format.
+   */
+  const GESPEICHERT = new Set([
+    "steps", "distance", "active_calories", "total_calories",
+    "heart_rate", "resting_heart_rate", "sleep", "weight", "body_fat",
+    "oxygen_saturation", "vo2_max", "daily_totals",
+  ]);
+  const RAHMEN = new Set([
+    "timestamp", "timezone", "app_version", "source", "device", "sequence",
+    "test", "message", "backfill", "window_start", "window_end", "window_complete",
+    "deleted_records", "deletions_unavailable", "records_outside_window", "_diagnostics",
+    "writeback", "_resolutions", "screen_time", "app_filter",
+  ]);
+  const nichtGespeichert: string[] = [];
   for (const schluessel of Object.keys(root)) {
-    if (schluessel === "timestamp" || schluessel === "app_version") continue;
-    if (liste(root[schluessel]).length) {
-      const bekannt = [
-        "steps", "distance", "active_calories", "total_calories",
-        "resting_heart_rate", "heart_rate", "sleep", "weight", "body_fat",
-        "oxygen_saturation", "vo2_max",
-      ];
-      if (!bekannt.includes(schluessel)) unbekannt.push(schluessel);
-    }
+    if (RAHMEN.has(schluessel) || GESPEICHERT.has(schluessel)) continue;
+    if (!liste(root[schluessel]).length && !objekt(root[schluessel])) continue;
+    /* Kennt die Health-Connect-Liste diesen Typ? Dann nur „nicht gespeichert". */
+    if (HEALTH_CONNECT_TYPEN.has(schluessel)) nichtGespeichert.push(schluessel);
+    else unbekannt.push(schluessel);
   }
 
   return {
@@ -421,6 +542,9 @@ export function parseHealthConnect(json: unknown): ParseErgebnis {
     tage: s.ergebnis(),
     felder: [...gesehen],
     unbekannt,
+    nichtGespeichert,
+    /* Test-Ping: Der Empfänger soll „ok" antworten, aber nichts speichern. */
+    test: root.test === true,
   };
 }
 
@@ -547,13 +671,26 @@ export function parseHealthNutzlast(json: unknown): ParseErgebnis {
 
   if (daten && Array.isArray(daten.metrics)) return parseAppleHealth(json);
 
+  /*
+   * Life Dashboard setzt `source: "health_connect"` und schickt `daily_totals`
+   * auch dann, wenn sonst keine Reihe dabei ist. HC Webhook hat diesen Marker
+   * nicht, dort erkennt man das Format an den Arrays.
+   */
+  if (typeof daten?.source === "string" && daten.source.toLowerCase().includes("health")) {
+    return parseHealthConnect(json);
+  }
+
   const hcSchluessel = [
     "steps", "sleep", "heart_rate", "resting_heart_rate", "weight",
     "active_calories", "total_calories", "distance", "oxygen_saturation",
+    "daily_totals", "vo2_max", "body_fat",
   ];
   if (daten && hcSchluessel.some((k) => Array.isArray(daten[k]))) {
     return parseHealthConnect(json);
   }
+
+  /* Auch ein reiner Test-Ping ist gültig und gehört zu Health Connect. */
+  if (daten && daten.test === true) return parseHealthConnect(json);
 
   /* Unbekannt: beide Wege probieren und den ergiebigeren nehmen. */
   const a = parseAppleHealth(json);

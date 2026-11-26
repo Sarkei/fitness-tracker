@@ -6648,6 +6648,24 @@ ${JSON.stringify(userCtx, null, 2)}
     }
   };
 
+  /**
+   * Felder, deren Spalte INTEGER ist.
+   *
+   * Health Connect und Apple Health liefern Kommawerte (4455.2 Meter, 395.4
+   * kcal). Postgres nimmt sie für eine INTEGER-Spalte nicht an — „invalid input
+   * syntax for type integer" — und der ganze Webhook scheiterte mit HTTP 500.
+   * Deshalb wird hier zentral gerundet, an einer Stelle, für alle Quellen.
+   */
+  const FELD_GANZZAHL = new Set<HealthFeld>([
+    "steps", "distanceMeters", "activeCalories", "totalCalories",
+    "restingHr", "minHr", "maxHr",
+    "sleepSecs", "deepSecs", "lightSecs", "remSecs", "awakeSecs",
+  ]);
+
+  /** Wert passend zur Spalte aufbereiten. */
+  const fuerSpalte = (feld: HealthFeld, wert: number): number =>
+    FELD_GANZZAHL.has(feld) ? Math.round(wert) : wert;
+
   type SchreibTag = {
     date: string;
     /** Bis wann die Werte dieses Tages reichen. */
@@ -6703,14 +6721,24 @@ ${JSON.stringify(userCtx, null, 2)}
           verworfen += 1;
           continue;
         }
-        neu[spalte] = wert;
+        neu[spalte] = fuerSpalte(feld, wert);
         standNeu[feld] = tag.stand.toISOString();
         uebernommen += 1;
       }
 
+      /*
+       * Garmin-exklusive Felder. Auch hier runden, wo die Spalte INTEGER ist —
+       * Body Battery oder Etagen können als Kommazahl kommen.
+       */
+      const GANZZAHL_SPALTEN = new Set([
+        "sleep_score", "sleep_quality", "floors", "stress_avg", "stress_max",
+        "bb_min", "bb_max", "fitness_age", "sleep_stress", "sleep_hr",
+        "readiness", "respiration",
+      ]);
       for (const [spalte, wert] of Object.entries(tag.nurGarmin ?? {})) {
         if (wert == null) continue;
-        neu[spalte] = wert;
+        neu[spalte] =
+          typeof wert === "number" && GANZZAHL_SPALTEN.has(spalte) ? Math.round(wert) : wert;
       }
 
       const spalten = Object.keys(neu);
@@ -8067,6 +8095,22 @@ ${JSON.stringify(userCtx, null, 2)}
       }
 
       const geparst = parseHealthNutzlast(req.body);
+
+      /*
+       * Test-Ping der Exporter-App: Adresse und Schlüssel stimmen, es sind aber
+       * keine Daten dabei. Antworten, nichts speichern — sonst würde jeder
+       * „Test"-Tippen einen leeren Tag anlegen.
+       */
+      if (geparst.test && !geparst.tage.length) {
+        res.json({
+          ok: true,
+          test: true,
+          quelle: geparst.quelle,
+          message: "Schlüssel und Adresse stimmen.",
+        });
+        return;
+      }
+
       const tage: SchreibTag[] = geparst.tage.map((t) => ({
         date: t.date,
         stand: t.stand,
@@ -8117,6 +8161,23 @@ ${JSON.stringify(userCtx, null, 2)}
       });
     } catch (err: unknown) {
       const text = err instanceof Error ? err.message : "webhook failed";
+      /* Sichtbar machen: Ohne Log steht im Betrieb nur ein nacktes 500. */
+      console.error("[health-webhook]", text);
+      try {
+        const r = await pool.query(
+          `SELECT id FROM users WHERE profile_extras->'health'->>'token' = $1 LIMIT 1`,
+          [key],
+        );
+        if (r.rows.length) {
+          await pool.query(
+            `INSERT INTO health_webhook_ereignisse (user_id, quelle, tage, felder, unbekannt, fehler)
+             VALUES ($1, 'unbekannt', 0, '{}', '{}', $2)`,
+            [Number(r.rows[0].id), text.slice(0, 500)],
+          );
+        }
+      } catch {
+        /* Protokollieren darf den Fehlerpfad nicht kippen. */
+      }
       res.status(500).json({ error: text });
     }
   });

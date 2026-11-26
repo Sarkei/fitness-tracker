@@ -72,7 +72,8 @@ pruefe('HC: Wach', hcErg.tage[0].werte.awakeSecs, 600);
 pruefe('HC: Gewicht', hcErg.tage[0].werte.weightKg, 113.4);
 pruefe('HC: Körperfett', hcErg.tage[0].werte.bodyFat, 30);
 pruefe('HC: SpO2', hcErg.tage[0].werte.spo2Avg, 97);
-pruefe('HC: unbekannt gemeldet', hcErg.unbekannt, ['hydration']);
+pruefe('HC: unbekannt gemeldet', hcErg.unbekannt, []);
+pruefe('HC: Wasser als "nicht gespeichert"', hcErg.nichtGespeichert, ['hydration']);
 
 /* Der Stand muss der späteste Zeitpunkt des Tages sein (07:00 UTC). */
 pruefe('HC: Stand = spätestes Ereignis', hcErg.tage[0].stand.toISOString(), '2026-11-26T07:00:00.000Z');
@@ -162,6 +163,104 @@ const zahlFall = {
 };
 const zahlErg = parseHealthConnect(zahlFall);
 pruefe('Unix-Sekunden erkannt', zahlErg.tage.length, 1);
+
+/* ── Life Dashboard Companion: daily_totals, Aggregate, duration_seconds ── */
+const ld = {
+  timestamp: '2026-11-26T09:15:00.000Z',
+  timezone: 'Europe/Berlin',
+  app_version: '1.31.0',
+  source: 'health_connect',
+  sequence: 42,
+  daily_totals: [
+    /* Health Connect hat hier bereits dedupliziert: Telefon + Uhr zählt einmal. */
+    {
+      date: '2026-11-26',
+      steps: 5231,
+      distance_meters: 3980.5,
+      active_calories: 412.7,
+      total_calories: 2410.2,
+    },
+  ],
+  /* Roh-Records derselben Art — dürfen die Tageswerte NICHT verdoppeln. */
+  steps: [
+    {
+      count: 800,
+      start_time: '2026-11-26T06:00:00Z',
+      end_time: '2026-11-26T07:00:00Z',
+      source: 'com.garmin.android.apps.connectmobile',
+    },
+  ],
+  sleep: [
+    {
+      session_end_time: '2026-11-26T05:30:00Z',
+      duration_seconds: 27000,
+      stages: [
+        { stage: 'deep', start_time: '2026-11-26T01:00:00Z', end_time: '2026-11-26T02:30:00Z' },
+        { stage: 'rem', start_time: '2026-11-26T03:00:00Z', end_time: '2026-11-26T04:00:00Z' },
+      ],
+    },
+  ],
+  heart_rate: [
+    {
+      bucket_start: '2026-11-26T06:00:00Z',
+      bucket_end: '2026-11-26T06:15:00Z',
+      sample_count: 30,
+      avg: 88,
+      min: 61,
+      max: 152,
+      complete: true,
+    },
+  ],
+  resting_heart_rate: [{ bpm: 63, time: '2026-11-26T05:00:00Z' }],
+  weight: [{ kilograms: 113.1, time: '2026-11-26T05:10:00Z' }],
+  body_fat: [{ percentage: 29.8, time: '2026-11-26T05:10:00Z' }],
+  oxygen_saturation: [
+    { bucket_start: '2026-11-26T05:00:00Z', bucket_end: '2026-11-26T05:30:00Z', avg: 96.4, min: 94 },
+  ],
+  vo2_max: [{ vo2_ml_per_min_per_kg: 36.8, time: '2026-11-26T05:15:00Z' }],
+};
+
+const ldErg = parseHealthNutzlast(ld);
+pruefe('LD: als Health Connect erkannt', ldErg.quelle, 'healthconnect');
+pruefe('LD: Tageswert Schritte (dedupliziert, nicht 5231+800)', ldErg.tage[0].werte.steps, 5231);
+pruefe('LD: Tageswert Distanz', ldErg.tage[0].werte.distanceMeters, 3980.5);
+pruefe('LD: Tageswert aktive kcal', ldErg.tage[0].werte.activeCalories, 412.7);
+pruefe('LD: Tageswert Gesamtkalorien', ldErg.tage[0].werte.totalCalories, 2410.2);
+pruefe('LD: Schlaf aus duration_seconds', ldErg.tage[0].werte.sleepSecs, 27000);
+pruefe('LD: Tiefschlaf aus Zeitstempeln', ldErg.tage[0].werte.deepSecs, 5400);
+pruefe('LD: REM aus Zeitstempeln', ldErg.tage[0].werte.remSecs, 3600);
+pruefe('LD: Ruhepuls aus eigenem Typ', ldErg.tage[0].werte.restingHr, 63);
+pruefe('LD: Puls max aus Aggregat', ldErg.tage[0].werte.maxHr, 152);
+pruefe('LD: Puls min aus Aggregat', ldErg.tage[0].werte.minHr, 61);
+pruefe('LD: Gewicht', ldErg.tage[0].werte.weightKg, 113.1);
+pruefe('LD: Körperfett', ldErg.tage[0].werte.bodyFat, 29.8);
+pruefe('LD: SpO2 aus Aggregat', ldErg.tage[0].werte.spo2Avg, 96.4);
+pruefe('LD: VO2max aus vo2_ml_per_min_per_kg', ldErg.tage[0].werte.vo2max, 36.8);
+pruefe('LD: keine unbekannten Schluessel', ldErg.unbekannt, []);
+
+/* Nur daily_totals, ohne jede Reihe — muss trotzdem erkannt werden. */
+const nurTages = {
+  timestamp: '2026-11-26T09:15:00.000Z',
+  source: 'health_connect',
+  daily_totals: [{ date: '2026-11-25', steps: 7912 }],
+};
+const nurErg = parseHealthNutzlast(nurTages);
+pruefe('LD: nur daily_totals erkannt', nurErg.quelle, 'healthconnect');
+pruefe('LD: gestriger Tag', nurErg.tage[0].date, '2026-11-25');
+pruefe('LD: Schritte', nurErg.tage[0].werte.steps, 7912);
+
+/* Test-Ping: darf nichts als Tag liefern, aber als Test erkannt werden. */
+const ping = {
+  timestamp: '2026-11-26T09:15:00.000Z',
+  app_version: '1.31.0',
+  source: 'health_connect',
+  test: true,
+  message: 'Test ping from Life Dashboard',
+};
+const pingErg = parseHealthNutzlast(ping);
+pruefe('Ping: als Test erkannt', pingErg.test, true);
+pruefe('Ping: keine Tage', pingErg.tage.length, 0);
+pruefe('Ping: Format erkannt', pingErg.quelle, 'healthconnect');
 
 if (fehler) {
   console.error(`\n${fehler} Fehler`);
