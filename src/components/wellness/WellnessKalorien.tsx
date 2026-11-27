@@ -196,7 +196,7 @@ export default function WellnessKalorien() {
           />
           <div className="flex gap-4 text-[10px]">
             <span className="inline-flex items-center gap-1.5">
-              <span className="inline-block h-2 w-2 rounded-full" style={{ background: '#4fbf8b' }} />
+              <span className="inline-block h-2 w-2 rounded-full" style={{ background: 'var(--success, #5cb98d)' }} />
               Defizit
             </span>
             <span className="inline-flex items-center gap-1.5">
@@ -225,14 +225,14 @@ export default function WellnessKalorien() {
                         style={{
                           width: `${anteil * 50}%`,
                           left: t.bilanz < 0 ? `${50 - anteil * 50}%` : '50%',
-                          background: t.bilanz < 0 ? '#4fbf8b' : '#f08a7a',
+                          background: t.bilanz < 0 ? 'var(--success, #5cb98d)' : 'var(--danger, #f08a7a)',
                         }}
                       />
                       <div className="absolute left-1/2 top-0 h-full w-px bg-[var(--text-muted)]/40" />
                     </div>
                     <span
                       className="w-14 shrink-0 text-right font-semibold tabular-nums"
-                      style={{ color: t.bilanz < 0 ? '#4fbf8b' : '#f08a7a' }}
+                      style={{ color: t.bilanz < 0 ? 'var(--success, #5cb98d)' : 'var(--danger, #f08a7a)' }}
                     >
                       {t.bilanz > 0 ? '+' : ''}
                       {t.bilanz.toLocaleString('de-DE')}
@@ -269,7 +269,7 @@ export default function WellnessKalorien() {
                   </td>
                   <td
                     className="py-1.5 text-right font-semibold tabular-nums"
-                    style={{ color: t.bilanz < 0 ? '#4fbf8b' : '#f08a7a' }}
+                    style={{ color: t.bilanz < 0 ? 'var(--success, #5cb98d)' : 'var(--danger, #f08a7a)' }}
                   >
                     {t.verbraucht > 0 && t.gegessen > 0
                       ? `${t.bilanz > 0 ? '+' : ''}${t.bilanz.toLocaleString('de-DE')}`

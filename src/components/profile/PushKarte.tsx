@@ -316,7 +316,7 @@ export default function PushKarte({
               textTransform: 'none',
               letterSpacing: 0,
               background: 'var(--accent-soft, #e6f1eb)',
-              color: 'var(--accent-ink, #123a28)',
+              color: 'var(--accent-ink, #b9e8d0)',
             }}
           >
             <Check size={9} /> aktiv
@@ -384,7 +384,7 @@ export default function PushKarte({
             fontSize: 11,
             background:
               meldung.art === 'ok' ? 'var(--accent-soft, #e6f1eb)' : 'var(--danger-soft, #fbecea)',
-            color: meldung.art === 'ok' ? 'var(--accent-ink, #123a28)' : 'var(--danger, #b4453a)',
+            color: meldung.art === 'ok' ? 'var(--accent-ink, #b9e8d0)' : 'var(--danger, #b4453a)',
           }}
         >
           {meldung.text}
@@ -422,7 +422,7 @@ export default function PushKarte({
                   }}
                 />
                 <span style={{ minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--ink, #16211c)' }}>
+                  <span style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--ink, #ededed)' }}>
                     {k.titel}
                   </span>
                   <span style={{ display: 'block', fontSize: 10.5, lineHeight: 1.4, color: 'var(--muted, #55635c)' }}>
@@ -477,7 +477,7 @@ export default function PushKarte({
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
-                      <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--ink, #16211c)' }}>{v.titel}</span>
+                      <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--ink, #ededed)' }}>{v.titel}</span>
                       <span style={{ flexShrink: 0, fontSize: 9.5, color: 'var(--muted, #55635c)' }}>{v.zeit}</span>
                     </div>
                     <p style={{ margin: '2px 0 0', fontSize: 10.5, lineHeight: 1.4, color: 'var(--muted, #55635c)' }}>
