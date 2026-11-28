@@ -338,7 +338,22 @@ export default function EinheitPage() {
     // Einheit aus der Liste holen (dort stehen die Kennzahlen) und parallel die Zeitreihen.
     Promise.all([
       api<{ aktivitaeten?: Einheit[] }>('/api/integrations/garmin/activities?limit=60').then(
-        (r) => (Array.isArray(r.aktivitaeten) ? r.aktivitaeten.find((e) => e.id === id) : undefined) ?? null,
+        (r) => {
+          const liste = Array.isArray(r.aktivitaeten) ? r.aktivitaeten : [];
+          /*
+           * IDs vergleichen ohne Präfix: die URL trägt `garmin_<zahl>` (so kommt
+           * sie aus /api/workouts), die Liste liefert dieselbe Kennung. Fällt das
+           * Präfix weg, wurde die Einheit nicht gefunden — die Detailseite blieb
+           * leer, obwohl die Aktivität existiert.
+           */
+          const schluessel = String(id).replace(/^garmin[-_]/, '');
+          return (
+            liste.find((e) => {
+              const kandidat = String(e.id ?? '').replace(/^garmin[-_]/, '');
+              return kandidat === schluessel || String(e.id ?? '') === String(id);
+            }) ?? null
+          );
+        },
       ),
       api<{ punkte?: Punkt[] }>(`/api/integrations/garmin/activities/${encodeURIComponent(id)}/timeseries`).catch(
         () => ({ punkte: [] as Punkt[] }),

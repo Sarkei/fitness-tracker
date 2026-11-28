@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, Dumbbell, Moon } from 'lucide-react';
+import { ChevronRight, Dumbbell, Moon, Plus } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { FastingCard } from '../components/dashboard/FastingCard';
 import EinheitDetailModal, { type EinheitDaten } from '../components/wellness/EinheitDetailModal';
@@ -33,6 +33,18 @@ import {
   type WorkoutEntry,
 } from './simpleApi';
 import { toYmd } from './analytics';
+
+/**
+ * Eintrag aus dem Wochenplan (`/api/trainings/plan`), so wie ihn die Startseite
+ * braucht: Name, Dauer und die ersten Übungen. Bewusst schlank gehalten — die
+ * volle Form steht in TrainingPage.
+ */
+type PlanHeuteZeile = {
+  id: string;
+  name: string;
+  dauer_min: number | null;
+  inhalt?: { uebungen?: unknown[] };
+};
 import { aufSyncFertig } from '../lib/syncStatus';
 import BilanzChart from './BilanzChart';
 import {
@@ -288,6 +300,18 @@ export default function TodayPage() {
   }, [heutePlanWoche, date]);
 
   const trainingToday = workouts.find((w) => toYmd(w.date) === date) ?? null;
+  /**
+   * Heutige Einheit von der Uhr — auch wenn sie nicht als Workout erfasst ist.
+   * Sie ersetzt die frühere Liste „Einheiten von der Uhr" auf der Startseite:
+   * Tim will die heutige Einheit sehen, nicht die letzten fünf.
+   */
+  const uhrHeute = useMemo(
+    () =>
+      einheiten.find(
+        (e) => String(e.date ?? e.start_date_local ?? '').slice(0, 10) === date,
+      ) ?? null,
+    [einheiten, date],
+  );
 
   /*
    * Der Wochenplan (Seite /plan) gehört auf die Startseite: Man plant am
@@ -338,13 +362,11 @@ export default function TodayPage() {
     return () => { ab = true; };
   }, [date]);
 
-  const [planWocheHeute, setPlanWocheHeute] = useState<
-    Array<{ id: string; name: string; dauer_min: number | null; inhalt?: { uebungen?: unknown[] } }>
-  >([]);
+  const [planWocheHeute, setPlanWocheHeute] = useState<PlanHeuteZeile[]>([]);
 
   useEffect(() => {
     let ab = false;
-    api<{ eintraege?: Array<{ id: string; name: string; dauer_min: number | null; inhalt?: { uebungen?: unknown[] } }> }>(
+    api<{ eintraege?: PlanHeuteZeile[] }>(
       `/api/trainings/plan?von=${date}&bis=${date}`,
     )
       .then((r) => { if (!ab) setPlanWocheHeute(Array.isArray(r.eintraege) ? r.eintraege : []); })
@@ -425,45 +447,6 @@ export default function TodayPage() {
         );
       })()}
 
-      {/* Einheiten von der Uhr — auch ohne geplantes Training */}
-      {einheiten.length > 0 && (
-        <Card className="p-5">
-          <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-            <Dumbbell className="h-3 w-3" /> Einheiten von der Uhr
-          </p>
-          <ul className="mt-2 divide-y divide-[var(--border-muted)]">
-            {einheiten.map((e, i) => {
-              const datum = String(e.date ?? e.start_date_local ?? '').slice(0, 10);
-              const distanz = e.distance != null ? Number(e.distance) / 1000 : null;
-              const dauer = e.moving_time != null ? Number(e.moving_time) : e.duration != null ? Number(e.duration) : null;
-              return (
-                <li key={`${String(e.id ?? i)}`}>
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/einheit/${encodeURIComponent(String(e.id ?? ''))}`)}
-                    className="flex w-full items-baseline justify-between gap-3 py-2 text-left transition hover:text-[var(--simple-accent)]"
-                  >
-                    <span className="flex min-w-0 flex-1 items-baseline gap-2">
-                      <span className="w-11 shrink-0 text-[10.5px] tabular-nums text-[var(--text-muted)]">
-                        {datum ? `${datum.slice(8, 10)}.${datum.slice(5, 7)}.` : '—'}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate text-[13px]">
-                        {String(e.name ?? e.type ?? 'Einheit')}
-                      </span>
-                    </span>
-                    <span className="shrink-0 text-[11.5px] tabular-nums text-[var(--text-muted)]">
-                      {[distanz != null ? `${distanz.toFixed(2)} km` : null, dauer != null ? `${Math.round(dauer / 60)} min` : null]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </Card>
-      )}
-
       {/* Serien auf einen Blick — nur die nackten Zahlen, ohne Erklärtext */}
       <div className="grid grid-cols-2 gap-3">
         <StatTile
@@ -482,9 +465,19 @@ export default function TodayPage() {
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-5 lg:items-stretch">
-        {/* Gegessen: nur die Tabelle */}
-        <Card className="flex h-full flex-col p-5 lg:col-span-3">
+      {/* Heutiges Training — anklickbar, volle Breite */}
+      <TrainingHeuteKarte
+        trainingToday={trainingToday}
+        planDay={planDay}
+        planWocheHeute={planWocheHeute}
+        uhrEinheit={uhrHeute}
+        laedt={laedt}
+        onErfassen={() => setShowSession(true)}
+        onOeffnen={(ziel) => navigate(ziel)}
+      />
+
+      {/* Gegessen: nur die Tabelle */}
+      <Card className="flex flex-col p-5">
           <SectionTitle
             action={
               <GhostButton onClick={() => navigate('/foods')}>
@@ -566,117 +559,6 @@ export default function TodayPage() {
           )}
         </Card>
 
-        {/* Training: eine Box mit der heutigen Einheit */}
-        <Card className="flex h-full flex-col p-5 lg:col-span-2">
-          <SectionTitle action={<GhostButton onClick={() => navigate('/training')}>Plan</GhostButton>}>
-            Heutiges Training
-          </SectionTitle>
-
-          {trainingToday ? (
-            <div className="flex-1 rounded-xl border border-[color-mix(in_srgb,var(--simple-accent)_40%,transparent)] bg-[var(--simple-accent-soft)]/50 p-4">
-              <div className="flex items-start gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--simple-accent)] text-[var(--simple-accent-ink)]">
-                  <Dumbbell className="h-5 w-5" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">{trainingToday.name}</p>
-                  <p className="text-xs text-[var(--text-muted)]">
-                    erledigt · {trainingToday.duration} min
-                    {Array.isArray(trainingToday.exercises) ? ` · ${trainingToday.exercises.length} Übungen` : ''}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : planDay && !planDay.isRest ? (
-            <button
-              type="button"
-              className="flex-1 w-full rounded-xl border border-[var(--border-muted)] bg-[var(--card-bg)] p-4 text-left transition hover:border-[var(--simple-accent)]/50"
-              onClick={() => setShowSession(true)}
-            >
-              <div className="flex items-start gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--simple-accent-soft)] text-[var(--simple-accent)]">
-                  <Dumbbell className="h-5 w-5" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">
-                    {planDay.title || DAY_LABELS[planDay.day] || 'Training'}
-                  </p>
-                  <p className="text-xs text-[var(--text-muted)]">
-                    {(planDay.exercises ?? []).length} Übungen
-                    {planDay.estimatedDuration ? ` · ca. ${planDay.estimatedDuration} min` : ''}
-                  </p>
-                  {(planDay.exercises ?? []).length > 0 && (
-                    <ul className="mt-2 space-y-1">
-                      {(planDay.exercises ?? []).slice(0, 4).map((e, i) => (
-                        <li key={`${e.name}-${i}`} className="flex items-baseline justify-between gap-2 text-[11.5px]">
-                          <span className="min-w-0 truncate text-[var(--text-muted)]">{e.name}</span>
-                          <span className="shrink-0 tabular-nums text-[var(--text-muted)]">
-                            {[e.sets && `${e.sets}×`, e.reps && `${e.reps}`].filter(Boolean).join(' ')}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-                <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[var(--text-muted)]" />
-              </div>
-            </button>
-          ) : planWocheHeute.length > 0 ? (
-            <button
-              type="button"
-              className="flex-1 w-full rounded-xl border border-[var(--border-muted)] bg-[var(--card-bg)] p-4 text-left transition hover:border-[var(--simple-accent)]/50"
-              onClick={() => navigate('/training')}
-            >
-              <div className="flex items-start gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--simple-accent-soft)] text-[var(--simple-accent)]">
-                  <Dumbbell className="h-5 w-5" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">{planWocheHeute[0].name}</p>
-                  <p className="text-xs text-[var(--text-muted)]">
-                    aus deinem Wochenplan
-                    {planWocheHeute[0].inhalt?.uebungen?.length
-                      ? ` · ${planWocheHeute[0].inhalt.uebungen.length} Übungen`
-                      : ''}
-                    {planWocheHeute[0].dauer_min ? ` · ${planWocheHeute[0].dauer_min} min` : ''}
-                  </p>
-                  {planWocheHeute.length > 1 && (
-                    <p className="mt-1 text-[10.5px] text-[var(--text-muted)]">
-                      + {planWocheHeute.length - 1} weitere Einheit{planWocheHeute.length > 2 ? 'en' : ''}
-                    </p>
-                  )}
-                </div>
-                <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[var(--text-muted)]" />
-              </div>
-            </button>
-          ) : (
-            <div className="flex-1 rounded-xl border border-[var(--border-muted)] bg-[var(--card-bg)] p-4">
-              <div className="flex items-start gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--border-muted)]/60 text-[var(--text-muted)]">
-                  <Moon className="h-5 w-5" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold">
-                    {planDay?.isRest ? 'Ruhetag' : laedt ? '…' : 'Kein Plan für heute'}
-                  </p>
-                  <p className="text-xs text-[var(--text-muted)]">
-                    {planDay?.isRest ? 'Erholung ist Teil des Plans.' : 'Training kannst du trotzdem erfassen.'}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <button
-            type="button"
-            className="mt-auto w-full pt-3 text-left text-[11px] font-semibold text-[var(--simple-accent)]"
-            onClick={() => setShowSession(true)}
-          >
-            + Training erfassen
-          </button>
-        </Card>
-      </div>
-
       {/* Kalorienbilanz */}
       <Card className="p-5">
         <SectionTitle
@@ -744,4 +626,171 @@ function fmtKurz(ymd: string | null): string {
 function fmtDatum(ymd: string): string {
   const [, m, d] = ymd.split('-');
   return m && d ? `${d}.${m}.` : ymd;
+}
+
+/**
+ * Heutiges Training als eigene Karte — die erste, die man nach den Serien sieht.
+ *
+ * Anklickbar: öffnet die volle Detailansicht. Was geöffnet wird, hängt davon ab,
+ * was es gibt:
+ *  - erfasste Einheit     -> /training (dort stehen Übungen und Verlauf)
+ *  - Einheit von der Uhr  -> /einheit/<id> (Diagramme, Kennzahlen)
+ *  - geplante Einheit     -> startet die Session direkt
+ */
+function TrainingHeuteKarte({
+  trainingToday,
+  planDay,
+  planWocheHeute,
+  uhrEinheit,
+  laedt,
+  onErfassen,
+  onOeffnen,
+}: {
+  trainingToday: WorkoutEntry | null;
+  planDay: PlanDay | null;
+  planWocheHeute: PlanHeuteZeile[];
+  uhrEinheit: Record<string, unknown> | null;
+  laedt: boolean;
+  onErfassen: () => void;
+  onOeffnen: (ziel: string) => void;
+}) {
+  /** Kennzahlen der Uhr-Einheit, soweit vorhanden. */
+  const kennzahlen = (() => {
+    if (!uhrEinheit) return [];
+    const distanz = uhrEinheit.distance != null ? Number(uhrEinheit.distance) / 1000 : null;
+    const sek =
+      uhrEinheit.moving_time != null
+        ? Number(uhrEinheit.moving_time)
+        : uhrEinheit.elapsed_time != null
+          ? Number(uhrEinheit.elapsed_time)
+          : null;
+    const minuten = sek != null && sek > 0 ? Math.round(sek / 60) : null;
+    const zeilen: Array<{ label: string; wert: string }> = [];
+    if (distanz != null && distanz > 0) zeilen.push({ label: 'Distanz', wert: `${distanz.toFixed(2)} km` });
+    if (minuten != null) zeilen.push({ label: 'Dauer', wert: `${minuten} min` });
+    if (uhrEinheit.avg_hr != null) {
+      zeilen.push({ label: 'Ø Puls', wert: `${Math.round(Number(uhrEinheit.avg_hr))} bpm` });
+    }
+    if (uhrEinheit.calories != null) {
+      zeilen.push({ label: 'Kalorien', wert: `${Math.round(Number(uhrEinheit.calories))} kcal` });
+    }
+    if (distanz != null && distanz > 0 && minuten != null && minuten > 0) {
+      const pace = (minuten * 60) / distanz;
+      zeilen.push({
+        label: 'Ø Pace',
+        wert: `${Math.floor(pace / 60)}:${String(Math.round(pace % 60)).padStart(2, '0')} min/km`,
+      });
+    }
+    return zeilen;
+  })();
+
+  const titel =
+    trainingToday?.name ||
+    (uhrEinheit ? String(uhrEinheit.name ?? uhrEinheit.type ?? 'Einheit') : '') ||
+    planWocheHeute[0]?.name ||
+    planDay?.title ||
+    (planDay?.isRest ? 'Ruhetag' : laedt ? '…' : 'Kein Training geplant');
+
+  const untertitel = trainingToday
+    ? 'erledigt'
+    : uhrEinheit
+      ? 'von der Uhr'
+      : planWocheHeute.length > 0
+        ? `aus deinem Wochenplan${planWocheHeute[0].inhalt?.uebungen?.length ? ` · ${planWocheHeute[0].inhalt.uebungen.length} Übungen` : ''}`
+        : planDay && !planDay.isRest
+          ? `${(planDay.exercises ?? []).length} Übungen geplant`
+          : planDay?.isRest
+            ? 'Erholung ist Teil des Plans.'
+            : 'Training kannst du trotzdem erfassen.';
+
+  /* Wohin der Klick führt. */
+  const ziel =
+    uhrEinheit && !trainingToday
+      ? `/einheit/${encodeURIComponent(String(uhrEinheit.id ?? ''))}`
+      : trainingToday
+        ? '/training'
+        : null;
+
+  const uebungen = planDay && !planDay.isRest ? (planDay.exercises ?? []) : [];
+
+  return (
+    <Card className="p-5">
+      <SectionTitle
+        action={
+          <GhostButton onClick={onErfassen}>
+            <Plus className="h-3 w-3" /> Erfassen
+          </GhostButton>
+        }
+      >
+        Heutiges Training
+      </SectionTitle>
+
+      <button
+        type="button"
+        disabled={!ziel}
+        onClick={() => ziel && onOeffnen(ziel)}
+        className={`w-full rounded-xl border p-4 text-left transition ${
+          ziel
+            ? 'border-[color-mix(in_srgb,var(--simple-accent)_40%,transparent)] bg-[var(--simple-accent-soft)]/50 hover:border-[var(--simple-accent)]'
+            : 'border-[var(--border-muted)] bg-[var(--card-bg)]'
+        }`}
+      >
+        <div className="flex items-start gap-3">
+          <span
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+              planDay?.isRest && !uhrEinheit && !trainingToday
+                ? 'bg-[var(--border-muted)]/60 text-[var(--text-muted)]'
+                : 'bg-[var(--simple-accent)] text-[var(--simple-accent-ink)]'
+            }`}
+          >
+            {planDay?.isRest && !uhrEinheit && !trainingToday ? (
+              <Moon className="h-5 w-5" />
+            ) : (
+              <Dumbbell className="h-5 w-5" />
+            )}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold">{titel}</p>
+            <p className="text-xs text-[var(--text-muted)]">{untertitel}</p>
+          </div>
+          {ziel && <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-[var(--text-muted)]" />}
+        </div>
+
+        {kennzahlen.length > 0 && (
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {kennzahlen.map((z) => (
+              <div key={z.label} className="rounded-lg bg-[var(--card-bg)]/70 px-2.5 py-1.5">
+                <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
+                  {z.label}
+                </p>
+                <p className="text-[12.5px] font-semibold tabular-nums">{z.wert}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {uebungen.length > 0 && (
+          <ul className="mt-3 space-y-1">
+            {uebungen.slice(0, 4).map((e, i) => (
+              <li key={`${e.name}-${i}`} className="flex items-baseline justify-between gap-2 text-[11.5px]">
+                <span className="min-w-0 truncate text-[var(--text-muted)]">{e.name}</span>
+                <span className="shrink-0 tabular-nums text-[var(--text-muted)]">
+                  {[e.sets && `${e.sets}×`, e.reps && `${e.reps}`].filter(Boolean).join(' ')}
+                </span>
+              </li>
+            ))}
+            {uebungen.length > 4 && (
+              <li className="text-[10.5px] text-[var(--text-muted)]">+{uebungen.length - 4} weitere</li>
+            )}
+          </ul>
+        )}
+
+        {ziel && (
+          <p className="mt-3 text-[10.5px] font-semibold text-[var(--simple-accent)]">
+            Antippen für alle Details
+          </p>
+        )}
+      </button>
+    </Card>
+  );
 }
