@@ -17,7 +17,6 @@ const ALL: NavItem[] = [
   { path: '/workouts', messageKey: 'nav.workouts' },
   { path: '/nutrition', messageKey: 'nav.nutrition' },
   { path: '/coach', messageKey: 'nav.coach' },
-  { path: '/stats', messageKey: 'nav.stats' },
   { path: '/health', messageKey: 'nav.wellness' },
   { path: '/social', messageKey: 'nav.social' },
   { path: '/profile', messageKey: 'nav.profile' },
@@ -33,14 +32,14 @@ export function splitNavItems(focus: NavigationFocus): { primary: NavItem[]; ove
     };
   }
   if (focus === 'workout') {
-    const primaryPaths = new Set(['/', '/workouts', '/coach', '/stats', '/health']);
+    const primaryPaths = new Set(['/', '/workouts', '/coach', '/health']);
     return {
       primary: ALL.filter(i => primaryPaths.has(i.path)),
       overflow: ALL.filter(i => !primaryPaths.has(i.path)),
     };
   }
   // nutrition-first
-  const primaryPaths = new Set(['/', '/nutrition', '/coach', '/stats', '/health']);
+  const primaryPaths = new Set(['/', '/nutrition', '/coach', '/health']);
   return {
     primary: ALL.filter(i => primaryPaths.has(i.path)),
     overflow: ALL.filter(i => !primaryPaths.has(i.path)),

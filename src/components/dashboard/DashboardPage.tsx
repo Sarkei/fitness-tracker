@@ -563,7 +563,7 @@ export default function Dashboard() {
             <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-muted)] mb-2">{t('dash.streaks.title')}</p>
             <p className="text-xs text-[var(--text-muted)] font-medium leading-snug hidden lg:block">{t('dash.streaks.hint')}</p>
             <Link
-              to="/stats"
+              to="/verlauf"
               className="hidden lg:inline-flex mt-2 ml-auto items-center gap-1 text-brand text-[10px] font-black uppercase tracking-widest hover:gap-2 transition-all"
             >
               {t('dash.streaks.more')} <ChevronRight size={14} />
@@ -590,7 +590,7 @@ export default function Dashboard() {
         </div>
         <button
           type="button"
-          onClick={() => navigate('/stats')}
+          onClick={() => navigate('/verlauf')}
           className="lg:hidden w-full mt-6 min-h-[44px] rounded-xl text-[9px] font-black uppercase tracking-widest bg-[var(--background)] border border-[var(--border-muted)] hover:border-brand transition-all flex items-center justify-center gap-1"
         >
           {t('dash.streaks.more')} <ChevronRight size={14} />
@@ -1024,7 +1024,7 @@ export default function Dashboard() {
            <motion.div whileHover={{ y: -2 }} className={cn('bg-[var(--card-bg)] rounded-[2rem] lg:rounded-[2.5rem] p-4 sm:p-6 md:p-8 shadow-sm w-full', dashCardHover)}>
              <div className="flex justify-between items-center mb-6 flex-wrap gap-2">
                <h3 className="font-black italic uppercase text-lg tracking-tighter">{t('dash.analytics.title')}</h3>
-               <Link to="/stats" className="text-brand text-[10px] font-black uppercase tracking-widest flex items-center gap-1 hover:gap-2 transition-all shrink-0">
+               <Link to="/verlauf" className="text-brand text-[10px] font-black uppercase tracking-widest flex items-center gap-1 hover:gap-2 transition-all shrink-0">
                  {t('dash.analytics.full')} <ChevronRight size={14} />
                </Link>
              </div>

@@ -16,7 +16,7 @@ const PRIMARY: NavEntry[] = [
   { to: '/training', labelKey: 'nav.training' },
   { to: '/foods', labelKey: 'nav.nutrition.short' },
   { to: '/coach', labelKey: 'nav.coach.short' },
-  { to: '/stats', labelKey: 'nav.stats.short' },
+  /* Statistik vorerst ausgeblendet — der Verlauf (/verlauf) ersetzt sie. */
   { to: '/health', labelKey: 'nav.wellness.short' },
   { to: '/profile', labelKey: 'nav.profile' },
 ];
