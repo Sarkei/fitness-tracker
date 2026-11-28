@@ -752,3 +752,190 @@ export async function garminZeitreiheLogin(
     return [];
   }
 }
+
+/**
+ * Vollständige Auswertung einer Aktivität aus Garmin Connect.
+ *
+ * Was die Uhr bzw. Garmin Connect zusätzlich zu Distanz und Dauer weiß:
+ *  - Herzfrequenz-Zonen mit Sekunden je Zone und den bpm-Grenzen
+ *  - Leistungszonen (nur mit Powermeter, z. B. Radfahren)
+ *  - Trainings-Effekt (aerob 0-5, anaerob), Belastungswert, Intensitätsminuten
+ *  - Kadenz, normalisierte Leistung, 20-Minuten-Bestleistung
+ *  - Höhenmeter auf und ab, höchster/tiefster Punkt
+ *  - Runden (Splits)
+ *  - Material (Rad/Schuhe) und Standort
+ *
+ * Fehlt ein Bereich, bleibt das Feld leer — der Aufrufer zeigt es dann nicht an.
+ * Deshalb liefert die Funktion bewusst Teilergebnisse statt zu werfen.
+ */
+export type GarminAktivitaetDetail = {
+  zonenHerz?: Array<{ zone: number; abBpm: number; sekunden: number }>;
+  zonenLeistung?: Array<{ zone: number; abWatt: number; sekunden: number }>;
+  runden?: Array<{
+    nummer: number;
+    distanzKm: number | null;
+    dauerMin: number | null;
+    avgHr: number | null;
+    avgPower: number | null;
+    aufstiegM: number | null;
+  }>;
+  effekt?: {
+    aerob: number | null;
+    anaerob: number | null;
+    label: string | null;
+    belastung: number | null;
+    intensitaetsMinuten: { moderat: number | null; intensiv: number | null } | null;
+  };
+  leistung?: {
+    durchschnitt: number | null;
+    normalisiert: number | null;
+    maximum: number | null;
+    best20Min: number | null;
+    arbeitKj: number | null;
+  };
+  kadenz?: { durchschnitt: number | null; maximum: number | null };
+  hoehe?: { aufstiegM: number | null; abstiegM: number | null; maxM: number | null; minM: number | null };
+  tempo?: { avgKmh: number | null; maxKmh: number | null };
+  material?: string | null;
+  ort?: string | null;
+  beschreibung?: string | null;
+};
+
+export async function garminAktivitaetDetail(
+  tokensJson: string,
+  activityId: number,
+): Promise<GarminAktivitaetDetail> {
+  const garmin = new Garmin(clientAusTokens(tokensJson));
+  const ergebnis: GarminAktivitaetDetail = {};
+
+  /* Herzfrequenz-Zonen */
+  try {
+    const hz = (await garmin.getActivityHrInTimezones(activityId)) as unknown as Array<Record<string, unknown>>;
+    if (Array.isArray(hz) && hz.length) {
+      ergebnis.zonenHerz = hz.map((z) => ({
+        zone: Number(z.zoneNumber) || 0,
+        abBpm: Number(z.zoneLowBoundary) || 0,
+        sekunden: Math.round(Number(z.secsInZone) || 0),
+      }));
+    }
+  } catch {
+    /* keine Zonen — Garmin liefert sie nur bei gepflegten Pulsbereichen */
+  }
+
+  /* Leistungszonen (Powermeter nötig) */
+  try {
+    const pz = (await garmin.getActivityPowerInTimezones(activityId)) as unknown as Array<Record<string, unknown>>;
+    if (Array.isArray(pz) && pz.length) {
+      ergebnis.zonenLeistung = pz.map((z) => ({
+        zone: Number(z.zoneNumber) || 0,
+        abWatt: Number(z.zoneLowBoundary) || 0,
+        sekunden: Math.round(Number(z.secsInZone) || 0),
+      }));
+    }
+  } catch {
+    /* ohne Powermeter leer */
+  }
+
+  /* Runden */
+  try {
+    const sp = (await garmin.getActivitySplits(activityId)) as { lapDTOs?: Array<Record<string, unknown>> };
+    const laps = Array.isArray(sp?.lapDTOs) ? sp.lapDTOs : [];
+    if (laps.length) {
+      ergebnis.runden = laps.map((l, i) => ({
+        nummer: Number(l.lapIndex ?? i + 1) || i + 1,
+        distanzKm: l.distance != null ? Math.round((Number(l.distance) / 1000) * 100) / 100 : null,
+        dauerMin: l.duration != null ? Math.round(Number(l.duration) / 60) : null,
+        avgHr: l.averageHR != null ? Math.round(Number(l.averageHR)) : null,
+        avgPower: l.averagePower != null ? Math.round(Number(l.averagePower)) : null,
+        aufstiegM: l.elevationGain != null ? Math.round(Number(l.elevationGain)) : null,
+      }));
+    }
+  } catch {
+    /* keine Runden */
+  }
+
+  /* Zusammenfassung: Effekt, Leistung, Höhe, Tempo */
+  try {
+    const roh = (await garmin.getActivity(activityId)) as {
+      summaryDTO?: Record<string, unknown>;
+      locationName?: string;
+      description?: string;
+    };
+    const s = roh?.summaryDTO ?? {};
+    const zahl = (v: unknown): number | null => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+
+    const aerob = zahl(s.trainingEffect);
+    const anaerob = zahl(s.anaerobicTrainingEffect);
+    if (aerob != null || anaerob != null) {
+      ergebnis.effekt = {
+        aerob,
+        anaerob,
+        label: typeof s.trainingEffectLabel === 'string' ? s.trainingEffectLabel : null,
+        belastung: zahl(s.activityTrainingLoad),
+        intensitaetsMinuten:
+          s.moderateIntensityMinutes != null || s.vigorousIntensityMinutes != null
+            ? {
+                moderat: zahl(s.moderateIntensityMinutes),
+                intensiv: zahl(s.vigorousIntensityMinutes),
+              }
+            : null,
+      };
+    }
+
+    if (s.averagePower != null || s.normalizedPower != null) {
+      const arbeit = zahl(s.totalWork);
+      ergebnis.leistung = {
+        durchschnitt: zahl(s.averagePower),
+        normalisiert: zahl(s.normalizedPower),
+        maximum: zahl(s.maxPower),
+        best20Min: zahl(s.maxPowerTwentyMinutes),
+        /* totalWork kommt in Kilojoule — bei Garmin ist das bereits kJ */
+        arbeitKj: arbeit != null ? Math.round(arbeit) : null,
+      };
+    }
+
+    if (s.elevationGain != null || s.maxElevation != null) {
+      ergebnis.hoehe = {
+        aufstiegM: zahl(s.elevationGain),
+        abstiegM: zahl(s.elevationLoss),
+        maxM: zahl(s.maxElevation),
+        minM: zahl(s.minElevation),
+      };
+    }
+
+    if (s.averageSpeed != null) {
+      ergebnis.tempo = {
+        /* m/s -> km/h */
+        avgKmh: s.averageSpeed != null ? Math.round(Number(s.averageSpeed) * 3.6 * 10) / 10 : null,
+        maxKmh: s.maxSpeed != null ? Math.round(Number(s.maxSpeed) * 3.6 * 10) / 10 : null,
+      };
+    }
+
+    if (s.averageBikeCadence != null || s.maxBikeCadence != null) {
+      ergebnis.kadenz = {
+        durchschnitt: zahl(s.averageBikeCadence),
+        maximum: zahl(s.maxBikeCadence),
+      };
+    }
+
+    if (typeof roh?.locationName === 'string') ergebnis.ort = roh.locationName;
+    if (typeof roh?.description === 'string') ergebnis.beschreibung = roh.description;
+  } catch {
+    /* ohne Zusammenfassung bleiben die Zonen trotzdem nutzbar */
+  }
+
+  /* Material (Rad, Schuhe) */
+  try {
+    const gear = (await garmin.getActivityGear(activityId)) as Array<Record<string, unknown>>;
+    const erstes = Array.isArray(gear) ? gear[0] : undefined;
+    const name = erstes?.customMakeModel ?? erstes?.displayName;
+    if (typeof name === 'string' && name.trim()) ergebnis.material = name.trim();
+  } catch {
+    /* kein Material hinterlegt */
+  }
+
+  return ergebnis;
+}

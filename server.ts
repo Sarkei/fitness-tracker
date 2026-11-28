@@ -36,7 +36,7 @@ import {
   SYNC_INTERVAL_OPTIONS,
   type IntervalsSettings,
 } from "./src/lib/intervals";
-import { anmelden, bestaetigeMfa, entschluesseln, verschluesseln, tagVoll, historieVoll, koerperWerte, aktivitaeten as garminAktivitaetenLogin, schreibeGewicht, schreibeWasser, tokensGueltig, garminZeitreiheLogin, type LoginTag } from "./src/lib/garminLogin";
+import { anmelden, bestaetigeMfa, entschluesseln, verschluesseln, tagVoll, historieVoll, koerperWerte, aktivitaeten as garminAktivitaetenLogin, schreibeGewicht, schreibeWasser, tokensGueltig, garminZeitreiheLogin, garminAktivitaetDetail, type LoginTag } from "./src/lib/garminLogin";
 import {
   HEALTH_FELDER,
   HEALTH_FELD_LABEL,
@@ -7025,6 +7025,88 @@ ${JSON.stringify(userCtx, null, 2)}
   };
 
   /**
+   * Garmin-Gewicht ins Profil übernehmen.
+   *
+   * Tims Befund: Das aktuelle Gewicht in den Einstellungen wurde von Garmin nie
+   * aktualisiert. Ursache: die Wiegungen landeten zwar in `garmin_days`
+   * (`weight_kg`), aber niemand schrieb sie nach `users.measurements.weight` —
+   * und von dort liest das Profil. Der Schreibweg (App → Garmin) existierte,
+   * der Leseweg fehlte.
+   *
+   * Regeln:
+   *  - nur die jüngste Wiegung der letzten 14 Tage zählt
+   *  - `measurements.weight` wird nur vorwärts gesetzt, wenn die Wiegung neuer
+   *    ist als `weightSourceAt` — sonst würde ein alter Wert einen manuell
+   *    eingetragenen überschreiben
+   *  - der Verlauf (`weightHistory`) wird ergänzt, nicht ersetzt
+   */
+  const uebernehmeGarminGewicht = async (userId: number): Promise<void> => {
+    try {
+      const juengste = await pool.query(
+        `SELECT date::text AS date, weight_kg
+           FROM garmin_days
+          WHERE user_id = $1 AND weight_kg IS NOT NULL AND weight_kg > 20 AND weight_kg < 400
+            AND date >= CURRENT_DATE - 14
+          ORDER BY date DESC
+          LIMIT 1`,
+        [userId],
+      );
+      const row = juengste.rows[0];
+      if (!row) return;
+
+      const kg = Math.round(Number(row.weight_kg) * 10) / 10;
+      const datum = String(row.date);
+
+      const u = await pool.query(
+        "SELECT measurements, weight_history FROM users WHERE id=$1",
+        [userId],
+      );
+      const messungen = (u.rows[0]?.measurements ?? {}) as Record<string, unknown>;
+      const verlauf = Array.isArray(u.rows[0]?.weight_history)
+        ? (u.rows[0].weight_history as Array<{ date?: string; value?: number }>)
+        : [];
+
+      const bisherigesGewicht = Number(messungen.weight);
+      const quelleAm = String(messungen.weightSourceAt ?? "");
+
+      /* Schon aktueller? Dann nichts tun. */
+      if (quelleAm >= datum && Number.isFinite(bisherigesGewicht) && bisherigesGewicht > 0) return;
+      /* Gleicher Wert, nur älteres Datum: auch nichts tun. */
+      if (Math.abs(bisherigesGewicht - kg) < 0.05 && quelleAm === datum) return;
+
+      const neueMessungen = {
+        ...messungen,
+        weight: kg,
+        /* Merker, damit ein alter Garmin-Wert keinen neueren überschreibt. */
+        weightSourceAt: datum,
+        weightSource: "garmin",
+      };
+
+      /*
+       * Verlauf ergänzen: pro Tag ein Eintrag. Ein vorhandener Eintrag desselben
+       * Tages wird ersetzt, nicht verdoppelt.
+       */
+      const ohneTag = verlauf.filter((v) => String(v?.date ?? "").slice(0, 10) !== datum);
+      const neuerVerlauf = [...ohneTag, { date: datum, value: kg }]
+        .filter((v) => Number.isFinite(Number(v?.value)))
+        .sort((a, b) => String(a.date).localeCompare(String(b.date)))
+        .slice(-400);
+
+      await pool.query(
+        `UPDATE users
+            SET measurements = $2::jsonb,
+                weight_history = $3::jsonb,
+                updated_at = NOW()
+          WHERE id = $1`,
+        [userId, JSON.stringify(neueMessungen), JSON.stringify(neuerVerlauf)],
+      );
+      console.log(`[garmin] Gewicht aus Profil uebernommen: ${kg} kg (${datum})`);
+    } catch (e) {
+      console.warn("[garmin] Gewicht uebernehmen:", e instanceof Error ? e.message : e);
+    }
+  };
+
+  /**
    * Aktivitaeten dauerhaft ablegen.
    *
    * Trainings, die Tim mit der Uhr aufzeichnet, kommen NICHT ueber die
@@ -7420,6 +7502,44 @@ ${JSON.stringify(userCtx, null, 2)}
    * getrennt von `/api/integrations/garmin`, damit ein Takt von 1 s nicht die
    * ganze Garmin-Antwort samt Tagesreihe durch das Netz zieht.
    */
+  /**
+   * Ausführliche Auswertung einer Aktivität (Zonen, Effekt, Leistung, Höhen).
+   *
+   * Ergänzt den Zeitreihen-Endpunkt: der liefert Verläufe, dieser hier die
+   * Kennzahlen, die Garmin Connect zusätzlich berechnet. Antwort wird 10 Minuten
+   * gecacht — die Werte einer abgeschlossenen Einheit ändern sich nicht mehr.
+   */
+  app.get("/api/integrations/garmin/activities/:id/detail", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const id = String(req.params.id).replace(/^garmin[-_]/, '');
+      const activityId = Number(id);
+      if (!Number.isFinite(activityId) || activityId <= 0) {
+        res.status(400).json({ error: "Ungültige Aktivität." });
+        return;
+      }
+      const gehoert = await pool.query(
+        "SELECT 1 FROM garmin_activities WHERE user_id = $1 AND activity_id = $2 LIMIT 1",
+        [req.userId, activityId],
+      );
+      if ((gehoert.rowCount ?? 0) === 0) {
+        res.status(404).json({ error: "Einheit nicht gefunden." });
+        return;
+      }
+      const g = await readGarminSettings(req.userId!);
+      if (!g.login?.tokens) {
+        res.status(400).json({ error: "Garmin-Login ist nicht verbunden." });
+        return;
+      }
+      const tokens = entschluesseln(g.login.tokens);
+      const detail = await garminAktivitaetDetail(tokens, activityId);
+      res.json({ aktivitaetId: String(activityId), ...detail });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Detail fehlgeschlagen.";
+      console.error("[garmin] Aktivitaets-Detail:", msg);
+      res.status(500).json({ error: msg });
+    }
+  });
+
   app.get("/api/integrations/sync-status", requireAuth, async (req: AuthRequest, res) => {
     const laufend = garminSyncLaufend.get(req.userId!);
     const letzter = letzterLaufVon(req.userId!);
@@ -7958,6 +8078,7 @@ ${JSON.stringify(userCtx, null, 2)}
       await speichereGarminTage(req.userId!, cache.tage).catch((e) =>
         console.warn("[garmin] Historie:", e),
       );
+      await uebernehmeGarminGewicht(req.userId!);
       const ersteAktivitaeten = await syncGarminAktivitaeten(apiKey, 40).catch(() => []);
       await speichereGarminAktivitaeten(req.userId!, ersteAktivitaeten).catch(() => {});
       res.json({
@@ -8020,6 +8141,7 @@ ${JSON.stringify(userCtx, null, 2)}
       await speichereGarminTage(req.userId!, cache.tage).catch((e) =>
         console.warn("[garmin] Historie:", e),
       );
+      await uebernehmeGarminGewicht(req.userId!);
       garminSyncLaufend.delete(req.userId!);
       res.json({
         ok: true,
@@ -9018,6 +9140,8 @@ ${JSON.stringify(userCtx, null, 2)}
             }
 
             await speichereLoginTage(userId, tage);
+            /* Gewicht ins Profil nachziehen — sonst bleibt es auf dem alten Stand. */
+            await uebernehmeGarminGewicht(userId);
 
             /* Cache fuer die Ansichten mitschreiben. */
             const cacheTage = [...(g.cache?.tage ?? [])];
@@ -9103,6 +9227,7 @@ ${JSON.stringify(userCtx, null, 2)}
             lastVollSyncAt: new Date().toISOString(),
           });
           await speichereGarminTage(userId, cache.tage).catch(() => {});
+          await uebernehmeGarminGewicht(userId);
           const aktivitaetenBg = await syncGarminAktivitaeten(g.apiKey, 40).catch(() => []);
           await speichereGarminAktivitaeten(userId, aktivitaetenBg).catch((e) => {
             console.warn('[garmin] Aktivitaeten speichern:', e);

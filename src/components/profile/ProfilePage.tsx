@@ -16,12 +16,9 @@ import ErrorBanner from '@/src/components/ui/ErrorBanner';
 import type { Post } from '@/src/lib/useSocial';
 import { cn } from '@/src/lib/utils';
 import ReportHistoryView from './ReportHistoryView';
-import IntervalsConnect from './IntervalsConnect';
 import MealplannerConnect from './MealplannerConnect';
-import GarminConnect from './GarminConnect';
 import SyncKarte from './SyncKarte';
 import GarminLogin from './GarminLogin';
-import HandyHealthKarte from './HandyHealthKarte';
 import { Card, PageHeader } from '@/src/simple/ui';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
@@ -36,7 +33,6 @@ import {
   overlayPortal,
   useMobileOverlaySheet,
 } from '@/src/lib/mobileViewport';
-import PushoverKarte from './PushoverKarte';
 import PushKarte from './PushKarte';
 import FastingSettings from './FastingSettings';
 
@@ -576,20 +572,6 @@ export default function ProfilePage() {
             ))}
           </div>
 
-          <Card className="space-y-2 p-4">
-            <p className="text-[11.5px] font-semibold">Einstellungen</p>
-            <p className="text-[10.5px] leading-relaxed text-[var(--muted)]">
-              Name, Sprache, Erscheinungsmodus und Fasten findest du im Tab „Konto".
-            </p>
-            <button
-              type="button"
-              onClick={() => setTab('account')}
-              className="min-h-[36px] rounded-lg border border-[var(--border-muted)] px-3 text-[11px] font-semibold text-[var(--simple-accent)]"
-            >
-              Zu den Einstellungen
-            </button>
-          </Card>
-
         </div>
       )}
 
@@ -939,22 +921,22 @@ export default function ProfilePage() {
           {/* Ein Knopf fuer alle Quellen — vorher hatte jede Karte ihren eigenen. */}
           <SyncKarte />
 
+          {/*
+            Datenquellen: nur noch der Login.
+            Die Personal-API (apiKey), Intervals.icu und Handy-Health sind raus —
+            Tim nutzt ausschließlich den Garmin-Login. Die Endpunkte im Server
+            bleiben bestehen; sie werden nur nicht mehr angeboten.
+          */}
           <Gruppe titel="Datenquellen" hinweis="Woher deine Werte kommen">
-            <GarminConnect />
-            {/* Zweiter Weg zur Uhr: kein Tageslimit, alle Schlafwerte. */}
             <GarminLogin />
-            <IntervalsConnect />
-            {/*
-              Handy-Health: zeigt sich nur auf dem Handy und dort nur mit der
-              Plattform, die es gibt (Android → Health Connect, iPhone → Apple
-              Health). Am Rechner steht stattdessen ein Hinweis.
-            */}
-            <HandyHealthKarte />
           </Gruppe>
 
+          {/*
+            Benachrichtigungen: nur die App-eigenen Push-Nachrichten.
+            Pushover ist entfernt.
+          */}
           <Gruppe titel="Benachrichtigungen" hinweis="Wie du erinnert wirst">
             <PushKarte beschreibung="Nachrichten aufs Handy, auch wenn die App geschlossen ist." />
-            <PushoverKarte beschreibung="Pushover schickt dir Erinnerungen und Hinweise aufs Handy. Beide Werte stehen in deinem Pushover-Konto." />
           </Gruppe>
 
           <Gruppe titel="Mahlzeiten" hinweis="Verbindung zum Mealplanner">

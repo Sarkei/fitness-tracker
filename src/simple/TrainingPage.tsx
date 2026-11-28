@@ -261,6 +261,18 @@ export default function TrainingPage() {
   /** Wochenplan-Einträge des gewählten Tages. */
   const planHeute = wochenPlan.filter((z) => z.datum === selectedYmd);
 
+  /*
+   * Einheit von der Uhr am gewählten Tag.
+   *
+   * Tims Vorgabe: Wer an einem Ruhetag trainiert hat, soll hier dieselbe Ansicht
+   * sehen wie auf der Startseite — Aktivität mit Kennzahlen, keine Ruhetag-Box.
+   */
+  const uhrAmTag =
+    uhrEinheiten.find((e) => String(e.date ?? e.start_date_local ?? '').slice(0, 10) === selectedYmd) ??
+    null;
+  /** Ist an diesem Tag überhaupt etwas passiert? */
+  const tagHatAktivitaet = Boolean(trainingAmTag || uhrAmTag || planHeute.length > 0);
+
   // Auswertungen
   const streak = workoutStreak(workouts);
   const diesenMonat = workoutsThisMonth(workouts);
@@ -525,33 +537,110 @@ export default function TrainingPage() {
         <Card className="flex flex-col p-5 lg:col-span-2">
           <div className="flex items-start gap-3">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--simple-accent-soft)] text-[var(--simple-accent)]">
-              {planDay?.isRest && planHeute.length === 0 ? <Moon className="h-5 w-5" /> : <Dumbbell className="h-5 w-5" />}
+              {!tagHatAktivitaet && planDay?.isRest ? <Moon className="h-5 w-5" /> : <Dumbbell className="h-5 w-5" />}
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
                 {DAY_LABELS[selected]} · {Number(selectedYmd.slice(8, 10))}. {Number(selectedYmd.slice(5, 7))}.
               </p>
               <p className="text-lg font-semibold leading-tight">
-                {trainingAmTag?.name || (planHeute.length > 0 && planHeute[0].name) || planDay?.title || (planDay?.isRest ? 'Ruhetag' : 'Training')}
+                {trainingAmTag?.name || String(uhrAmTag?.name ?? '') || (planHeute.length > 0 && planHeute[0].name) || planDay?.title || (planDay?.isRest ? 'Ruhetag' : 'Training')}
               </p>
               <p className="mt-0.5 text-xs text-[var(--text-muted)]">
-                {trainingAmTag
-                  ? `erledigt · ${trainingAmTag.duration} min`
-                  : planHeute.length > 0
-                    ? `aus deinem Wochenplan · ${planHeute.reduce((a, z) => a + (z.inhalt?.uebungen?.length ?? 0), 0)} Übungen`
-                    : planDay?.isRest
-                      ? 'Erholung — kein Training geplant.'
-                      : `${(planDay?.exercises ?? []).length} Übungen${planDay?.estimatedDuration ? ` · ca. ${planDay.estimatedDuration} min` : ''}`}
+                {trainingAmTag?.source === 'garmin' || uhrAmTag
+                  ? 'erledigt · von der Uhr'
+                  : trainingAmTag
+                    ? 'erledigt'
+                    : planHeute.length > 0
+                      ? `aus deinem Wochenplan · ${planHeute.reduce((a, z) => a + (z.inhalt?.uebungen?.length ?? 0), 0)} Übungen`
+                      : planDay?.isRest
+                        ? 'Erholung — kein Training geplant.'
+                        : `${(planDay?.exercises ?? []).length} Übungen${planDay?.estimatedDuration ? ` · ca. ${planDay.estimatedDuration} min` : ''}`}
               </p>
             </div>
-            <button
-              className="flex shrink-0 items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold"
-              style={{ background: 'var(--simple-accent)', color: 'var(--simple-accent-ink)' }}
-              onClick={() => setRunning(true)}
-            >
-              <Play className="h-4 w-4" /> {trainingAmTag ? 'Nochmal' : 'Start'}
-            </button>
           </div>
+
+          {/*
+            * Kennzahlen der Einheit — dieselbe Ansicht wie auf der Startseite.
+            * Vorher stand hier nur „erledigt · undefined min", weil Garmin-Einheiten
+            * kein `duration`-Feld haben, sondern `duration_min`.
+            */}
+          {(() => {
+            const e = uhrAmTag;
+            const istGarmin = trainingAmTag?.source === 'garmin';
+            let distanz: number | null = null;
+            let minuten: number | null = null;
+            let pulsOe: number | null = null;
+            let pulsMax: number | null = null;
+            let kcal: number | null = null;
+
+            if (istGarmin && trainingAmTag) {
+              distanz = trainingAmTag.distance_km != null ? Number(trainingAmTag.distance_km) : null;
+              minuten = trainingAmTag.duration_min != null ? Number(trainingAmTag.duration_min) : null;
+              pulsOe = trainingAmTag.avg_hr != null ? Number(trainingAmTag.avg_hr) : null;
+              pulsMax = trainingAmTag.max_hr != null ? Number(trainingAmTag.max_hr) : null;
+              kcal = trainingAmTag.calories != null ? Number(trainingAmTag.calories) : null;
+            } else if (e) {
+              distanz = e.distance != null ? Number(e.distance) / 1000 : null;
+              const sek =
+                e.moving_time != null ? Number(e.moving_time) : e.elapsed_time != null ? Number(e.elapsed_time) : null;
+              minuten = sek != null && sek > 0 ? Math.round(sek / 60) : null;
+              pulsOe = e.avg_hr != null ? Number(e.avg_hr) : null;
+              pulsMax = e.max_hr != null ? Number(e.max_hr) : null;
+              kcal = e.calories != null ? Number(e.calories) : null;
+            } else if (trainingAmTag) {
+              minuten = dauerMinuten(trainingAmTag) || null;
+            }
+
+            const zeilen: Array<{ label: string; wert: string }> = [];
+            if (distanz != null && distanz > 0) zeilen.push({ label: 'Distanz', wert: `${distanz.toFixed(2)} km` });
+            if (minuten != null && minuten > 0) zeilen.push({ label: 'Dauer', wert: `${Math.round(minuten)} min` });
+            if (pulsOe != null) zeilen.push({ label: 'Ø Puls', wert: `${Math.round(pulsOe)} bpm` });
+            if (pulsMax != null) zeilen.push({ label: 'Max', wert: `${Math.round(pulsMax)} bpm` });
+            if (kcal != null) zeilen.push({ label: 'Kalorien', wert: `${Math.round(kcal)} kcal` });
+            if (distanz != null && distanz > 0 && minuten != null && minuten > 0) {
+              const pace = (minuten * 60) / distanz;
+              zeilen.push({
+                label: 'Ø Pace',
+                wert: `${Math.floor(pace / 60)}:${String(Math.round(pace % 60)).padStart(2, '0')} min/km`,
+              });
+            }
+            if (!zeilen.length) return null;
+
+            /* Uhr-Einheiten öffnen ihre Detailseite mit Zonen und Diagrammen. */
+            const garminId = istGarmin ? trainingAmTag?.id : uhrAmTag ? String(uhrAmTag.id ?? '') : null;
+            const inhalt = (
+              <>
+                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {zeilen.map((z) => (
+                    <div key={z.label} className="rounded-lg bg-[var(--border-muted)]/30 px-3 py-2">
+                      <p className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
+                        {z.label}
+                      </p>
+                      <p className="text-[13.5px] font-semibold tabular-nums">{z.wert}</p>
+                    </div>
+                  ))}
+                </div>
+                {garminId && (
+                  <p className="mt-2 text-[10.5px] font-semibold text-[var(--simple-accent)]">
+                    Antippen für Zonen, Effekt und Verlauf
+                  </p>
+                )}
+              </>
+            );
+
+            if (!garminId) return inhalt;
+
+            return (
+              <button
+                type="button"
+                onClick={() => navigate(`/einheit/${encodeURIComponent(garminId)}`)}
+                className="w-full text-left"
+              >
+                {inhalt}
+              </button>
+            );
+          })()}
 
           {planDay?.description && (
             <p className="mt-3 rounded-lg bg-[var(--border-muted)]/30 px-3 py-2 text-[12px] leading-relaxed text-[var(--text-muted)]">
@@ -633,30 +722,26 @@ export default function TrainingPage() {
             </div>
           )}
 
-          {planDay?.isRest && planHeute.length === 0 && (
-            <EmptyState
-              icon={<Moon className="h-6 w-6" />}
-              title="Ruhetag"
-              hint="Muskeln wachsen in der Pause. Wenn du trotzdem trainieren willst, erfass es einfach."
-              action={
-                <GhostButton onClick={() => setRunning(true)}>
-                  <Play className="h-3.5 w-3.5" /> Trotzdem trainieren
-                </GhostButton>
-              }
-            />
+          {/*
+            * Ruhetag nur, wenn an dem Tag wirklich nichts passiert ist — und als
+            * schmale Zeile. Die große Box mit Mond, Titel und Erklärsatz nahm den
+            * halben Bildschirm ein, auch wenn die Uhr eine Einheit hatte.
+            */}
+          {!tagHatAktivitaet && planDay?.isRest && (
+            <div className="mt-4 flex items-center gap-2 rounded-lg border border-[var(--border-muted)] px-3 py-2">
+              <Moon className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
+              <p className="min-w-0 flex-1 text-[11.5px] text-[var(--text-muted)]">
+                Ruhetag — Erholung ist Teil des Plans.
+              </p>
+              <GhostButton onClick={() => setRunning(true)}>Trotzdem trainieren</GhostButton>
+            </div>
           )}
         </Card>
 
         {/* Rechte Spalte: füllt die Höhe der linken Karte, damit beide Unterkanten abschließen */}
         <div className="flex h-full flex-col gap-4">
           <Card className="p-5">
-            <SectionTitle
-              action={
-                <GhostButton onClick={() => navigate('/plan')}>Plan bearbeiten</GhostButton>
-              }
-            >
-              Diese Woche
-            </SectionTitle>
+            <SectionTitle>Diese Woche</SectionTitle>
             <div className="space-y-2.5">
               <ProgressBar
                 value={wocheEinheiten}

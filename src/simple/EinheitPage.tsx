@@ -54,6 +54,43 @@ type Einheit = {
   source?: string | null;
 };
 
+/**
+ * Zusatz-Auswertung aus Garmin Connect (`/detail`).
+ * Alle Felder sind optional — was die Uhr nicht aufgezeichnet hat, fehlt.
+ */
+type GarminDetail = {
+  zonenHerz?: Array<{ zone: number; abBpm: number; sekunden: number }>;
+  zonenLeistung?: Array<{ zone: number; abWatt: number; sekunden: number }>;
+  runden?: Array<{
+    nummer: number;
+    distanzKm: number | null;
+    dauerMin: number | null;
+    avgHr: number | null;
+    avgPower: number | null;
+    aufstiegM: number | null;
+  }>;
+  effekt?: {
+    aerob: number | null;
+    anaerob: number | null;
+    label: string | null;
+    belastung: number | null;
+    intensitaetsMinuten: { moderat: number | null; intensiv: number | null } | null;
+  };
+  leistung?: {
+    durchschnitt: number | null;
+    normalisiert: number | null;
+    maximum: number | null;
+    best20Min: number | null;
+    arbeitKj: number | null;
+  };
+  kadenz?: { durchschnitt: number | null; maximum: number | null };
+  hoehe?: { aufstiegM: number | null; abstiegM: number | null; maxM: number | null; minM: number | null };
+  tempo?: { avgKmh: number | null; maxKmh: number | null };
+  material?: string | null;
+  ort?: string | null;
+  beschreibung?: string | null;
+};
+
 /** Typbezeichnung auf Deutsch. */
 function typLabel(typ?: string | null): string {
   const t = String(typ ?? '').toLowerCase();
@@ -328,6 +365,12 @@ export default function EinheitPage() {
   const [punkte, setPunkte] = useState<Punkt[]>([]);
   const [laedt, setLaedt] = useState(true);
   const [fehler, setFehler] = useState<string | null>(null);
+  /*
+   * Zusatz-Auswertung von Garmin: Zonen, Trainings-Effekt, Leistung, Runden.
+   * Diese Werte berechnet Garmin Connect selbst — sie stehen nicht in der
+   * Aktivitätsliste und auch nicht in den Zeitreihen.
+   */
+  const [detail, setDetail] = useState<GarminDetail | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -358,10 +401,14 @@ export default function EinheitPage() {
       api<{ punkte?: Punkt[] }>(`/api/integrations/garmin/activities/${encodeURIComponent(id)}/timeseries`).catch(
         () => ({ punkte: [] as Punkt[] }),
       ),
+      api<GarminDetail>(`/api/integrations/garmin/activities/${encodeURIComponent(id)}/detail`).catch(
+        () => ({}) as GarminDetail,
+      ),
     ])
-      .then(([e, ts]) => {
+      .then(([e, ts, det]) => {
         if (abgebrochen) return;
         setEinheit(e);
+        setDetail(det && Object.keys(det).length ? det : null);
         setPunkte(Array.isArray(ts.punkte) ? ts.punkte : []);
         if (!e) setFehler('Diese Einheit wurde nicht gefunden.');
       })
@@ -477,6 +524,190 @@ export default function EinheitPage() {
           <Wert label="Aufstieg" wert={String(Math.round(einheit.total_elevation_gain))} einheit="m" />
         )}
       </div>
+
+      {/* Zusatz-Auswertung von Garmin: Zonen, Effekt, Leistung, Runden */}
+      {detail && (() => {
+        const zonen = detail.zonenHerz ?? [];
+        const zonenSumme = zonen.reduce((a, z) => a + z.sekunden, 0);
+        const pZonen = detail.zonenLeistung ?? [];
+        const pSumme = pZonen.reduce((a, z) => a + z.sekunden, 0);
+        const runden = detail.runden ?? [];
+        const eff = detail.effekt;
+        const leist = detail.leistung;
+        const kennzahlen: Array<{ label: string; wert: string }> = [];
+
+        if (leist?.durchschnitt != null) kennzahlen.push({ label: 'Leistung Ø', wert: `${Math.round(leist.durchschnitt)} W` });
+        if (leist?.normalisiert != null) kennzahlen.push({ label: 'Normalisiert', wert: `${Math.round(leist.normalisiert)} W` });
+        if (leist?.maximum != null) kennzahlen.push({ label: 'Leistung max.', wert: `${Math.round(leist.maximum)} W` });
+        if (leist?.best20Min != null) kennzahlen.push({ label: 'Best 20 min', wert: `${Math.round(leist.best20Min)} W` });
+        if (leist?.arbeitKj != null) kennzahlen.push({ label: 'Arbeit', wert: `${Math.round(leist.arbeitKj)} kJ` });
+        if (detail.kadenz?.durchschnitt != null) kennzahlen.push({ label: 'Kadenz Ø', wert: `${Math.round(detail.kadenz.durchschnitt)} rpm` });
+        if (detail.tempo?.avgKmh != null) kennzahlen.push({ label: 'Tempo Ø', wert: `${detail.tempo.avgKmh} km/h` });
+        if (detail.tempo?.maxKmh != null) kennzahlen.push({ label: 'Tempo max.', wert: `${detail.tempo.maxKmh} km/h` });
+        if (detail.hoehe?.abstiegM != null) kennzahlen.push({ label: 'Abstieg', wert: `${Math.round(detail.hoehe.abstiegM)} m` });
+        if (detail.hoehe?.maxM != null) kennzahlen.push({ label: 'Höchster Punkt', wert: `${Math.round(detail.hoehe.maxM)} m` });
+        if (detail.material) kennzahlen.push({ label: 'Material', wert: detail.material });
+        if (detail.ort) kennzahlen.push({ label: 'Ort', wert: detail.ort });
+
+        const zonenFarbe = ['#8ab4a8', '#5fa88c', '#4d9f6b', '#d98a2b', '#dc5a4a', '#a855f7', '#6b7280'];
+
+        return (
+          <>
+            {eff && (eff.aerob != null || eff.anaerob != null) && (
+              <section className="rounded-2xl border border-[var(--border-muted)] bg-[var(--card-bg)] p-4">
+                <p className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold">
+                  <TrendingUp className="h-3.5 w-3.5 text-[var(--simple-accent)]" /> Trainings-Effekt
+                </p>
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                  <div className="rounded-xl bg-[var(--surface-gray)] px-3 py-2">
+                    <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">Aerob</p>
+                    <p className="text-[15px] font-semibold tabular-nums">
+                      {eff.aerob != null ? eff.aerob.toFixed(1) : '—'}
+                      <span className="ml-1 text-[10px] font-normal text-[var(--text-muted)]">/ 5</span>
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-[var(--surface-gray)] px-3 py-2">
+                    <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">Anaerob</p>
+                    <p className="text-[15px] font-semibold tabular-nums">
+                      {eff.anaerob != null ? eff.anaerob.toFixed(1) : '—'}
+                      <span className="ml-1 text-[10px] font-normal text-[var(--text-muted)]">/ 5</span>
+                    </p>
+                  </div>
+                  {eff.belastung != null && (
+                    <div className="rounded-xl bg-[var(--surface-gray)] px-3 py-2">
+                      <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">Belastung</p>
+                      <p className="text-[15px] font-semibold tabular-nums">{Math.round(eff.belastung)}</p>
+                    </div>
+                  )}
+                  {eff.intensitaetsMinuten && (
+                    <div className="rounded-xl bg-[var(--surface-gray)] px-3 py-2">
+                      <p className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">Intensiv</p>
+                      <p className="text-[15px] font-semibold tabular-nums">
+                        {Math.round((eff.intensitaetsMinuten.moderat ?? 0) + (eff.intensitaetsMinuten.intensiv ?? 0))}
+                        <span className="ml-1 text-[10px] font-normal text-[var(--text-muted)]">min</span>
+                      </p>
+                    </div>
+                  )}
+                </div>
+                {eff.label && (
+                  <p className="mt-2 text-[11px] text-[var(--text-muted)]">
+                    Garmin stuft die Einheit als <b>{eff.label}</b> ein.
+                  </p>
+                )}
+              </section>
+            )}
+
+            {zonen.length > 0 && zonenSumme > 0 && (
+              <section className="rounded-2xl border border-[var(--border-muted)] bg-[var(--card-bg)] p-4">
+                <p className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold">
+                  <Heart className="h-3.5 w-3.5 text-[#dc5a4a]" /> Herzfrequenz-Zonen
+                </p>
+                <div className="space-y-1.5">
+                  {zonen.map((z) => {
+                    const anteil = z.sekunden / zonenSumme;
+                    return (
+                      <div key={z.zone} className="flex items-center gap-2">
+                        <span className="w-8 shrink-0 text-[10px] font-semibold text-[var(--text-muted)]">Z{z.zone}</span>
+                        <span className="w-12 shrink-0 text-right text-[10px] tabular-nums text-[var(--text-muted)]">
+                          {z.abBpm}
+                        </span>
+                        <span className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--border-muted)]/60">
+                          <span
+                            className="block h-full rounded-full"
+                            style={{
+                              width: `${Math.max(1, anteil * 100)}%`,
+                              background: zonenFarbe[(z.zone - 1) % zonenFarbe.length],
+                            }}
+                          />
+                        </span>
+                        <span className="w-14 shrink-0 text-right text-[10.5px] tabular-nums">
+                          {Math.floor(z.sekunden / 60)} min
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="mt-2 text-[10px] text-[var(--text-muted)]">Balkenlänge = Anteil an der Gesamtzeit, Zahl links = Zonenbeginn in bpm.</p>
+              </section>
+            )}
+
+            {pZonen.length > 0 && pSumme > 0 && (
+              <section className="rounded-2xl border border-[var(--border-muted)] bg-[var(--card-bg)] p-4">
+                <p className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold">
+                  <Zap className="h-3.5 w-3.5 text-[#d98a2b]" /> Leistungs-Zonen
+                </p>
+                <div className="space-y-1.5">
+                  {pZonen.map((z) => {
+                    const anteil = z.sekunden / pSumme;
+                    return (
+                      <div key={z.zone} className="flex items-center gap-2">
+                        <span className="w-8 shrink-0 text-[10px] font-semibold text-[var(--text-muted)]">Z{z.zone}</span>
+                        <span className="w-12 shrink-0 text-right text-[10px] tabular-nums text-[var(--text-muted)]">
+                          {z.abWatt} W
+                        </span>
+                        <span className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--border-muted)]/60">
+                          <span
+                            className="block h-full rounded-full"
+                            style={{
+                              width: `${Math.max(1, anteil * 100)}%`,
+                              background: zonenFarbe[(z.zone - 1) % zonenFarbe.length],
+                            }}
+                          />
+                        </span>
+                        <span className="w-14 shrink-0 text-right text-[10.5px] tabular-nums">
+                          {Math.floor(z.sekunden / 60)} min
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
+            {kennzahlen.length > 0 && (
+              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+                {kennzahlen.map((k) => (
+                  <Wert key={k.label} label={k.label} wert={k.wert} />
+                ))}
+              </div>
+            )}
+
+            {runden.length > 1 && (
+              <section className="rounded-2xl border border-[var(--border-muted)] bg-[var(--card-bg)] p-4">
+                <p className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold">
+                  <Activity className="h-3.5 w-3.5 text-[var(--text-muted)]" /> Runden
+                </p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[11.5px]">
+                    <thead className="text-[9.5px] uppercase tracking-[0.1em] text-[var(--text-muted)]">
+                      <tr>
+                        <th className="py-1 text-left font-semibold">#</th>
+                        <th className="py-1 text-right font-semibold">km</th>
+                        <th className="py-1 text-right font-semibold">min</th>
+                        <th className="py-1 text-right font-semibold">Puls</th>
+                        <th className="py-1 text-right font-semibold">Watt</th>
+                        <th className="py-1 text-right font-semibold">↑ m</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--border-muted)]">
+                      {runden.map((r) => (
+                        <tr key={r.nummer}>
+                          <td className="py-1 text-[var(--text-muted)]">{r.nummer}</td>
+                          <td className="py-1 text-right tabular-nums">{r.distanzKm?.toFixed(2) ?? '—'}</td>
+                          <td className="py-1 text-right tabular-nums">{r.dauerMin ?? '—'}</td>
+                          <td className="py-1 text-right tabular-nums">{r.avgHr ?? '—'}</td>
+                          <td className="py-1 text-right tabular-nums">{r.avgPower ?? '—'}</td>
+                          <td className="py-1 text-right tabular-nums">{r.aufstiegM ?? '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
+          </>
+        );
+      })()}
 
       {/* Diagramme */}
       <div className="space-y-3">
