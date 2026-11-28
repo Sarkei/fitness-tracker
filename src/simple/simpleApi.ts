@@ -55,7 +55,32 @@ export type WorkoutEntry = {
   duration: number;
   date: string;
   exercises?: Array<{ name: string; sets?: unknown }>;
+  /**
+   * Garmin-Einheiten liefern `duration_min` statt `duration`.
+   * Ohne dieses Feld blieben sie bei jeder Minuten-Summe außen vor — die
+   * Einheiten wurden gezählt, die Minuten aber nicht.
+   */
+  duration_min?: number | null;
+  distance_km?: number | null;
+  calories?: number | null;
+  avg_hr?: number | null;
+  max_hr?: number | null;
+  source?: string;
 };
+
+/**
+ * Dauer einer Einheit in Minuten — egal aus welcher Quelle.
+ *
+ * Eigene Workouts führen `duration` (Minuten), Garmin-Einheiten `duration_min`.
+ * Diese Funktion ist die einzige Stelle, die das wissen muss.
+ */
+export function dauerMinuten(w: WorkoutEntry): number {
+  const a = Number(w?.duration);
+  if (Number.isFinite(a) && a > 0) return a;
+  const b = Number(w?.duration_min);
+  if (Number.isFinite(b) && b > 0) return b;
+  return 0;
+}
 
 export const DAY_KEYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
 export const DAY_LABELS: Record<string, string> = {

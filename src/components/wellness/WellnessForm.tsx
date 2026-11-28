@@ -21,6 +21,8 @@ function formFarbe(tone: string): string {
 export default function WellnessForm() {
   const { daten } = useWellness();
   const tage = daten.tage;
+  /** Diagramme und Detail-Sheets: immer mind. 7 Tage, auch bei "Heute". */
+  const trendTage = daten.trendTage ?? tage;
   const [detail, setDetail] = useState<'form' | 'fitness' | 'ermuedung' | null>(null);
   const [tagOffen, setTagOffen] = useState<string | null>(null);
 
@@ -91,7 +93,7 @@ export default function WellnessForm() {
         <KennzahlSheet
           def={{ key: 'form', titel: 'Trainingsform (TSB)', format: (v) => String(Math.round(v)), hoeherBesser: true,
             hinweis: 'Fitness minus Ermüdung. Über 5 heißt frisch, unter -30 überlastet.' }}
-          punkte={tage.map((t) => ({ datum: t.date, wert: t.tsb ?? null }))}
+          punkte={trendTage.map((t) => ({ datum: t.date, wert: t.tsb ?? null }))}
           onClose={() => setDetail(null)}
         />
       )}
@@ -99,7 +101,7 @@ export default function WellnessForm() {
         <KennzahlSheet
           def={{ key: 'fitness', titel: 'Fitness (CTL)', format: (v) => String(Math.round(v)), hoeherBesser: true,
             hinweis: 'Langfristige Trainingsbelastung. Steigt langsam, fällt langsam.' }}
-          punkte={tage.map((t) => ({ datum: t.date, wert: t.ctl ?? null }))}
+          punkte={trendTage.map((t) => ({ datum: t.date, wert: t.ctl ?? null }))}
           onClose={() => setDetail(null)}
         />
       )}
@@ -107,7 +109,7 @@ export default function WellnessForm() {
         <KennzahlSheet
           def={{ key: 'ermuedung', titel: 'Ermüdung (ATL)', format: (v) => String(Math.round(v)), hoeherBesser: false,
             hinweis: 'Kurzfristige Belastung. Steigt nach harten Einheiten schnell, fällt schnell.' }}
-          punkte={tage.map((t) => ({ datum: t.date, wert: t.atl ?? null }))}
+          punkte={trendTage.map((t) => ({ datum: t.date, wert: t.atl ?? null }))}
           onClose={() => setDetail(null)}
         />
       )}

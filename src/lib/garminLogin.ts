@@ -648,7 +648,13 @@ export async function aktivitaeten(
       const datum = String(a.startTimeLocal ?? a.startTimeGMT ?? '').slice(0, 10);
       return datum >= grenzeYmd;
     });
-  } catch {
+  } catch (e) {
+    /*
+     * Nicht still verschlucken: ein leerer Rueckgabewert sieht sonst genauso aus
+     * wie "es gibt keine Aktivitaeten" — genau daran blieb unbemerkt, dass der
+     * Abruf scheiterte.
+     */
+    console.warn('[garmin-login] Aktivitaeten abrufen:', e instanceof Error ? e.message : e);
     return [];
   }
 }

@@ -47,6 +47,8 @@ export default function WellnessUebersicht() {
   const { daten } = useWellness();
   const navigate = useNavigate();
   const tage = daten.tage;
+  /** Diagramme und Detail-Sheets: immer mind. 7 Tage, auch bei "Heute". */
+  const trendTage = daten.trendTage ?? tage;
   const [offen, setOffen] = useState<string | null>(null);
   const [tagOffen, setTagOffen] = useState<string | null>(null);
   const [einheitOffen, setEinheitOffen] = useState<EinheitDaten | null>(null);
@@ -163,27 +165,27 @@ export default function WellnessUebersicht() {
     schlaf: {
       def: { key: 'schlaf', titel: 'Schlafdauer', einheit: 'h', format: (v) => v.toFixed(1), hoeherBesser: true,
         hinweis: 'Nacht für Nacht. Unter 7 Stunden gilt als zu kurz.' },
-      punkte: tage.map((t) => ({ datum: t.date, wert: schlafStunden(t.sleepSecs) })),
+      punkte: trendTage.map((t) => ({ datum: t.date, wert: schlafStunden(t.sleepSecs) })),
     },
     schritte: {
       def: { key: 'schritte', titel: 'Schritte', format: (v) => Math.round(v).toLocaleString('de-DE'), hoeherBesser: true,
         hinweis: 'Alltagsbewegung pro Tag.' },
-      punkte: tage.map((t) => ({ datum: t.date, wert: t.steps ?? null })),
+      punkte: trendTage.map((t) => ({ datum: t.date, wert: t.steps ?? null })),
     },
     hrv: {
       def: { key: 'hrv', titel: 'HRV', einheit: 'ms', hoeherBesser: true,
         hinweis: 'Herzfrequenzvariabilität. Sinkt sie über Tage, fehlt Erholung.' },
-      punkte: tage.map((t) => ({ datum: t.date, wert: t.hrv ?? null })),
+      punkte: trendTage.map((t) => ({ datum: t.date, wert: t.hrv ?? null })),
     },
     puls: {
       def: { key: 'puls', titel: 'Ruhepuls', einheit: 'bpm', hoeherBesser: false,
         hinweis: 'Steigt er bei gleicher Belastung, ist das ein Ermüdungszeichen.' },
-      punkte: tage.map((t) => ({ datum: t.date, wert: t.restingHr ?? null })),
+      punkte: trendTage.map((t) => ({ datum: t.date, wert: t.restingHr ?? null })),
     },
     form: {
       def: { key: 'form', titel: 'Trainingsform (TSB)', format: (v) => String(Math.round(v)), hoeherBesser: true,
         hinweis: 'Fitness minus Ermüdung. Über 5 heißt frisch, unter -30 überlastet.' },
-      punkte: tage.map((t) => ({ datum: t.date, wert: t.tsb ?? null })),
+      punkte: trendTage.map((t) => ({ datum: t.date, wert: t.tsb ?? null })),
     },
   };
 

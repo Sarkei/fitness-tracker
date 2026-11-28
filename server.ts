@@ -4299,6 +4299,139 @@ COMPARISON WITH WEEK ${plan.current_week - 1}:
 
   // ── Coach: Plans ──────────────────────────────────────────────────────────
 
+  /**
+   * Wochenziele durch den Coach bewerten und anpassen.
+   *
+   * Nur aktiv, wenn der Nutzer im Profil `goals.coachAdjustsWeeklyGoals` gesetzt
+   * hat. Dann schaut die KI auf die letzten vier Wochen (erledigt vs. geplant,
+   * Erholung, Gewichtstrend) und schlägt neue Zahlen für Einheiten und Minuten
+   * vor — mehr, wenn zuverlässig trainiert wurde, weniger, wenn Erholung oder
+   * Zeit fehlen. Die Änderung ist auf ±50 % um den bisherigen Wert begrenzt,
+   * damit kein Sprung entsteht.
+   */
+  app.post("/api/coach/weekly-goals/adjust", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const u = await pool.query("SELECT goals FROM users WHERE id=$1", [req.userId]);
+      const goals = (u.rows[0]?.goals ?? {}) as Record<string, unknown>;
+      if (!goals.coachAdjustsWeeklyGoals) {
+        res.status(400).json({ error: "Coach-Anpassung ist im Profil nicht aktiviert.", code: "DISABLED" });
+        return;
+      }
+      if (!resolveAiCapabilities().enabled) {
+        res.status(503).json({ error: "KI ist nicht konfiguriert (kein gültiger API-Key)." });
+        return;
+      }
+
+      const aktuellEinheiten = Number(goals.weeklySessions) || 3;
+      const aktuellMinuten = Number(goals.weeklyMinutes) || 150;
+
+      /* Letzte vier Wochen: was war geplant, was wurde gemacht? */
+      const seit = new Date();
+      seit.setDate(seit.getDate() - 28);
+      const seitYmd = seit.toISOString().slice(0, 10);
+      const erledigt = await pool.query(
+        `SELECT COUNT(*)::int AS n,
+                COALESCE(SUM(COALESCE(NULLIF(duration, 0), duration_min, 0)), 0)::int AS minuten
+           FROM (
+             SELECT duration, NULL::int AS duration_min, date::text AS d FROM workouts
+              WHERE user_id=$1 AND date >= $2::date
+             UNION ALL
+             SELECT NULL::int, ROUND(duration_s / 60.0)::int, date::text FROM garmin_activities
+              WHERE user_id=$1 AND date >= $2::date
+           ) x`,
+        [req.userId, seitYmd],
+      );
+      const ist = erledigt.rows[0] ?? { n: 0, minuten: 0 };
+
+      /* Erholung: HRV und Ruhepuls der letzten 14 Tage gegen die 14 davor. */
+      const erholung = await pool.query(
+        `SELECT
+           AVG(hrv) FILTER (WHERE date >= CURRENT_DATE - 13) AS hrv_neu,
+           AVG(hrv) FILTER (WHERE date < CURRENT_DATE - 13) AS hrv_alt,
+           AVG(resting_hr) FILTER (WHERE date >= CURRENT_DATE - 13) AS puls_neu,
+           AVG(resting_hr) FILTER (WHERE date < CURRENT_DATE - 13) AS puls_alt
+         FROM garmin_days WHERE user_id=$1 AND date >= CURRENT_DATE - 27`,
+        [req.userId],
+      );
+      const e = erholung.rows[0] ?? {};
+
+      const fakten = {
+        zielEinheitenWoche: aktuellEinheiten,
+        zielMinutenWoche: aktuellMinuten,
+        erledigtLetzte4Wochen: { einheiten: Number(ist.n) || 0, minuten: Number(ist.minuten) || 0 },
+        erholung: {
+          hrvLetzte14: e.hrv_neu != null ? Math.round(Number(e.hrv_neu)) : null,
+          hrvDavor14: e.hrv_alt != null ? Math.round(Number(e.hrv_alt)) : null,
+          ruhepulsLetzte14: e.puls_neu != null ? Math.round(Number(e.puls_neu)) : null,
+          ruhepulsDavor14: e.puls_alt != null ? Math.round(Number(e.puls_alt)) : null,
+        },
+        zielGewichtKg: goals.weight ?? null,
+      };
+
+      const antwort = await completeCoachJson(
+        [
+          {
+            role: "system",
+            content:
+              "Du bist Trainingscoach. Passe das wöchentliche Trainingspensum an. " +
+              "Antworte ausschließlich mit JSON der Form " +
+              '{"weeklySessions": <int 1-7>, "weeklyMinutes": <int 30-900>, "begruendung": "<ein Satz, deutsch>"}. ' +
+              "Regeln: Halte dich nah am bisherigen Ziel. Erhöhe nur, wenn mindestens 80 % des " +
+              "Pensums der letzten Wochen erledigt wurde und die Erholung stabil ist (HRV nicht " +
+              "deutlich gefallen, Ruhepuls nicht deutlich gestiegen). Senke, wenn weniger als die " +
+              "Hälfte erledigt wurde oder die Erholung leidet. Sonst lass die Zahlen gleich. " +
+              "Ändere pro Lauf höchstens um 50 Prozent.",
+          },
+          { role: "user", content: JSON.stringify(fakten) },
+        ],
+        "coach_workout",
+      );
+
+      let neu: { weeklySessions?: number; weeklyMinutes?: number; begruendung?: string };
+      try {
+        const roh = antwort.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+        neu = JSON.parse(roh);
+      } catch {
+        res.status(502).json({ error: "Antwort der KI war kein gültiges JSON." });
+        return;
+      }
+
+      const begrenze = (wert: unknown, alt: number, min: number, max: number): number => {
+        const n = Math.round(Number(wert));
+        if (!Number.isFinite(n)) return alt;
+        const unten = Math.max(min, Math.round(alt * 0.5));
+        const oben = Math.min(max, Math.round(alt * 1.5));
+        return Math.max(unten, Math.min(oben, n));
+      };
+
+      const naechsteEinheiten = begrenze(neu.weeklySessions, aktuellEinheiten, 1, 7);
+      const naechsteMinuten = begrenze(neu.weeklyMinutes, aktuellMinuten, 30, 900);
+
+      const zusammen = {
+        ...goals,
+        weeklySessions: naechsteEinheiten,
+        weeklyMinutes: naechsteMinuten,
+        weeklyGoalsAdjustedAt: new Date().toISOString(),
+      };
+      await pool.query("UPDATE users SET goals=$2::jsonb, updated_at=NOW() WHERE id=$1", [
+        req.userId,
+        JSON.stringify(zusammen),
+      ]);
+
+      res.json({
+        ok: true,
+        vorher: { weeklySessions: aktuellEinheiten, weeklyMinutes: aktuellMinuten },
+        nachher: { weeklySessions: naechsteEinheiten, weeklyMinutes: naechsteMinuten },
+        begruendung: String(neu.begruendung ?? "").slice(0, 400),
+        fakten,
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Anpassung fehlgeschlagen.";
+      console.error("coach/weekly-goals/adjust:", msg);
+      res.status(500).json({ error: msg });
+    }
+  });
+
   app.get("/api/exercise-name-localizations", requireAuth, async (_req: AuthRequest, res) => {
     try {
       const r = await pool.query(
@@ -6903,6 +7036,15 @@ ${JSON.stringify(userCtx, null, 2)}
     liste: GarminAktivitaet[],
   ): Promise<void> => {
     if (!liste.length) return;
+    /*
+     * Garmin liefert Sekunden und Höhenmeter als Kommazahlen
+     * (z. B. duration: 1796.916015625). duration_s, moving_s, avg_hr, max_hr und
+     * calories sind in der DB integer — ein einziger solcher Wert kippt den
+     * gesamten Batch-Insert (invalid input syntax for type integer), und damit
+     * landete gar keine Aktivität mehr in der App. Deshalb hier hart runden.
+     */
+    const ganz = (v: number | undefined): number | null =>
+      typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : null;
     const werte: unknown[] = [];
     const platzhalter: string[] = [];
     let i = 0;
@@ -6914,8 +7056,8 @@ ${JSON.stringify(userCtx, null, 2)}
       );
       werte.push(
         userId, a.activityId, a.date, a.name, a.type,
-        a.distanceM ?? null, a.durationSecs ?? null, a.movingSecs ?? null,
-        a.avgHr ?? null, a.maxHr ?? null, a.calories ?? null, a.elevationM ?? null,
+        a.distanceM ?? null, ganz(a.durationSecs), ganz(a.movingSecs),
+        ganz(a.avgHr), ganz(a.maxHr), ganz(a.calories), a.elevationM ?? null,
       );
     }
     await pool.query(
@@ -8917,7 +9059,9 @@ ${JSON.stringify(userCtx, null, 2)}
                     calories: Number(a.calories ?? 0) || undefined,
                     elevationM: Number(a.elevationGain ?? 0) || undefined,
                   })),
-                ).catch(() => {});
+                ).catch((e) => {
+                  console.warn('[garmin-login] Aktivitaeten speichern:', e);
+                });
               }
             }
 
@@ -8960,7 +9104,9 @@ ${JSON.stringify(userCtx, null, 2)}
           });
           await speichereGarminTage(userId, cache.tage).catch(() => {});
           const aktivitaetenBg = await syncGarminAktivitaeten(g.apiKey, 40).catch(() => []);
-          await speichereGarminAktivitaeten(userId, aktivitaetenBg).catch(() => {});
+          await speichereGarminAktivitaeten(userId, aktivitaetenBg).catch((e) => {
+            console.warn('[garmin] Aktivitaeten speichern:', e);
+          });
         } catch (e) {
           garminSyncLaufend.delete(userId);
           await writeGarminSettings(userId, {

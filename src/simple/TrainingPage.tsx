@@ -35,6 +35,7 @@ import { aufSyncFertig } from '../lib/syncStatus';
 import {
   DAY_LABELS,
   dayKeyOf,
+  dauerMinuten,
   deleteWorkout,
   fetchActivePlan,
   fetchWorkouts,
@@ -144,6 +145,14 @@ export default function TrainingPage() {
   const [laedt, setLaedt] = useState(true);
   /** Zähler für den Coach-Wizard; von der Plan-Seite aus über den State ausgelöst. */
   const [neuerPlanToken, setNeuerPlanToken] = useState(0);
+  /**
+   * Persönliche Wochenziele aus dem Profil.
+   *
+   * Vorher richtete sich der Fortschritt nach dem Plan (`geplanteTage`). Ohne
+   * aktiven Plan stand dort "2 / 0" — die Einheiten wurden gezählt, das Ziel war
+   * null. Jetzt gelten eigene Zahlen aus dem Profil, unabhängig vom Plan.
+   */
+  const [wochenZiel, setWochenZiel] = useState<{ einheiten: number; minuten: number } | null>(null);
 
   /*
    * „Neuer Plan" führt jetzt in die manuelle Planung (/plan). Wer den Plan lieber
@@ -170,6 +179,15 @@ export default function TrainingPage() {
       api<{ aktivitaeten?: Array<Record<string, unknown>> }>('/api/integrations/garmin/activities?limit=8')
         .then((r) => setUhrEinheiten(Array.isArray(r.aktivitaeten) ? r.aktivitaeten : []))
         .catch(() => setUhrEinheiten([]));
+      // Persönliche Wochenziele — unabhängig davon, ob ein Plan aktiv ist.
+      api<{ goals?: { weeklySessions?: number; weeklyMinutes?: number } }>('/api/profile')
+        .then((p) =>
+          setWochenZiel({
+            einheiten: Number(p?.goals?.weeklySessions) || 3,
+            minuten: Number(p?.goals?.weeklyMinutes) || 150,
+          }),
+        )
+        .catch(() => setWochenZiel({ einheiten: 3, minuten: 150 }));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Konnte nicht laden.');
     } finally {
@@ -254,6 +272,42 @@ export default function TrainingPage() {
   const muskel = muskelbalance(workouts, 30).slice(0, 7);
   const maxMuskel = Math.max(1, ...muskel.map((m) => m.saetze));
   const geplanteTage = days.filter((d) => !d.isRest).length;
+
+  /*
+   * Wochenfortschritt gegen die persönlichen Ziele.
+   *
+   * Gezählt wird alles, was in den letzten 7 Tagen passiert ist: eigene Workouts
+   * UND Einheiten von der Uhr. Vorher zählten nur die Workouts — ein Lauf von der
+   * Uhr fehlte in der Einheiten- und Minuten-Zahl.
+   */
+  const zielEinheiten = wochenZiel?.einheiten ?? 3;
+  const zielMinuten = wochenZiel?.minuten ?? 150;
+  const { wocheEinheiten, wocheMinuten } = useMemo(() => {
+    const ymdVon = shiftYmdLocal(today, -6);
+    let einheiten = 0;
+    let minuten = 0;
+    const tageGezaehlt = new Set<string>();
+
+    for (const w of workouts) {
+      const ymd = toYmd(w.date);
+      if (!ymd || ymd < ymdVon) continue;
+      einheiten += 1;
+      minuten += dauerMinuten(w);
+      tageGezaehlt.add(ymd);
+    }
+    for (const e of uhrEinheiten) {
+      const ymd = String(e.date ?? e.start_date_local ?? '').slice(0, 10);
+      if (!ymd || ymd < ymdVon) continue;
+      // Ein Tag mit Uhr-Einheit und erfasstem Workout zählt nur einmal.
+      if (tageGezaehlt.has(ymd)) continue;
+      const sek =
+        e.moving_time != null ? Number(e.moving_time) : e.elapsed_time != null ? Number(e.elapsed_time) : null;
+      if (sek == null || !Number.isFinite(sek) || sek <= 0) continue;
+      einheiten += 1;
+      minuten += Math.round(sek / 60);
+    }
+    return { wocheEinheiten: einheiten, wocheMinuten: Math.round(minuten) };
+  }, [workouts, uhrEinheiten, today]);
 
   // Heatmap: 12 Wochen Trainings
   const heatmapTage = useMemo(() => {
@@ -605,16 +659,16 @@ export default function TrainingPage() {
             </SectionTitle>
             <div className="space-y-2.5">
               <ProgressBar
-                value={letzte7.length}
-                max={Math.max(geplanteTage, 1)}
+                value={wocheEinheiten}
+                max={Math.max(zielEinheiten, 1)}
                 label="Einheiten"
-                right={`${letzte7.length} / ${geplanteTage}`}
+                right={`${wocheEinheiten} / ${zielEinheiten}`}
               />
               <ProgressBar
-                value={letzte7.reduce((s, w) => s + (Number(w.duration) || 0), 0)}
-                max={Math.max(geplanteTage * 60, 60)}
+                value={wocheMinuten}
+                max={Math.max(zielMinuten, 1)}
                 label="Minuten"
-                right={`${letzte7.reduce((s, w) => s + (Number(w.duration) || 0), 0)}`}
+                right={`${wocheMinuten} / ${zielMinuten}`}
               />
             </div>
             <div className="mt-3 flex items-center justify-between border-t border-[var(--border-muted)] pt-2.5 text-[11px] text-[var(--text-muted)]">
@@ -626,9 +680,9 @@ export default function TrainingPage() {
               </span>
             </div>
             {!week && (
-              <p className="mt-2 rounded-lg bg-[#fbbf24]/10 px-2.5 py-2 text-[11px] leading-relaxed text-[#a16207]">
-                Noch kein aktiver Plan — oben <b>„Neuer Plan"</b> für den Wochenplan oder <b>„Von Coach
-                erstellen lassen"</b> für einen KI-Plan.
+              <p className="mt-2 rounded-lg bg-[var(--border-muted)]/30 px-2.5 py-2 text-[11px] leading-relaxed text-[var(--text-muted)]">
+                Kein Plan aktiv — die Ziele oben gelten trotzdem. Für einen Plan: <b>„Neuer Plan"</b> oben
+                oder <b>„Von Coach erstellen lassen"</b>.
               </p>
             )}
             {week && !angezeigtePlanWoche && (

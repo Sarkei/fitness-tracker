@@ -85,6 +85,17 @@ export interface UserProfile {
     /** Tägliches Wasserziel in ml (Standard 2500) */
     dailyWaterMl?: number;
     dailyCalories?: number;
+    /**
+     * Persönliche Wochenziele — gelten unabhängig vom Trainingsplan.
+     *
+     * `weeklySessions`/`weeklyMinutes` sind die Zahlen, gegen die die
+     * Trainingsseite misst. Ist `coachAdjustsWeeklyGoals` gesetzt, darf der Coach
+     * sie Woche für Woche anpassen (mehr bei guter Disziplin, weniger bei
+     * schlechter Erholung). Fehlt der Schalter, bleiben die Zahlen fest.
+     */
+    weeklySessions?: number;
+    weeklyMinutes?: number;
+    coachAdjustsWeeklyGoals?: boolean;
     macros?: {
       protein: number;
       carbs: number;

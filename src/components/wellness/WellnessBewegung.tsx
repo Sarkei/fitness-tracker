@@ -13,6 +13,8 @@ import { mittel, summe } from '@/src/lib/wellness';
 export default function WellnessBewegung() {
   const { daten } = useWellness();
   const tage = daten.tage;
+  /** Diagramme und Detail-Sheets: immer mind. 7 Tage, auch bei "Heute". */
+  const trendTage = daten.trendTage ?? tage;
   const [detail, setDetail] = useState<'schritte' | 'etagen' | null>(null);
   const [tagOffen, setTagOffen] = useState<string | null>(null);
 
@@ -105,14 +107,14 @@ export default function WellnessBewegung() {
         <KennzahlSheet
           def={{ key: 'schritte', titel: 'Schritte', format: (v) => Math.round(v).toLocaleString('de-DE'), hoeherBesser: true,
             hinweis: 'Alltagsbewegung pro Tag.' }}
-          punkte={tage.map((t) => ({ datum: t.date, wert: t.steps ?? null }))}
+          punkte={trendTage.map((t) => ({ datum: t.date, wert: t.steps ?? null }))}
           onClose={() => setDetail(null)}
         />
       )}
       {detail === 'etagen' && (
         <KennzahlSheet
           def={{ key: 'etagen', titel: 'Etagen', hoeherBesser: true, hinweis: 'Erstiegene Etagen pro Tag.' }}
-          punkte={tage.map((t) => ({ datum: t.date, wert: t.floors ?? null }))}
+          punkte={trendTage.map((t) => ({ datum: t.date, wert: t.floors ?? null }))}
           onClose={() => setDetail(null)}
         />
       )}

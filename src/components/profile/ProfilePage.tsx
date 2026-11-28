@@ -314,6 +314,17 @@ export default function ProfilePage() {
     dailyCalories: profile?.goals?.dailyCalories || (tdee ?? 2400),
     dailySteps: profile?.goals?.dailySteps ?? 10000,
     dailyWaterMl: profile?.goals?.dailyWaterMl ?? 2500,
+    /*
+     * Persönliche Wochenziele.
+     *
+     * Vorher zeigte die Trainingsseite nur, was der Plan vorsah — ohne Plan also
+     * "0 / 0". Jetzt sind es eigene Ziele, unabhängig davon, ob ein Plan
+     * existiert. `weeklySessions`/`weeklyMinutes` sind die Zahlen, gegen die
+     * gemessen wird; `coachAdjustsWeeklyGoals` erlaubt der KI, sie zu ändern.
+     */
+    weeklySessions: Number(profile?.goals?.weeklySessions) || 3,
+    weeklyMinutes: Number(profile?.goals?.weeklyMinutes) || 150,
+    coachAdjustsWeeklyGoals: Boolean(profile?.goals?.coachAdjustsWeeklyGoals),
   });
 
   // Whenever user changes target weight, auto-update the calorie field
@@ -338,6 +349,9 @@ export default function ProfilePage() {
           dailyCalories: goalsForm.dailyCalories,
           dailySteps: Math.max(1000, Math.round(goalsForm.dailySteps)),
           dailyWaterMl: Math.max(500, Math.round(goalsForm.dailyWaterMl)),
+          weeklySessions: Math.max(0, Math.round(goalsForm.weeklySessions)),
+          weeklyMinutes: Math.max(0, Math.round(goalsForm.weeklyMinutes)),
+          coachAdjustsWeeklyGoals: goalsForm.coachAdjustsWeeklyGoals,
         },
       });
       setIsEditingGoals(false);
@@ -637,6 +651,9 @@ export default function ProfilePage() {
                 dailyCalories: profile?.goals?.dailyCalories || (tdee ?? 2400),
                 dailySteps: profile?.goals?.dailySteps ?? 10000,
                 dailyWaterMl: profile?.goals?.dailyWaterMl ?? 2500,
+                weeklySessions: Number(profile?.goals?.weeklySessions) || 3,
+                weeklyMinutes: Number(profile?.goals?.weeklyMinutes) || 150,
+                coachAdjustsWeeklyGoals: Boolean(profile?.goals?.coachAdjustsWeeklyGoals),
               });
               setIsEditingGoals(!isEditingGoals);
             }}
@@ -738,6 +755,68 @@ export default function ProfilePage() {
                   className="w-full bg-[var(--background)] border border-[var(--line)] rounded-xl p-4 font-bold text-[var(--text-primary)]"
                 />
               </div>
+
+              {/* Persönliche Trainingsziele pro Woche — unabhängig vom Plan */}
+              <div className="pt-2 border-t border-[var(--line)]">
+                <p className="text-[9px] font-semibold text-[var(--text-muted)] tracking-widest mb-3">
+                  Woche · persönliche Ziele
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[8px] font-semibold text-[var(--text-muted)] tracking-widest mb-2 block">
+                      Einheiten
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={21}
+                      value={goalsForm.weeklySessions}
+                      onChange={e => setGoalsForm({ ...goalsForm, weeklySessions: parseInt(e.target.value, 10) || 0 })}
+                      className="w-full bg-[var(--background)] border border-[var(--line)] rounded-xl p-4 font-bold text-[var(--text-primary)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[8px] font-semibold text-[var(--text-muted)] tracking-widest mb-2 block">
+                      Minuten
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={15}
+                      value={goalsForm.weeklyMinutes}
+                      onChange={e => setGoalsForm({ ...goalsForm, weeklyMinutes: parseInt(e.target.value, 10) || 0 })}
+                      className="w-full bg-[var(--background)] border border-[var(--line)] rounded-xl p-4 font-bold text-[var(--text-primary)]"
+                    />
+                  </div>
+                </div>
+                <p className="mt-2 text-[9.5px] leading-relaxed text-[var(--text-muted)]">
+                  Gilt für jede Woche, egal ob ein Plan aktiv ist. Die Trainingsseite misst dagegen.
+                </p>
+
+                {/*
+                  * Coach darf die Ziele anpassen.
+                  * Ist der Schalter an, zieht oder senkt die KI das Pensum Woche für
+                  * Woche — je nachdem, was erledigt wurde, wie die Erholung aussieht
+                  * und was das Gewichtsziel verlangt. Aus bleibt: feste Zahlen.
+                  */}
+                <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--background)] p-3">
+                  <input
+                    type="checkbox"
+                    checked={goalsForm.coachAdjustsWeeklyGoals}
+                    onChange={e => setGoalsForm({ ...goalsForm, coachAdjustsWeeklyGoals: e.target.checked })}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--brand)]"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-[11.5px] font-semibold text-[var(--text-primary)]">
+                      Coach passt die Ziele an
+                    </span>
+                    <span className="block text-[10px] leading-relaxed text-[var(--text-muted)]">
+                      Wöchentlich neu bewertet: mehr, wenn du zuverlässig dranbleibst; weniger, wenn
+                      Erholung oder Zeit knapp sind. Die Zahlen oben sind dann der Startwert.
+                    </span>
+                  </span>
+                </label>
+              </div>
               {saveError && <p className="text-xs font-bold text-red-600">{saveError}</p>}
               <button
                 onClick={handleUpdateGoals}
@@ -778,6 +857,30 @@ export default function ProfilePage() {
             <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest text-center">
               {(profile.goals?.dailySteps ?? 10000).toLocaleString()} {t('nav.quick.steps')} · {(profile.goals?.dailyWaterMl ?? 2500).toLocaleString()} ml
             </p>
+            {/* Persönliche Wochenziele — gelten ohne und mit Plan. */}
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <div className="rounded-xl bg-[var(--surface-gray)] px-3 py-2">
+                <p className="text-[8.5px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
+                  Einheiten / Woche
+                </p>
+                <p className="text-[15px] font-semibold tabular-nums">
+                  {Number(profile.goals?.weeklySessions) || 3}
+                </p>
+              </div>
+              <div className="rounded-xl bg-[var(--surface-gray)] px-3 py-2">
+                <p className="text-[8.5px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
+                  Minuten / Woche
+                </p>
+                <p className="text-[15px] font-semibold tabular-nums">
+                  {Number(profile.goals?.weeklyMinutes) || 150}
+                </p>
+              </div>
+            </div>
+            {Boolean(profile.goals?.coachAdjustsWeeklyGoals) && (
+              <p className="text-center text-[9.5px] font-semibold uppercase tracking-[0.12em] text-brand">
+                Coach passt die Ziele an
+              </p>
+            )}
             </div>
           )}
         </div>

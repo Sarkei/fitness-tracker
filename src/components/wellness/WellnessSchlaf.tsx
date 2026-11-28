@@ -14,6 +14,8 @@ import { alsHHMM, mittel, schlafBewertung, schlafFarben, schlafStufe, schlafStun
 export default function WellnessSchlaf() {
   const { daten, zeitraum } = useWellness();
   const tage = daten.tage;
+  /** Diagramme und Detail-Sheets: immer mind. 7 Tage, auch bei "Heute". */
+  const trendTage = daten.trendTage ?? tage;
 
   /*
    * Tabelle "Nacht fuer Nacht" immer ueber 30 Naechte.
@@ -335,7 +337,7 @@ export default function WellnessSchlaf() {
         <KennzahlSheet
           def={{ key: 'dauer', titel: 'Schlafdauer', einheit: 'h', format: (v) => v.toFixed(1), hoeherBesser: true,
             hinweis: 'Nacht für Nacht. Unter 7 Stunden gilt als zu kurz.' }}
-          punkte={tage.map((t) => ({ datum: t.date, wert: schlafStunden(t.sleepSecs) }))}
+          punkte={trendTage.map((t) => ({ datum: t.date, wert: schlafStunden(t.sleepSecs) }))}
           onClose={() => setDetail(null)}
         />
       )}
@@ -343,7 +345,7 @@ export default function WellnessSchlaf() {
         <KennzahlSheet
           def={{ key: 'score', titel: 'Schlafscore', format: (v) => String(Math.round(v)), hoeherBesser: true,
             hinweis: 'Qualität der Nacht: 80+ sehr gut, unter 40 schlecht.' }}
-          punkte={tage.map((t) => ({ datum: t.date, wert: t.sleepScore ?? null }))}
+          punkte={trendTage.map((t) => ({ datum: t.date, wert: t.sleepScore ?? null }))}
           onClose={() => setDetail(null)}
         />
       )}

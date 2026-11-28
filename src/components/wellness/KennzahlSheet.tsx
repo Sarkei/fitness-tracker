@@ -87,7 +87,16 @@ export function KennzahlSheet({
     };
   })();
 
-  const reihe = punkte.map((p) => p.wert ?? 0);
+  /*
+   * Nur Tage mit echtem Messwert in die Kurve.
+   *
+   * Vorher stand hier `p.wert ?? 0`: jeder Tag ohne Messung wurde als 0
+   * eingetragen. Ueber 90 Tage mit fuenf Wiegungen ergab das eine Kurve, die
+   * fast nur aus Nullen bestand (y-Achse bis 0, Linie stuerzt ab) — der Verlauf
+   * war unlesbar. Jetzt zaehlt nur, was tatsaechlich gemessen wurde.
+   */
+  const mitWertPunkte = punkte.filter((p) => typeof p.wert === 'number' && Number.isFinite(p.wert));
+  const reihe = mitWertPunkte.map((p) => p.wert as number);
 
   const inhalt = (
     <div
@@ -156,11 +165,21 @@ export function KennzahlSheet({
                 <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
                   Verlauf
                 </p>
-                <Sparkline values={reihe} height={110} einheit={def.einheit} />
-                <div className="mt-1 flex justify-between text-[9.5px] text-[var(--text-muted)]">
-                  <span>{datumKurz(punkte[0].datum)}</span>
-                  <span>{datumKurz(punkte[punkte.length - 1].datum)}</span>
-                </div>
+                {reihe.length >= 2 ? (
+                  <>
+                    <Sparkline values={reihe} height={110} einheit={def.einheit} />
+                    <div className="mt-1 flex justify-between text-[9.5px] text-[var(--text-muted)]">
+                      <span>{datumKurz(mitWertPunkte[0].datum)}</span>
+                      <span>{datumKurz(mitWertPunkte[mitWertPunkte.length - 1].datum)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <p className="py-6 text-center text-[11.5px] leading-relaxed text-[var(--text-muted)]">
+                    {reihe.length === 1
+                      ? `Nur ein Messwert im Zeitraum (${fmt(reihe[0])}${def.einheit ? ` ${def.einheit}` : ''}) — für einen Verlauf wähle oben einen längeren Zeitraum.`
+                      : 'Keine Messwerte im Zeitraum.'}
+                  </p>
+                )}
               </div>
 
               <div className="rounded-xl border border-[var(--border-muted)]">

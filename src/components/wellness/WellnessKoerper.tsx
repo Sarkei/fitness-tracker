@@ -14,6 +14,11 @@ import { letzter, mittel } from '@/src/lib/wellness';
 export default function WellnessKoerper() {
   const { daten } = useWellness();
   const tage = daten.tage;
+  /*
+   * Diagramme rechnen mit `trendTage` (immer >= 7 Tage), nicht mit `tage`.
+   * Bei "Heute" enthaelt `tage` nur einen Tag — die Kurven waeren leer.
+   */
+  const trendTage = daten.trendTage ?? tage;
 
   // Garmin-Werte, die Intervals nicht liefert.
   const spo2Reihe = tage.filter((t) => t.spo2 != null).map((t) => t.spo2 as number);
@@ -25,9 +30,14 @@ export default function WellnessKoerper() {
   const [detail, setDetail] = useState<'hrv' | 'puls' | 'gewicht' | null>(null);
   const [tagOffen, setTagOffen] = useState<string | null>(null);
 
-  const hrv = tage.map((t) => t.hrv ?? 0);
-  const puls = tage.map((t) => t.restingHr ?? 0);
-  const gewicht = tage.map((t) => t.weight ?? 0).filter((g) => g > 0);
+  /*
+   * Nur echte Messwerte in die Kurve, nicht `?? 0`: jeder Tag ohne HRV/Puls
+   * wurde als 0 eingetragen, die Linie sackte auf null und sah aus wie ein
+   * Einbruch, der nie gemessen wurde.
+   */
+  const hrv = trendTage.map((t) => t.hrv).filter((v): v is number => v != null);
+  const puls = trendTage.map((t) => t.restingHr).filter((v): v is number => v != null);
+  const gewicht = trendTage.map((t) => t.weight ?? 0).filter((g) => g > 0);
 
   const hrvSchnitt = mittel(tage.map((t) => t.hrv));
   const pulsSchnitt = mittel(tage.map((t) => t.restingHr));
@@ -175,7 +185,7 @@ export default function WellnessKoerper() {
         <KennzahlSheet
           def={{ key: 'hrv', titel: 'HRV', einheit: 'ms', hoeherBesser: true,
             hinweis: 'Herzfrequenzvariabilität. Sinkt sie über Tage, fehlt Erholung.' }}
-          punkte={tage.map((t) => ({ datum: t.date, wert: t.hrv ?? null }))}
+          punkte={trendTage.map((t) => ({ datum: t.date, wert: t.hrv ?? null }))}
           onClose={() => setDetail(null)}
         />
       )}
@@ -183,7 +193,7 @@ export default function WellnessKoerper() {
         <KennzahlSheet
           def={{ key: 'puls', titel: 'Ruhepuls', einheit: 'bpm', hoeherBesser: false,
             hinweis: 'Steigt er bei gleicher Belastung, ist das ein Ermüdungszeichen.' }}
-          punkte={tage.map((t) => ({ datum: t.date, wert: t.restingHr ?? null }))}
+          punkte={trendTage.map((t) => ({ datum: t.date, wert: t.restingHr ?? null }))}
           onClose={() => setDetail(null)}
         />
       )}
@@ -191,7 +201,7 @@ export default function WellnessKoerper() {
         <KennzahlSheet
           def={{ key: 'gewicht', titel: 'Gewicht', einheit: 'kg', format: (v) => v.toFixed(1),
             hinweis: 'Nur an Tagen mit Wiegedaten.' }}
-          punkte={tage.map((t) => ({ datum: t.date, wert: t.weight ?? null }))}
+          punkte={trendTage.map((t) => ({ datum: t.date, wert: t.weight ?? null }))}
           onClose={() => setDetail(null)}
         />
       )}
@@ -212,6 +222,12 @@ function MapCard({
   einheit: string;
   hinweis: string;
 }) {
+  /*
+   * Eine Linie braucht mindestens zwei Messungen. Bei nur einem Wert blieb der
+   * Diagrammbereich leer — das sah wie ein kaputtes Diagramm aus. Jetzt steht
+   * dort, warum nichts zu sehen ist, und der Wert selbst.
+   */
+  const zuWenig = werte.length < 2;
   return (
     <Card className="space-y-2 p-5">
       <div className="flex items-center gap-2">
@@ -221,7 +237,17 @@ function MapCard({
           Ø {schnitt != null ? Math.round(schnitt) : '—'} {einheit}
         </span>
       </div>
-      <Sparkline values={werte} height={80} einheit={einheit} />
+      {zuWenig ? (
+        <div className="flex h-[80px] items-center justify-center rounded-lg bg-[var(--border-muted)]/25 px-3 text-center">
+          <p className="text-[11.5px] leading-relaxed text-[var(--text-muted)]">
+            {werte.length === 1
+              ? `Nur ein Messwert im Zeitraum (${Math.round(werte[0])} ${einheit}) — für eine Kurve wähle oben einen längeren Zeitraum.`
+              : 'Keine Messwerte im Zeitraum.'}
+          </p>
+        </div>
+      ) : (
+        <Sparkline values={werte} height={80} einheit={einheit} />
+      )}
       <p className="text-[11px] leading-relaxed text-[var(--text-muted)]">{hinweis}</p>
     </Card>
   );

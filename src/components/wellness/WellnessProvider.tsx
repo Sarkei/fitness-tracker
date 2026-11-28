@@ -15,6 +15,15 @@ import type { WellnessAktivitaet, WellnessTag } from '@/src/lib/wellness';
 export type WellnessDaten = {
   fetchedAt: string | null;
   tage: WellnessTag[];
+  /*
+   * Immer mindestens 7 Tage, unabhaengig vom gewaehlten Zeitraum.
+   *
+   * Kurven (HRV, Ruhepuls, Gewicht) brauchen einen Verlauf. Bei "Heute" hatte
+   * `tage` nur einen Eintrag — das Diagramm blieb leer und das Detail-Sheet
+   * zeigte einen "Verlauf" aus einem einzigen Messwert. Die Kacheln rechnen
+   * weiter mit `tage`, die Diagramme mit `trendTage`.
+   */
+  trendTage: WellnessTag[];
   aktivitaeten: WellnessAktivitaet[];
   verfuegbar: {
     schlaf: boolean;
@@ -61,7 +70,11 @@ const ZEITRAEUME = [
 
 export function WellnessProvider({ children }: { children: ReactNode }) {
   const [daten, setDaten] = useState<WellnessDaten | null>(null);
-  const [zeitraum, setZeitraum] = useState(1);  // Standard: nur heute
+  /*
+   * Standard "7 Tage", nicht "Heute": mit "Heute" enthielt `tage` genau einen
+   * Tag, jede Kurve hatte einen Punkt und blieb leer.
+   */
+  const [zeitraum, setZeitraum] = useState(7);
   const [laedt, setLaedt] = useState(true);
   const [synct, setSynct] = useState(false);
   const [fortschritt, setFortschritt] = useState<{ schritt: number; gesamt: number } | null>(null);
@@ -87,7 +100,16 @@ export function WellnessProvider({ children }: { children: ReactNode }) {
     for (let versuch = 1; versuch <= 3; versuch++) {
       try {
         const res = await api<WellnessDaten>(`/api/integrations/intervals/wellness?days=${tageApi}`);
-        setDaten(zeitraum === 1 ? { ...res, tage: res.tage.slice(-1) } : res);
+        /*
+         * `trendTage` immer mindestens 7 Tage tief halten — auch bei "Heute".
+         * Sonst hat jede Kurve nur einen Punkt und das Detail-Sheet zeigt einen
+         * "Verlauf", der keiner ist.
+         */
+        setDaten({
+          ...res,
+          trendTage: res.tage.slice(-Math.max(7, res.tage.length)),
+          tage: zeitraum === 1 ? res.tage.slice(-1) : res.tage,
+        });
         setFehler(null);
         setLaedt(false);
         return;
