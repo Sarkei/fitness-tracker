@@ -29,7 +29,6 @@ import {
   StatTile,
 } from './ui';
 import WorkoutSheet from './WorkoutSheet';
-import PlanBereich from '../components/coach/CoachPage';
 import { TrainingTagesdetail } from '../components/training/TrainingTagesdetail';
 import { aufSyncFertig } from '../lib/syncStatus';
 import {
@@ -153,6 +152,14 @@ export default function TrainingPage() {
    * null. Jetzt gelten eigene Zahlen aus dem Profil, unabhängig vom Plan.
    */
   const [wochenZiel, setWochenZiel] = useState<{ einheiten: number; minuten: number } | null>(null);
+  /**
+   * Vorhandene Pläne für die Auswahl unten.
+   * `art` unterscheidet Coach-Plan (aus der KI) und manuellen Wochenplan.
+   */
+  const [plaene, setPlaene] = useState<
+    Array<{ id: string; name: string; art: 'coach' | 'manuell'; info?: string }>
+  >([]);
+  const [aktiverPlanId, setAktiverPlanId] = useState<string | null>(null);
 
   /*
    * „Neuer Plan" führt jetzt in die manuelle Planung (/plan). Wer den Plan lieber
@@ -179,6 +186,52 @@ export default function TrainingPage() {
       api<{ aktivitaeten?: Array<Record<string, unknown>> }>('/api/integrations/garmin/activities?limit=8')
         .then((r) => setUhrEinheiten(Array.isArray(r.aktivitaeten) ? r.aktivitaeten : []))
         .catch(() => setUhrEinheiten([]));
+      /*
+       * Pläne laden: Coach-Pläne aus /api/coach/plans, dazu der manuelle
+       * Wochenplan, sofern einer existiert (erkannt an vorhandenen Einträgen).
+       */
+      void (async () => {
+        try {
+          const [coach, wp] = await Promise.all([
+            api<Array<{ id: string; type?: string; status?: string; name?: string | null; current_week?: number }>>(
+              '/api/coach/plans',
+            ).catch(() => []),
+            api<{ eintraege?: Array<{ name?: string | null }> }>(
+              `/api/trainings/plan?von=${shiftYmdLocal(today, -28)}&bis=${shiftYmdLocal(today, 28)}`,
+            ).catch(() => ({ eintraege: [] as Array<{ name?: string | null }> })),
+          ]);
+          const liste: Array<{ id: string; name: string; art: 'coach' | 'manuell'; info?: string }> = [];
+          let aktiv: string | null = null;
+          for (const c of coach ?? []) {
+            if (c.type !== 'workout') continue;
+            liste.push({
+              id: c.id,
+              name: String(c.name ?? 'Coach-Plan'),
+              art: 'coach',
+              info: c.current_week ? `Woche ${c.current_week}` : undefined,
+            });
+            if (c.status === 'active') aktiv = c.id;
+          }
+          /* Manueller Wochenplan: ein Eintrag = ein Plan. */
+          const wpListe: Array<{ name?: string | null }> = Array.isArray(wp?.eintraege) ? wp.eintraege : [];
+          if (wpListe.length) {
+            const namen = [...new Set(wpListe.map((z) => String(z.name ?? '')).filter(Boolean))];
+            liste.push({
+              id: 'manuell',
+              name: namen.length === 1 ? namen[0] : 'Manueller Wochenplan',
+              art: 'manuell',
+              info: `${wpListe.length} Einheiten`,
+            });
+            if (!aktiv) aktiv = 'manuell';
+          }
+          setPlaene(liste);
+          setAktiverPlanId(aktiv);
+        } catch {
+          setPlaene([]);
+          setAktiverPlanId(null);
+        }
+      })();
+
       // Persönliche Wochenziele — unabhängig davon, ob ein Plan aktiv ist.
       api<{ goals?: { weeklySessions?: number; weeklyMinutes?: number } }>('/api/profile')
         .then((p) =>
@@ -285,6 +338,28 @@ export default function TrainingPage() {
   const maxMuskel = Math.max(1, ...muskel.map((m) => m.saetze));
   const geplanteTage = days.filter((d) => !d.isRest).length;
 
+  /**
+   * Wurde in den letzten 7 Tagen Krafttraining aufgezeichnet?
+   *
+   * Nur dann haben Muskelbalance und Trainingsvolumen eine Aussage. Läufe und
+   * Radfahrten von der Uhr haben keine Sätze — dort stünde in beiden Boxen
+   * nichts als Leere.
+   */
+  const hatKraftLetzteWoche = useMemo(() => {
+    const ymdVon = shiftYmdLocal(today, -6);
+    return workouts.some((w) => {
+      const ymd = toYmd(w.date);
+      if (!ymd || ymd < ymdVon) return false;
+      /* Eigene Workouts mit Übungen sind Kraft; Uhr-Einheiten ohne Übungen nicht. */
+      if (!Array.isArray(w.exercises) || w.exercises.length === 0) return false;
+      const typ = String(w.type ?? '').toLowerCase();
+      if (typ && !/strength|kraft|gym|bodyweight|calisthenics/.test(typ) && typ !== 'other') {
+        return false;
+      }
+      return true;
+    });
+  }, [workouts, today]);
+
   /*
    * Wochenfortschritt gegen die persönlichen Ziele.
    *
@@ -353,6 +428,36 @@ export default function TrainingPage() {
     });
   }, [workouts, today]);
   const maxWochenVolumen = Math.max(1, ...wochenVolumen.map((w) => w.saetze));
+
+  /**
+   * Einen Plan aktiv schalten — oder mit `null` alle aus.
+   *
+   * Coach-Pläne laufen über den Status in `coach_plans`; es darf immer nur einer
+   * aktiv sein, deshalb werden die anderen zuerst deaktiviert.
+   */
+  const setzePlanAktiv = async (id: string | null) => {
+    try {
+      for (const pl of plaene) {
+        if (pl.art !== 'coach') continue;
+        const sollAktiv = pl.id === id;
+        if (sollAktiv) {
+          await api(`/api/coach/plans/${pl.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: 'active' }),
+          });
+        } else if (pl.id === aktiverPlanId) {
+          await api(`/api/coach/plans/${pl.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: 'paused' }),
+          });
+        }
+      }
+      setAktiverPlanId(id);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Plan konnte nicht umgeschaltet werden.');
+    }
+  };
 
   const remove = async (id: string) => {
     if (!window.confirm('Training löschen?')) return;
@@ -777,92 +882,26 @@ export default function TrainingPage() {
             )}
           </Card>
 
-          <Card className="flex flex-1 flex-col p-5">
-            <SectionTitle>Muskelbalance · 30 Tage</SectionTitle>
-            {muskel.length ? (
+          {/*
+            * Muskelbalance nur zeigen, wenn in den letzten 7 Tagen Krafttraining
+            * aufgezeichnet wurde. Eine leere Box mit „sobald du Trainings erfasst"
+            * ist unnötig — sie sagt nur, dass keine Daten da sind.
+            */}
+          {hatKraftLetzteWoche && (
+            <Card className="flex flex-1 flex-col p-5">
+              <SectionTitle>Muskelbalance · 30 Tage</SectionTitle>
               <div className="space-y-2">
                 {muskel.map((m) => (
                   <BarRow key={m.gruppe} label={m.gruppe} value={m.saetze} max={maxMuskel} caption={`${m.saetze}`} />
                 ))}
               </div>
-            ) : (
-              <p className="flex flex-1 items-center justify-center py-4 text-center text-[11.5px] text-[var(--text-muted)]">
-                Sobald du Trainings erfasst, siehst du hier die Verteilung.
-              </p>
-            )}
-          </Card>
+            </Card>
+          )}
         </div>
       </div>
 
-      {/* Einheiten von der Uhr — Trainings ohne geplantes Workout */}
-      {uhrEinheiten.length > 0 && (
-        <Card className="p-5">
-          <SectionTitle action={<span className="text-[11px] text-[var(--text-muted)]">von Garmin</span>}>
-            Einheiten von der Uhr
-          </SectionTitle>
-          <ul className="divide-y divide-[var(--border-muted)]">
-            {uhrEinheiten.slice(uhrSeite * 5, uhrSeite * 5 + 5).map((e, i) => {
-              const datum = String(e.date ?? e.start_date_local ?? '').slice(0, 10);
-              const distanz = e.distance != null ? Number(e.distance) / 1000 : null;
-              const dauerSek =
-                e.moving_time != null ? Number(e.moving_time) : e.duration != null ? Number(e.duration) : null;
-              return (
-                <li key={`uhr-${String(e.id ?? i)}`}>
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/einheit/${encodeURIComponent(String(e.id ?? ''))}`)}
-                    className="flex w-full items-baseline justify-between gap-3 py-2.5 text-left transition hover:text-[var(--simple-accent)]"
-                  >
-                    <span className="flex min-w-0 flex-1 items-baseline gap-2">
-                      <span className="w-11 shrink-0 text-[10.5px] tabular-nums text-[var(--text-muted)]">
-                        {datum ? `${datum.slice(8, 10)}.${datum.slice(5, 7)}.` : '—'}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate text-[13px]">
-                        {String(e.name ?? e.type ?? 'Einheit')}
-                      </span>
-                    </span>
-                    <span className="shrink-0 text-[11.5px] tabular-nums text-[var(--text-muted)]">
-                      {[distanz != null ? `${distanz.toFixed(2)} km` : null, dauerSek != null ? `${Math.round(dauerSek / 60)} min` : null]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-
-          {uhrEinheiten.length > 5 && (
-            <div className="mt-3 flex items-center justify-between gap-2 border-t border-[var(--border-muted)] pt-3">
-              <button
-                type="button"
-                onClick={() => setUhrSeite((v) => Math.max(0, v - 1))}
-                disabled={uhrSeite === 0}
-                className="rounded-lg border border-[var(--border-muted)] px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40"
-              >
-                ← Zurück
-              </button>
-              <span className="text-[11px] tabular-nums text-[var(--text-muted)]">
-                Seite {uhrSeite + 1} von {Math.max(1, Math.ceil(uhrEinheiten.length / 5))} ·{' '}
-                {uhrSeite * 5 + 1}–{Math.min(uhrEinheiten.length, uhrSeite * 5 + 5)} von{' '}
-                {uhrEinheiten.length}
-              </span>
-              <button
-                type="button"
-                onClick={() =>
-                  setUhrSeite((v) => Math.min(Math.ceil(uhrEinheiten.length / 5) - 1, v + 1))
-                }
-                disabled={uhrSeite >= Math.ceil(uhrEinheiten.length / 5) - 1}
-                className="rounded-lg border border-[var(--border-muted)] px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40"
-              >
-                Weiter →
-              </button>
-            </div>
-          )}
-        </Card>
-      )}
-
-      {/* Volumen-Verlauf */}
+      {/* Volumen-Verlauf — nur bei Krafttraining, sonst steht dort 8x eine Null. */}
+      {hatKraftLetzteWoche && (
       <Card className="p-5">
         <SectionTitle action={<span className="text-[11px] text-[var(--text-muted)]">Sätze pro Woche</span>}>
           Trainingsvolumen · 8 Wochen
@@ -889,6 +928,7 @@ export default function TrainingPage() {
           ))}
         </div>
       </Card>
+      )}
 
       {/* Aktivität + Verlauf */}
       <div className="grid gap-4 lg:grid-cols-3 lg:items-stretch">
@@ -955,11 +995,53 @@ export default function TrainingPage() {
 
       {error && <p className="rounded-xl bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-600">{error}</p>}
 
-      {/* Trainingspläne: direkt unter dem Verlauf, ohne eigene Überschrift/Button —
-          "Neuer Plan" sitzt oben in der Kopfzeile. */}
-      <section className="mt-2 border-t border-[var(--border-muted)] pt-6">
-        <PlanBereich hideHeader openOnboardingToken={neuerPlanToken} onPlansChanged={() => void load()} />
-      </section>
+      {/*
+        * Plan-Auswahl: zeigt nur vorhandene Pläne mit Kennzeichnung (Coach oder
+        * manuell) und lässt genau einen aktiv schalten — oder alle aus.
+        * Ohne Pläne erscheint hier nichts; der Coach-Bereich (CoachPage) ist raus.
+        */}
+      {plaene.length > 0 && (
+        <section className="mt-2 border-t border-[var(--border-muted)] pt-6">
+          <SectionTitle
+            action={
+              aktiverPlanId ? (
+                <GhostButton onClick={() => void setzePlanAktiv(null)}>Alle aus</GhostButton>
+              ) : undefined
+            }
+          >
+            Deine Trainingspläne
+          </SectionTitle>
+          <ul className="mt-2 divide-y divide-[var(--border-muted)]">
+            {plaene.map((pl) => {
+              const aktiv = pl.id === aktiverPlanId;
+              return (
+                <li key={pl.id} className="flex items-center gap-3 py-2.5">
+                  <span
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                      aktiv
+                        ? 'bg-[var(--simple-accent)] text-[var(--simple-accent-ink)]'
+                        : 'bg-[var(--border-muted)]/50 text-[var(--text-muted)]'
+                    }`}
+                  >
+                    {pl.art === 'coach' ? <TrendingUp className="h-4 w-4" /> : <Dumbbell className="h-4 w-4" />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13px] font-semibold">{pl.name}</span>
+                    <span className="block text-[10.5px] text-[var(--text-muted)]">
+                      {pl.art === 'coach' ? 'Coach-Plan' : 'Manueller Plan'}
+                      {pl.info ? ` · ${pl.info}` : ''}
+                      {aktiv ? ' · aktiv' : ''}
+                    </span>
+                  </span>
+                  <GhostButton onClick={() => void setzePlanAktiv(aktiv ? null : pl.id)}>
+                    {aktiv ? 'Deaktivieren' : 'Aktivieren'}
+                  </GhostButton>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       {tagOffen && (() => {
         const tagesWorkouts = workouts.filter((w) => String(w.date).slice(0, 10) === tagOffen);
