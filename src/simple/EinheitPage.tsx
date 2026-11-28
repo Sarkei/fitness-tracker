@@ -24,8 +24,6 @@ import {
   Zap,
 } from 'lucide-react';
 import { api } from '@/src/lib/api';
-import 'leaflet/dist/leaflet.css';
-import { MapContainer, TileLayer, Polyline, CircleMarker } from 'react-leaflet';
 
 type Punkt = {
   t: number;
@@ -539,42 +537,127 @@ export default function EinheitPage() {
         * Nur bei Einheiten mit GPS — im Studio gibt es keine Punkte, dann bleibt
         * der Block weg. Start und Ende sind als Punkte markiert.
         */}
+      {/*
+        * Route als reine Grafik.
+        *
+        * Vorher lag hier eine Leaflet-Karte mit festem Zoom 14. Bei längeren
+        * Strecken (Radfahrt quer durch Zürich) passte die Route damit nicht in den
+        * Ausschnitt — man sah nur ein Stück. Jetzt wird die Spur direkt in ein SVG
+        * projiziert und immer auf die volle Breite skaliert: die gesamte Route ist
+        * sichtbar, ohne Zoom und ohne Kartenkacheln.
+        */}
       {route.length >= 2 && (() => {
         const lats = route.map((r) => r[0]);
         const lons = route.map((r) => r[1]);
-        const mitte: [number, number] = [
-          (Math.min(...lats) + Math.max(...lats)) / 2,
-          (Math.min(...lons) + Math.max(...lons)) / 2,
-        ];
+        const minLat = Math.min(...lats);
+        const maxLat = Math.max(...lats);
+        const minLon = Math.min(...lons);
+        const maxLon = Math.max(...lons);
+
+        /*
+         * Seitenverhältnis korrigieren: Längengrade sind in unseren Breiten
+         * deutlich kürzer als Breitengrade. Ohne Korrektur wirkt die Strecke
+         * gestaucht bzw. gestreckt.
+         */
+        const latMitte = (minLat + maxLat) / 2;
+        const lonFaktor = Math.cos((latMitte * Math.PI) / 180) || 1;
+
+        const breiteGeo = Math.max((maxLon - minLon) * lonFaktor, 1e-6);
+        const hoeheGeo = Math.max(maxLat - minLat, 1e-6);
+
+        const PAD = 10;
+        const W = 320;
+        const H = 200;
+        const nutzB = W - 2 * PAD;
+        const nutzH = H - 2 * PAD;
+        const skala = Math.min(nutzB / breiteGeo, nutzH / hoeheGeo);
+
+        /* Zentrieren: die Grafik soll die Fläche füllen, ohne zu verzerren. */
+        const versatzX = PAD + (nutzB - breiteGeo * skala) / 2;
+        const versatzY = PAD + (nutzH - hoeheGeo * skala) / 2;
+
+        const x = (lon: number) => versatzX + (lon - minLon) * lonFaktor * skala;
+        // y läuft nach unten, Breitengrad nach oben — deshalb umdrehen.
+        const y = (lat: number) => versatzY + (maxLat - lat) * skala;
+
+        const punkte = route.map((r) => `${x(r[1]).toFixed(1)},${y(r[0]).toFixed(1)}`).join(' ');
         const start = route[0];
         const ende = route[route.length - 1];
+
+        /* Maßstab: Strecke in Metern für den Hinweis unten. */
+        const kmProGradLat = 111.32;
+        const breiteKm = hoeheGeo * kmProGradLat;
+        const laengeKm = breiteGeo * kmProGradLat;
+
         return (
-          <section className="overflow-hidden rounded-2xl border border-[var(--border-muted)] bg-[var(--card-bg)]">
-            <div className="flex items-center justify-between gap-2 px-4 pt-4">
+          <section className="rounded-2xl border border-[var(--border-muted)] bg-[var(--card-bg)] p-4">
+            <div className="flex items-center justify-between gap-2">
               <p className="flex items-center gap-1.5 text-[12px] font-semibold">
                 <MapPin className="h-3.5 w-3.5 text-[var(--simple-accent)]" /> Route
               </p>
-              <span className="text-[10.5px] text-[var(--text-muted)]">{route.length} Punkte</span>
+              <span className="text-[10.5px] tabular-nums text-[var(--text-muted)]">
+                {laengeKm.toFixed(1)} × {breiteKm.toFixed(1)} km
+              </span>
             </div>
-            <div className="mt-2 h-[260px] w-full">
-              <MapContainer
-                center={mitte}
-                zoom={14}
-                scrollWheelZoom={false}
-                style={{ height: '100%', width: '100%' }}
-                attributionControl={false}
+            <div className="mt-2 overflow-hidden rounded-xl bg-[var(--surface-gray)]">
+              <svg
+                viewBox={`0 0 ${W} ${H}`}
+                className="w-full"
+                style={{ height: 'auto', display: 'block' }}
+                role="img"
+                aria-label="Streckenverlauf der Einheit"
               >
-                <TileLayer
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  attribution="© OpenStreetMap"
+                {/* Grundlinien als dezenter Hintergrund, damit die Form lesbar ist */}
+                {[0.25, 0.5, 0.75].map((f) => (
+                  <line
+                    key={`h${f}`}
+                    x1={PAD}
+                    x2={W - PAD}
+                    y1={PAD + nutzH * f}
+                    y2={PAD + nutzH * f}
+                    stroke="var(--border-muted)"
+                    strokeWidth={0.5}
+                    opacity={0.4}
+                  />
+                ))}
+                {[0.25, 0.5, 0.75].map((f) => (
+                  <line
+                    key={`v${f}`}
+                    y1={PAD}
+                    y2={H - PAD}
+                    x1={PAD + nutzB * f}
+                    x2={PAD + nutzB * f}
+                    stroke="var(--border-muted)"
+                    strokeWidth={0.5}
+                    opacity={0.4}
+                  />
+                ))}
+
+                {/* Die eigentliche Spur */}
+                <polyline
+                  points={punkte}
+                  fill="none"
+                  /* Rot: hebt sich auf der hellen Fläche am besten ab. */
+                  stroke="#dc5a4a"
+                  strokeWidth={2.4}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                  vectorEffect="non-scaling-stroke"
                 />
-                <Polyline positions={route} pathOptions={{ color: '#3f9c6d', weight: 3 }} />
-                <CircleMarker center={start} radius={5} pathOptions={{ color: '#3f9c6d', fillColor: '#3f9c6d', fillOpacity: 1 }} />
-                <CircleMarker center={ende} radius={5} pathOptions={{ color: '#dc5a4a', fillColor: '#dc5a4a', fillOpacity: 1 }} />
-              </MapContainer>
+
+                {/* Start und Ende */}
+                <circle cx={x(start[1])} cy={y(start[0])} r={4.5} fill="#3f9c6d" stroke="var(--card-bg)" strokeWidth={1.5} />
+                <circle cx={x(ende[1])} cy={y(ende[0])} r={4.5} fill="#2b5c8a" stroke="var(--card-bg)" strokeWidth={1.5} />
+              </svg>
             </div>
-            <p className="px-4 py-2 text-[10px] text-[var(--text-muted)]">
-              Grün = Start, rot = Ende. Karte © OpenStreetMap.
+            <p className="mt-2 flex items-center gap-3 text-[10px] text-[var(--text-muted)]">
+              <span className="flex items-center gap-1">
+                <span className="inline-block h-2 w-2 rounded-full bg-[#3f9c6d]" /> Start
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="inline-block h-2 w-2 rounded-full bg-[#2b5c8a]" /> Ende
+              </span>
+              <span className="ml-auto">{route.length} Punkte</span>
             </p>
           </section>
         );
