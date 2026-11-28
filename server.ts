@@ -36,7 +36,7 @@ import {
   SYNC_INTERVAL_OPTIONS,
   type IntervalsSettings,
 } from "./src/lib/intervals";
-import { anmelden, bestaetigeMfa, entschluesseln, verschluesseln, tagVoll, historieVoll, koerperWerte, aktivitaeten as garminAktivitaetenLogin, schreibeGewicht, schreibeWasser, tokensGueltig, garminZeitreiheLogin, garminAktivitaetDetail, type LoginTag } from "./src/lib/garminLogin";
+import { anmelden, bestaetigeMfa, entschluesseln, verschluesseln, tagVoll, historieVoll, koerperWerte, aktivitaeten as garminAktivitaetenLogin, schreibeGewicht, schreibeWasser, tokensGueltig, garminZeitreiheLogin, garminAktivitaetDetail, garminAktivitaetRoute, type LoginTag } from "./src/lib/garminLogin";
 import {
   HEALTH_FELDER,
   HEALTH_FELD_LABEL,
@@ -7536,6 +7536,44 @@ ${JSON.stringify(userCtx, null, 2)}
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Detail fehlgeschlagen.";
       console.error("[garmin] Aktivitaets-Detail:", msg);
+      res.status(500).json({ error: msg });
+    }
+  });
+
+  /**
+   * GPS-Route einer Aktivität.
+   *
+   * Eigener Endpunkt, weil die Route groß ist (mehrere Hundert Punkte) und nur
+   * auf der Detailseite gebraucht wird. `?max=Punkte` begrenzt die Ausdünnung.
+   */
+  app.get("/api/integrations/garmin/activities/:id/route", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const id = String(req.params.id).replace(/^garmin[-_]/, '');
+      const activityId = Number(id);
+      if (!Number.isFinite(activityId) || activityId <= 0) {
+        res.status(400).json({ error: "Ungültige Aktivität." });
+        return;
+      }
+      const gehoert = await pool.query(
+        "SELECT 1 FROM garmin_activities WHERE user_id = $1 AND activity_id = $2 LIMIT 1",
+        [req.userId, activityId],
+      );
+      if ((gehoert.rowCount ?? 0) === 0) {
+        res.status(404).json({ error: "Einheit nicht gefunden." });
+        return;
+      }
+      const g = await readGarminSettings(req.userId!);
+      if (!g.login?.tokens) {
+        res.status(400).json({ error: "Garmin-Login ist nicht verbunden." });
+        return;
+      }
+      const max = Math.min(2000, Math.max(50, Number(req.query.max) || 800));
+      const tokens = entschluesseln(g.login.tokens);
+      const punkte = await garminAktivitaetRoute(tokens, activityId, max);
+      res.json({ aktivitaetId: String(activityId), punkte, anzahl: punkte.length });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Route fehlgeschlagen.";
+      console.error("[garmin] Route:", msg);
       res.status(500).json({ error: msg });
     }
   });

@@ -939,3 +939,62 @@ export async function garminAktivitaetDetail(
 
   return ergebnis;
 }
+
+/**
+ * GPS-Route einer Aktivität aus Garmin Connect.
+ *
+ * Garmin liefert in `getActivityDetails` unter `geoPolylineDTO.polyline` die
+ * tatsächlich aufgezeichnete Strecke (lat/lon/altitude, bis mehrere Tausend
+ * Punkte). Für die Anzeige wird ausgedünnt; Start und Ende bleiben immer.
+ */
+export type GarminRoutePunkt = { lat: number; lon: number; alt?: number };
+
+export async function garminAktivitaetRoute(
+  tokensJson: string,
+  activityId: number,
+  maxPunkte = 600,
+): Promise<GarminRoutePunkt[]> {
+  try {
+    const garmin = new Garmin(clientAusTokens(tokensJson));
+    const roh = (await garmin.getActivityDetails(activityId, 2000, 10000)) as {
+      geoPolylineDTO?: {
+        polyline?: Array<{ lat?: number; lon?: number; altitude?: number | null; valid?: boolean }>;
+      };
+    } | null;
+
+    const punkte = roh?.geoPolylineDTO?.polyline;
+    if (!Array.isArray(punkte) || punkte.length < 2) return [];
+
+    /* Garmin markiert Aussetzer mit valid:false — die dürfen nicht in die Linie. */
+    const gueltig = punkte.filter(
+      (p) =>
+        p?.valid !== false &&
+        typeof p?.lat === 'number' &&
+        typeof p?.lon === 'number' &&
+        Number.isFinite(p.lat) &&
+        Number.isFinite(p.lon) &&
+        Math.abs(p.lat) <= 90 &&
+        Math.abs(p.lon) <= 180,
+    );
+    if (gueltig.length < 2) return [];
+
+    let auswahl = gueltig;
+    if (gueltig.length > maxPunkte) {
+      const schritt = gueltig.length / maxPunkte;
+      auswahl = gueltig.filter((_, i) => i % Math.ceil(schritt) === 0);
+      const letzter = gueltig[gueltig.length - 1];
+      if (auswahl[auswahl.length - 1] !== letzter) auswahl.push(letzter);
+    }
+
+    return auswahl.map((p) => ({
+      lat: Number(p.lat),
+      lon: Number(p.lon),
+      ...(typeof p.altitude === 'number' && Number.isFinite(p.altitude)
+        ? { alt: Math.round(p.altitude * 10) / 10 }
+        : {}),
+    }));
+  } catch (e) {
+    console.warn('[garmin] Route:', e instanceof Error ? e.message : e);
+    return [];
+  }
+}
