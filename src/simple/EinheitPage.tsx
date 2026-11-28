@@ -24,6 +24,8 @@ import {
   Zap,
 } from 'lucide-react';
 import { api } from '@/src/lib/api';
+import 'leaflet/dist/leaflet.css';
+import { MapContainer, TileLayer, Polyline, CircleMarker } from 'react-leaflet';
 
 type Punkt = {
   t: number;
@@ -371,6 +373,8 @@ export default function EinheitPage() {
    * Aktivitätsliste und auch nicht in den Zeitreihen.
    */
   const [detail, setDetail] = useState<GarminDetail | null>(null);
+  /** GPS-Route als [lat, lon]-Paare — leer, wenn die Einheit kein GPS hat. */
+  const [route, setRoute] = useState<Array<[number, number]>>([]);
 
   useEffect(() => {
     if (!id) return;
@@ -404,11 +408,16 @@ export default function EinheitPage() {
       api<GarminDetail>(`/api/integrations/garmin/activities/${encodeURIComponent(id)}/detail`).catch(
         () => ({}) as GarminDetail,
       ),
+      api<{ punkte?: Array<{ lat: number; lon: number }> }>(
+        `/api/integrations/garmin/activities/${encodeURIComponent(id)}/route?max=800`,
+      ).catch(() => ({ punkte: [] })),
     ])
-      .then(([e, ts, det]) => {
+      .then(([e, ts, det, rt]) => {
         if (abgebrochen) return;
         setEinheit(e);
         setDetail(det && Object.keys(det).length ? det : null);
+        const rp = Array.isArray(rt?.punkte) ? rt.punkte : [];
+        setRoute(rp.map((q) => [Number(q.lat), Number(q.lon)] as [number, number]));
         setPunkte(Array.isArray(ts.punkte) ? ts.punkte : []);
         if (!e) setFehler('Diese Einheit wurde nicht gefunden.');
       })
@@ -524,6 +533,52 @@ export default function EinheitPage() {
           <Wert label="Aufstieg" wert={String(Math.round(einheit.total_elevation_gain))} einheit="m" />
         )}
       </div>
+
+      {/*
+        * Route: die tatsächlich gelaufene/gefahrene Strecke aus den GPS-Punkten.
+        * Nur bei Einheiten mit GPS — im Studio gibt es keine Punkte, dann bleibt
+        * der Block weg. Start und Ende sind als Punkte markiert.
+        */}
+      {route.length >= 2 && (() => {
+        const lats = route.map((r) => r[0]);
+        const lons = route.map((r) => r[1]);
+        const mitte: [number, number] = [
+          (Math.min(...lats) + Math.max(...lats)) / 2,
+          (Math.min(...lons) + Math.max(...lons)) / 2,
+        ];
+        const start = route[0];
+        const ende = route[route.length - 1];
+        return (
+          <section className="overflow-hidden rounded-2xl border border-[var(--border-muted)] bg-[var(--card-bg)]">
+            <div className="flex items-center justify-between gap-2 px-4 pt-4">
+              <p className="flex items-center gap-1.5 text-[12px] font-semibold">
+                <MapPin className="h-3.5 w-3.5 text-[var(--simple-accent)]" /> Route
+              </p>
+              <span className="text-[10.5px] text-[var(--text-muted)]">{route.length} Punkte</span>
+            </div>
+            <div className="mt-2 h-[260px] w-full">
+              <MapContainer
+                center={mitte}
+                zoom={14}
+                scrollWheelZoom={false}
+                style={{ height: '100%', width: '100%' }}
+                attributionControl={false}
+              >
+                <TileLayer
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  attribution="© OpenStreetMap"
+                />
+                <Polyline positions={route} pathOptions={{ color: '#3f9c6d', weight: 3 }} />
+                <CircleMarker center={start} radius={5} pathOptions={{ color: '#3f9c6d', fillColor: '#3f9c6d', fillOpacity: 1 }} />
+                <CircleMarker center={ende} radius={5} pathOptions={{ color: '#dc5a4a', fillColor: '#dc5a4a', fillOpacity: 1 }} />
+              </MapContainer>
+            </div>
+            <p className="px-4 py-2 text-[10px] text-[var(--text-muted)]">
+              Grün = Start, rot = Ende. Karte © OpenStreetMap.
+            </p>
+          </section>
+        );
+      })()}
 
       {/* Zusatz-Auswertung von Garmin: Zonen, Effekt, Leistung, Runden */}
       {detail && (() => {
