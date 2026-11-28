@@ -60,8 +60,15 @@ export default function BilanzChart({
   bilanz,
   heute,
   hoechstens = 14,
+  teile,
 }: {
   bilanz: BilanzTag[];
+  /**
+   * Aktiv und passiv je Tag (aus Garmin), ymd -> { aktiv, passiv }.
+   * Ohne diese Aufschlüsselung stand bei „Verbraucht" nur die Gesamtzahl; Tim
+   * will sehen, wie sie sich zusammensetzt.
+   */
+  teile?: Map<string, { aktiv: number | null; passiv: number | null }>;
   heute: string;
   hoechstens?: number;
 }) {
@@ -310,7 +317,25 @@ export default function BilanzChart({
                 <p className="mt-0.5 text-[15px] font-bold tabular-nums leading-none">
                   {t.verbrannt > 0 ? fmtZahl(t.verbrannt) : '—'}
                 </p>
-                <p className="text-[9px] text-[var(--text-muted)]">kcal</p>
+                {/*
+                  * Aufschlüsselung: passiv (Grundumsatz) + aktiv (Bewegung).
+                  * Beides zusammen ist der Wert darüber — so sieht man, woraus
+                  * sich der Verbrauch zusammensetzt.
+                  */}
+                {(() => {
+                  const teil = teile?.get(t.ymd);
+                  if (!teil || (teil.aktiv == null && teil.passiv == null)) {
+                    return <p className="text-[9px] text-[var(--text-muted)]">kcal</p>;
+                  }
+                  const a = teil.aktiv ?? 0;
+                  const pv = teil.passiv ?? 0;
+                  return (
+                    <p className="text-[9px] leading-tight tabular-nums text-[var(--text-muted)]">
+                      {fmtZahl(pv)} + {fmtZahl(a)}
+                      <span className="block opacity-80">passiv + aktiv</span>
+                    </p>
+                  );
+                })()}
               </div>
               <div>
                 <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--text-muted)]">
@@ -326,7 +351,13 @@ export default function BilanzChart({
             <p className="mt-2.5 text-[10px] leading-relaxed text-[var(--text-muted)]">
               {t.hatDaten ? (
                 <>
-                  {fmtZahl(t.kcal)} gegessen − {fmtZahl(t.verbrannt)} verbraucht ={' '}
+                  {fmtZahl(t.kcal)} gegessen − {fmtZahl(t.verbrannt)} verbraucht
+                  {(() => {
+                    const teil = teile?.get(t.ymd);
+                    if (!teil || (teil.aktiv == null && teil.passiv == null)) return null;
+                    return ` (${fmtZahl(teil.passiv ?? 0)} passiv + ${fmtZahl(teil.aktiv ?? 0)} aktiv)`;
+                  })()}
+                  {' = '}
                   <span className="font-semibold" style={{ color: summe > 0 ? UEBERSCHUSS : DEFIZIT }}>
                     {summe > 0 ? '+' : '−'}
                     {fmtZahl(Math.abs(summe))} kcal

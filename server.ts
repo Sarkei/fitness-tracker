@@ -7814,7 +7814,7 @@ ${JSON.stringify(userCtx, null, 2)}
       res.json({
         verbunden: Boolean(g.login?.tokens || g.apiKey),
         datum: heute,
-        verlauf: verlauf.rows,
+        verlauf,
         gesamt: total,
         aktiv,
         passiv: total != null && aktiv != null ? Math.max(0, total - aktiv) : null,
@@ -7822,9 +7822,9 @@ ${JSON.stringify(userCtx, null, 2)}
         nachgeholt: false,
         standSek: zeile?.stand ?? null,
         schnitt: {
-          gesamt: schnitt.rows[0]?.total ?? null,
-          aktiv: schnitt.rows[0]?.aktiv ?? null,
-          tage: schnitt.rows[0]?.tage ?? 0,
+          gesamt: schnittR.rows[0]?.total ?? null,
+          aktiv: schnittR.rows[0]?.aktiv ?? null,
+          tage: schnittR.rows[0]?.tage ?? 0,
         },
         stand: g.lastAutoSyncAt ?? g.cache?.fetchedAt ?? null,
       });

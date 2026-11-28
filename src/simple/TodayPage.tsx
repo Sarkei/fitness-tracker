@@ -146,12 +146,19 @@ export default function TodayPage() {
         aktiv?: number | null;
         passiv?: number | null;
         schnitt?: { gesamt?: number | null };
-        verlauf?: Array<{ date: string; total: number }>;
+        verlauf?: Array<{ date: string; total: number; aktiv?: number | null; passiv?: number | null }>;
         standSek?: number | null;
       }>('/api/integrations/garmin/heute');
       if (!r.verbunden) return;
       if (Array.isArray(r.verlauf)) {
-        setGarminTage(r.verlauf.map((v) => ({ date: String(v.date), total: Number(v.total) || 0 })));
+        setGarminTage(
+          r.verlauf.map((v) => ({
+            date: String(v.date),
+            total: Number(v.total) || 0,
+            aktiv: v.aktiv != null ? Number(v.aktiv) : null,
+            passiv: v.passiv != null ? Number(v.passiv) : null,
+          })),
+        );
       }
       setGarminHeute({
         gesamt: r.gesamt ?? null,
@@ -268,11 +275,24 @@ export default function TodayPage() {
    * Verbrauch je Tag aus der Garmin-Historie — damit auch die Balken der
    * Kalorienbilanz den echten Verbrauch zeigen und dynamisch ausschlagen.
    */
-  const [garminTage, setGarminTage] = useState<Array<{ date: string; total: number }>>([]);
+  const [garminTage, setGarminTage] = useState<
+    Array<{ date: string; total: number; aktiv: number | null; passiv: number | null }>
+  >([]);
   const garminBilanzMap = useMemo(() => {
     const m = new Map<string, number>();
     for (const t of garminTage) {
       if (t.total > 0) m.set(t.date.slice(0, 10), t.total);
+    }
+    return m;
+  }, [garminTage]);
+  /**
+   * Aktiv und passiv je Tag — für die Aufschlüsselung „Verbraucht".
+   * Passiv ist der Grundumsatz, aktiv alles, was Bewegung dazubringt.
+   */
+  const garminTeileMap = useMemo(() => {
+    const m = new Map<string, { aktiv: number | null; passiv: number | null }>();
+    for (const t of garminTage) {
+      m.set(t.date.slice(0, 10), { aktiv: t.aktiv, passiv: t.passiv });
     }
     return m;
   }, [garminTage]);
@@ -569,7 +589,7 @@ export default function TodayPage() {
           Kalorienbilanz
         </SectionTitle>
 
-        <BilanzChart bilanz={bilanz} heute={date} />
+        <BilanzChart bilanz={bilanz} heute={date} teile={garminTeileMap} />
 
         {hatBilanz && (
           <div className="mt-2 flex flex-wrap items-center justify-end gap-2 text-[10px] text-[var(--text-muted)]">
