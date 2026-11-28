@@ -160,6 +160,12 @@ export default function TrainingPage() {
     Array<{ id: string; name: string; art: 'coach' | 'manuell'; info?: string }>
   >([]);
   const [aktiverPlanId, setAktiverPlanId] = useState<string | null>(null);
+  /**
+   * Verlauf: erst 10 Einträge, auf Wunsch alle.
+   * Tim will jede Einheit öffnen können — früher verwies der Link auf die
+   * Statistik, wo man keine Details sieht.
+   */
+  const [verlaufAlle, setVerlaufAlle] = useState(false);
 
   /*
    * „Neuer Plan" führt jetzt in die manuelle Planung (/plan). Wer den Plan lieber
@@ -949,41 +955,76 @@ export default function TrainingPage() {
             />
           ) : (
             <ul className="divide-y divide-[var(--border-muted)]">
-              {workouts.slice(0, 10).map((workout) => {
+              {(verlaufAlle ? workouts : workouts.slice(0, 10)).map((workout) => {
                 const uebungen = Array.isArray(workout.exercises) ? workout.exercises.length : 0;
+                const istGarmin = workout.source === 'garmin';
+                const minuten = Math.round(dauerMinuten(workout));
                 return (
                   <li key={workout.id} className="flex items-center justify-between gap-3 py-2.5">
                     <button
                       type="button"
-                      onClick={() => setTagOffen(String(workout.date).slice(0, 10))}
-                      className="min-w-0 flex-1 text-left transition hover:opacity-80"
+                      /*
+                       * Uhr-Einheiten öffnen die volle Detailseite (/einheit/<id>):
+                       * dort stehen Route, Zonen, Trainings-Effekt, Leistung und die
+                       * Diagramme. eigene Workouts haben diese Werte nicht — für sie
+                       * bleibt das Tagesdetail mit Übungen und Sätzen.
+                       */
+                      onClick={() =>
+                        istGarmin
+                          ? navigate(`/einheit/${encodeURIComponent(workout.id)}`)
+                          : setTagOffen(String(workout.date).slice(0, 10))
+                      }
+                      className="flex min-w-0 flex-1 items-center gap-2 text-left transition hover:opacity-80"
                     >
-                      {/* Zweizeilig statt abgeschnitten: Trainingsnamen wie
-                          „Stephanskirchen - Coach: Mittag" sind sonst unlesbar. */}
-                      <p className="line-clamp-2 text-sm font-medium leading-snug">{workout.name}</p>
-                      <p className="text-[11px] text-[var(--text-muted)]">
-                        {formatDay(toYmd(workout.date))} · {workout.duration} min
-                        {uebungen ? ` · ${uebungen} Übungen` : ''}
-                      </p>
+                      <span className="min-w-0 flex-1">
+                        {/* Zweizeilig statt abgeschnitten: Trainingsnamen wie
+                            „Stephanskirchen - Coach: Mittag" sind sonst unlesbar. */}
+                        <p className="line-clamp-2 text-sm font-medium leading-snug">{workout.name}</p>
+                        <p className="text-[11px] text-[var(--text-muted)]">
+                          {formatDay(toYmd(workout.date))}
+                          {minuten > 0 ? ` · ${minuten} min` : ''}
+                          {uebungen ? ` · ${uebungen} Übungen` : ''}
+                          {istGarmin ? ' · von der Uhr' : ''}
+                        </p>
+                      </span>
+                      <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
                     </button>
                     <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
                       {dayLabelShort(toYmd(workout.date))}
                     </span>
-                    <button
-                      className="rounded-lg p-1.5 text-[var(--text-muted)] transition hover:text-[var(--simple-clay)]"
-                      onClick={() => void remove(workout.id)}
-                      aria-label="Löschen"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    {/* Uhr-Einheiten lassen sich nicht in der App löschen — sie gehören Garmin. */}
+                    {!istGarmin && (
+                      <button
+                        className="rounded-lg p-1.5 text-[var(--text-muted)] transition hover:text-[var(--simple-clay)]"
+                        onClick={() => void remove(workout.id)}
+                        aria-label="Löschen"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </li>
                 );
               })}
-              {workouts.length > 10 && (
+              {workouts.length > 10 && !verlaufAlle && (
                 <li className="pt-2 text-center">
-                  <Link to="/stats" className="text-[11.5px] font-semibold text-[var(--simple-accent)]">
-                    Alle {workouts.length} Einheiten in der Statistik
-                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setVerlaufAlle(true)}
+                    className="text-[11.5px] font-semibold text-[var(--simple-accent)]"
+                  >
+                    Alle {workouts.length} Einheiten anzeigen
+                  </button>
+                </li>
+              )}
+              {verlaufAlle && workouts.length > 10 && (
+                <li className="pt-2 text-center">
+                  <button
+                    type="button"
+                    onClick={() => setVerlaufAlle(false)}
+                    className="text-[11.5px] font-semibold text-[var(--text-muted)]"
+                  >
+                    Weniger anzeigen
+                  </button>
                 </li>
               )}
             </ul>
