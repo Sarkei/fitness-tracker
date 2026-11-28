@@ -301,17 +301,19 @@ export default function TodayPage() {
 
   const trainingToday = workouts.find((w) => toYmd(w.date) === date) ?? null;
   /**
-   * Heutige Einheit von der Uhr — auch wenn sie nicht als Workout erfasst ist.
-   * Sie ersetzt die frühere Liste „Einheiten von der Uhr" auf der Startseite:
-   * Tim will die heutige Einheit sehen, nicht die letzten fünf.
+   * Heutige Einheit von der Uhr.
+   *
+   * `/api/workouts` liefert Aktivitäten der Uhr bereits mit (`source: 'garmin'`)
+   * — deshalb steht die heutige Einheit schon in `trainingToday`. Die separate
+   * Liste `einheiten` wird für die Karte nur als Rückfallebene gebraucht, falls
+   * die Zusammenführung mal ausfällt.
    */
-  const uhrHeute = useMemo(
-    () =>
-      einheiten.find(
-        (e) => String(e.date ?? e.start_date_local ?? '').slice(0, 10) === date,
-      ) ?? null,
-    [einheiten, date],
-  );
+  const uhrHeute = useMemo(() => {
+    if (trainingToday && trainingToday.source === 'garmin') return null;
+    return (
+      einheiten.find((e) => String(e.date ?? e.start_date_local ?? '').slice(0, 10) === date) ?? null
+    );
+  }, [einheiten, date, trainingToday]);
 
   /*
    * Der Wochenplan (Seite /plan) gehört auf die Startseite: Man plant am
@@ -654,26 +656,48 @@ function TrainingHeuteKarte({
   onErfassen: () => void;
   onOeffnen: (ziel: string) => void;
 }) {
-  /** Kennzahlen der Uhr-Einheit, soweit vorhanden. */
+  /**
+   * Kennzahlen der heutigen Einheit.
+   *
+   * Zwei Quellen, gleiche Anzeige:
+   *  - Einheit von der Uhr: steckt in `trainingToday` (source 'garmin') mit
+   *    `distance_km`, `duration_min`, `avg_hr`, `calories`
+   *  - reine Garmin-Aktivität: kommt als `uhrEinheit` mit Sekunden und Metern
+   */
   const kennzahlen = (() => {
-    if (!uhrEinheit) return [];
-    const distanz = uhrEinheit.distance != null ? Number(uhrEinheit.distance) / 1000 : null;
-    const sek =
-      uhrEinheit.moving_time != null
-        ? Number(uhrEinheit.moving_time)
-        : uhrEinheit.elapsed_time != null
-          ? Number(uhrEinheit.elapsed_time)
-          : null;
-    const minuten = sek != null && sek > 0 ? Math.round(sek / 60) : null;
+    const quelleUhr = uhrEinheit;
+    const istGarmin = trainingToday?.source === 'garmin';
+
+    let distanz: number | null = null;
+    let minuten: number | null = null;
+    let puls: number | null = null;
+    let kcal: number | null = null;
+
+    if (istGarmin) {
+      distanz = trainingToday!.distance_km != null ? Number(trainingToday!.distance_km) : null;
+      minuten = trainingToday!.duration_min != null ? Number(trainingToday!.duration_min) : null;
+      puls = trainingToday!.avg_hr != null ? Number(trainingToday!.avg_hr) : null;
+      kcal = trainingToday!.calories != null ? Number(trainingToday!.calories) : null;
+    } else if (quelleUhr) {
+      distanz = quelleUhr.distance != null ? Number(quelleUhr.distance) / 1000 : null;
+      const sek =
+        quelleUhr.moving_time != null
+          ? Number(quelleUhr.moving_time)
+          : quelleUhr.elapsed_time != null
+            ? Number(quelleUhr.elapsed_time)
+            : null;
+      minuten = sek != null && sek > 0 ? Math.round(sek / 60) : null;
+      puls = quelleUhr.avg_hr != null ? Number(quelleUhr.avg_hr) : null;
+      kcal = quelleUhr.calories != null ? Number(quelleUhr.calories) : null;
+    } else {
+      return [];
+    }
+
     const zeilen: Array<{ label: string; wert: string }> = [];
     if (distanz != null && distanz > 0) zeilen.push({ label: 'Distanz', wert: `${distanz.toFixed(2)} km` });
-    if (minuten != null) zeilen.push({ label: 'Dauer', wert: `${minuten} min` });
-    if (uhrEinheit.avg_hr != null) {
-      zeilen.push({ label: 'Ø Puls', wert: `${Math.round(Number(uhrEinheit.avg_hr))} bpm` });
-    }
-    if (uhrEinheit.calories != null) {
-      zeilen.push({ label: 'Kalorien', wert: `${Math.round(Number(uhrEinheit.calories))} kcal` });
-    }
+    if (minuten != null && minuten > 0) zeilen.push({ label: 'Dauer', wert: `${Math.round(minuten)} min` });
+    if (puls != null) zeilen.push({ label: 'Ø Puls', wert: `${Math.round(puls)} bpm` });
+    if (kcal != null) zeilen.push({ label: 'Kalorien', wert: `${Math.round(kcal)} kcal` });
     if (distanz != null && distanz > 0 && minuten != null && minuten > 0) {
       const pace = (minuten * 60) / distanz;
       zeilen.push({
@@ -703,9 +727,17 @@ function TrainingHeuteKarte({
             ? 'Erholung ist Teil des Plans.'
             : 'Training kannst du trotzdem erfassen.';
 
-  /* Wohin der Klick führt. */
-  const ziel =
-    uhrEinheit && !trainingToday
+  /*
+   * Wohin der Klick führt.
+   *
+   * Eine Einheit von der Uhr hat ihre eigenen Kennzahlen und Diagramme — die
+   * stehen auf /einheit/<id>. Für sie wäre /training die falsche Seite: dort
+   * gäbe es Übungen, die es bei einer Radfahrt nicht gibt.
+   */
+  const garminId = trainingToday?.source === 'garmin' ? trainingToday.id : null;
+  const ziel = garminId
+    ? `/einheit/${encodeURIComponent(garminId)}`
+    : uhrEinheit
       ? `/einheit/${encodeURIComponent(String(uhrEinheit.id ?? ''))}`
       : trainingToday
         ? '/training'
