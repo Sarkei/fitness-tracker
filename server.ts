@@ -7733,6 +7733,40 @@ ${JSON.stringify(userCtx, null, 2)}
        * Profilziel. Jetzt geht der gespeicherte Wert sofort raus, das
        * Nachholen passiert danach.
        */
+      /*
+       * Verlauf und Schnitt EINMAL laden, bevor geantwortet wird.
+       *
+       * Vorher hingen beide nur am Zweig „frisch genug". War der gespeicherte
+       * Stand älter als zwei Minuten — der Normalfall —, antwortete der Server
+       * ohne `verlauf`. Die Kalorienbilanz bekam damit für keinen Tag einen
+       * Verbrauch und zeigte überall 0 kcal.
+       */
+      const [schnittR, verlaufR] = await Promise.all([
+        pool.query(
+          `SELECT AVG(total_kcal)::int AS total, AVG(active_kcal)::int AS aktiv, COUNT(*)::int AS tage
+             FROM garmin_days
+            WHERE user_id = $1 AND date < $2 AND total_kcal IS NOT NULL AND total_kcal > 0`,
+          [req.userId!, heute],
+        ),
+        pool.query(
+          `SELECT date::text AS date,
+                  total_kcal::int AS total,
+                  active_kcal::int AS aktiv,
+                  GREATEST(0, COALESCE(total_kcal, 0) - COALESCE(active_kcal, 0))::int AS passiv
+             FROM garmin_days
+            WHERE user_id = $1 AND date >= ($2::date - INTERVAL '29 days')
+              AND date <= $2::date AND total_kcal IS NOT NULL AND total_kcal > 0
+            ORDER BY date`,
+          [req.userId!, heute],
+        ),
+      ]);
+      const verlauf = verlaufR.rows.map((v) => ({
+        date: String(v.date),
+        total: Number(v.total) || 0,
+        aktiv: v.aktiv != null ? Number(v.aktiv) : null,
+        passiv: v.passiv != null ? Number(v.passiv) : null,
+      }));
+
       const antwortSenden = (nachgeholt: boolean) => {
         res.json({
           verbunden: Boolean(g.login?.tokens || g.apiKey),
@@ -7745,6 +7779,9 @@ ${JSON.stringify(userCtx, null, 2)}
           nachgeholt,
           /** Zeitpunkt des gespeicherten Werts (Unix-Sekunden) — für „vor X Min". */
           standSek: zeile?.stand ?? null,
+          /** Verbrauch je Tag (Gesamt, aktiv, passiv) — Grundlage der Bilanz. */
+          verlauf,
+          schnitt: schnittR.rows[0] ?? null,
         });
       };
 
@@ -7773,24 +7810,7 @@ ${JSON.stringify(userCtx, null, 2)}
         return;
       }
 
-      /* Frisch genug: Bilanzverlauf und Schnitt mitgeben, dann antworten. */
-      const [schnitt, verlauf] = await Promise.all([
-        pool.query(
-          `SELECT AVG(total_kcal)::int AS total, AVG(active_kcal)::int AS aktiv, COUNT(*)::int AS tage
-             FROM garmin_days
-            WHERE user_id = $1 AND date < $2 AND total_kcal IS NOT NULL AND total_kcal > 0`,
-          [req.userId!, heute],
-        ),
-        pool.query(
-          `SELECT date::text AS date, total_kcal::int AS total
-             FROM garmin_days
-            WHERE user_id = $1 AND date >= ($2::date - INTERVAL '13 days')
-              AND date <= $2::date AND total_kcal IS NOT NULL AND total_kcal > 0
-            ORDER BY date`,
-          [req.userId!, heute],
-        ),
-      ]);
-
+      /* Frisch genug: direkt antworten — Verlauf und Schnitt sind schon geladen. */
       res.json({
         verbunden: Boolean(g.login?.tokens || g.apiKey),
         datum: heute,
